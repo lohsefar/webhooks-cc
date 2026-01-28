@@ -1,0 +1,23 @@
+version: "3.8"
+
+services:
+  web:
+    build:
+      context: .
+      dockerfile: apps/web/Dockerfile
+    ports:
+      - "3000:3000"
+    environment:
+      - NEXT_PUBLIC_CONVEX_URL=${NEXT_PUBLIC_CONVEX_URL}
+      - CONVEX_DEPLOYMENT=${CONVEX_DEPLOYMENT}
+    restart: unless-stopped
+
+  receiver:
+    build:
+      context: .
+      dockerfile: apps/receiver/Dockerfile
+    ports:
+      - "3001:3001"
+    environment:
+      - CONVEX_URL=${CONVEX_URL}
+    restart: unless-stopped

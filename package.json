@@ -1,0 +1,25 @@
+{
+  "name": "webhooks-cc",
+  "private": true,
+  "scripts": {
+    "dev": "turbo dev",
+    "dev:web": "turbo dev --filter=web",
+    "dev:convex": "convex dev",
+    "build": "turbo build",
+    "lint": "turbo lint",
+    "test": "turbo test",
+    "typecheck": "turbo typecheck",
+    "receiver": "cd apps/receiver && go run .",
+    "cli": "cd apps/cli && go run ./cmd/whk"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.0",
+    "convex": "^1.17.0",
+    "turbo": "^2.3.0",
+    "typescript": "^5.7.0"
+  },
+  "packageManager": "pnpm@9.15.0",
+  "engines": {
+    "node": ">=20"
+  }
+}

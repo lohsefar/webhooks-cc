@@ -1,0 +1,25 @@
+{
+  "name": "@webhooks-cc/sdk",
+  "version": "0.1.0",
+  "description": "Official SDK for webhooks.cc",
+  "main": "dist/index.js",
+  "module": "dist/index.mjs",
+  "types": "dist/index.d.ts",
+  "files": ["dist"],
+  "scripts": {
+    "build": "tsup src/index.ts --format cjs,esm --dts",
+    "dev": "tsup src/index.ts --format cjs,esm --dts --watch",
+    "lint": "eslint src/",
+    "typecheck": "tsc --noEmit"
+  },
+  "keywords": ["webhook", "testing", "api", "sdk"],
+  "author": "",
+  "license": "MIT",
+  "devDependencies": {
+    "tsup": "^8.3.5",
+    "typescript": "^5.7.0"
+  },
+  "peerDependencies": {
+    "convex": "^1.17.0"
+  }
+}
