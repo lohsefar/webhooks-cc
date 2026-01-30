@@ -1,0 +1,121 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  typecheck:
+    name: TypeScript Typecheck
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 9
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "pnpm"
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Run typecheck
+        run: pnpm typecheck
+
+  build-web:
+    name: Build Web App
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 9
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "pnpm"
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build
+        run: pnpm build
+        env:
+          NEXT_PUBLIC_CONVEX_URL: https://placeholder.convex.cloud
+          NEXT_PUBLIC_WEBHOOK_URL: https://placeholder.example.com
+          NEXT_PUBLIC_APP_URL: https://placeholder.example.com
+
+  build-go:
+    name: Build Go
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        component: [cli, receiver]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: "1.21"
+          cache-dependency-path: apps/${{ matrix.component }}/go.sum
+
+      - name: Build ${{ matrix.component }}
+        run: go build ./...
+        working-directory: apps/${{ matrix.component }}
+
+  test-go:
+    name: Test Go
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        component: [cli, receiver]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: "1.21"
+          cache-dependency-path: apps/${{ matrix.component }}/go.sum
+
+      - name: Run tests
+        run: go test -v -race ./...
+        working-directory: apps/${{ matrix.component }}
+
+  lint-go:
+    name: Lint Go
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        component: [cli, receiver]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: "1.21"
+          cache-dependency-path: apps/${{ matrix.component }}/go.sum
+
+      - name: Run golangci-lint
+        uses: golangci/golangci-lint-action@v6
+        with:
+          version: latest
+          working-directory: apps/${{ matrix.component }}
