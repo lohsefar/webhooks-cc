@@ -19,87 +19,23 @@ interface ReplayDialogProps {
 }
 
 /**
- * Validates that a URL is safe to send requests to.
- * Blocks internal IPs, localhost, and cloud metadata endpoints to prevent SSRF.
+ * Validates that a URL has a valid format for replaying requests.
+ *
+ * SECURITY NOTE: This is a client-side feature that runs entirely in the user's browser.
+ * The fetch request is made from the user's browser, not from our servers. This means:
+ * - There is no server-side SSRF risk
+ * - The user can only access URLs their browser can reach
+ * - Localhost/private IPs are intentionally allowed for local development testing
+ *
+ * We only validate protocol to prevent javascript: or data: URL attacks.
  */
 function isValidTargetUrl(url: string): { valid: boolean; error?: string } {
   try {
     const parsed = new URL(url);
 
-    // Only allow http/https protocols
+    // Only allow http/https protocols to prevent javascript:/data: attacks
     if (parsed.protocol !== "http:" && parsed.protocol !== "https:") {
       return { valid: false, error: "Only http:// and https:// URLs are allowed" };
-    }
-
-    const hostname = parsed.hostname.toLowerCase();
-
-    // Block localhost variants (including subdomains containing localhost)
-    if (
-      hostname === "localhost" ||
-      hostname === "127.0.0.1" ||
-      hostname === "::1" ||
-      hostname === "[::1]" ||
-      hostname.endsWith(".localhost") ||
-      hostname.includes("localhost.")
-    ) {
-      return { valid: false, error: "localhost URLs are not allowed" };
-    }
-
-    // Block cloud metadata endpoints (AWS, GCP, Azure, and others)
-    if (
-      hostname === "169.254.169.254" ||
-      hostname === "metadata.google.internal" ||
-      hostname === "metadata.internal" ||
-      hostname === "100.100.100.200" // Alibaba Cloud
-    ) {
-      return { valid: false, error: "Cloud metadata endpoints are not allowed" };
-    }
-
-    // Block IPv6 private/local addresses
-    // Link-local (fe80::), unique local (fc00::/7), loopback (::1)
-    const ipv6Hostname = hostname.replace(/^\[|\]$/g, ""); // Remove brackets if present
-    if (
-      ipv6Hostname.startsWith("fe80:") ||
-      ipv6Hostname.startsWith("fc") ||
-      ipv6Hostname.startsWith("fd") ||
-      ipv6Hostname === "::1"
-    ) {
-      return { valid: false, error: "Private IPv6 addresses are not allowed" };
-    }
-
-    // Block IPv4-mapped IPv6 addresses (::ffff:x.x.x.x) to prevent SSRF bypass
-    if (ipv6Hostname.toLowerCase().startsWith("::ffff:")) {
-      return { valid: false, error: "IPv4-mapped IPv6 addresses are not allowed" };
-    }
-
-    // Block private IP ranges (IPv4)
-    const ipv4Match = hostname.match(/^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/);
-    if (ipv4Match) {
-      const [, a, b] = ipv4Match.map(Number);
-      // 10.0.0.0/8
-      if (a === 10) {
-        return { valid: false, error: "Private IP addresses are not allowed" };
-      }
-      // 172.16.0.0/12
-      if (a === 172 && b >= 16 && b <= 31) {
-        return { valid: false, error: "Private IP addresses are not allowed" };
-      }
-      // 192.168.0.0/16
-      if (a === 192 && b === 168) {
-        return { valid: false, error: "Private IP addresses are not allowed" };
-      }
-      // 169.254.0.0/16 (link-local)
-      if (a === 169 && b === 254) {
-        return { valid: false, error: "Link-local addresses are not allowed" };
-      }
-      // 127.0.0.0/8 (loopback)
-      if (a === 127) {
-        return { valid: false, error: "Loopback addresses are not allowed" };
-      }
-      // 0.0.0.0/8
-      if (a === 0) {
-        return { valid: false, error: "Invalid IP address" };
-      }
     }
 
     return { valid: true };
@@ -173,7 +109,10 @@ export function ReplayDialog({ method, headers, body }: ReplayDialogProps) {
       <DialogContent className="border-2 border-foreground shadow-neo">
         <DialogHeader>
           <DialogTitle className="font-bold uppercase tracking-wide">Replay Request</DialogTitle>
-          <DialogDescription>Send this captured request to another URL.</DialogDescription>
+          <DialogDescription>
+            Send this captured request to another URL. Requests are made from your browser,
+            so localhost URLs work for local development testing.
+          </DialogDescription>
         </DialogHeader>
 
         <div className="space-y-4">

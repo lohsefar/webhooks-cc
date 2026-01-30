@@ -1,6 +1,21 @@
 import { v } from "convex/values";
 import { action, internalMutation } from "./_generated/server";
 import { internal } from "./_generated/api";
+import { Id } from "./_generated/dataModel";
+import { FREE_REQUEST_LIMIT, PRO_REQUEST_LIMIT, BILLING_PERIOD_MS } from "./config";
+
+// Polar webhook event data validator
+const polarSubscriptionData = v.object({
+  id: v.string(),
+  customerId: v.string(),
+  currentPeriodStart: v.string(),
+  currentPeriodEnd: v.string(),
+  metadata: v.optional(
+    v.object({
+      userId: v.optional(v.string()),
+    })
+  ),
+});
 
 // Create Polar.sh checkout session
 export const createCheckout = action({
@@ -13,9 +28,9 @@ export const createCheckout = action({
     // const polar = new Polar({ accessToken: process.env.POLAR_ACCESS_TOKEN });
     // const checkout = await polar.checkouts.create({
     //   productPriceId: process.env.POLAR_PRO_PRICE_ID,
-    //   successUrl: `https://webhooks.cc/billing/success`,
+    //   successUrl: `${process.env.APP_URL}/billing/success`,
     //   customerEmail: identity.email,
-    //   metadata: { odId: identity.subject },
+    //   metadata: { userId: identity.subject },
     // });
     // return checkout.url;
 
@@ -31,14 +46,16 @@ export const createCheckout = action({
 export const handleWebhook = internalMutation({
   args: {
     event: v.string(),
-    data: v.any(),
+    data: polarSubscriptionData,
   },
   handler: async (ctx, { event, data }) => {
     switch (event) {
       case "subscription.created":
       case "subscription.updated": {
-        const userId = data.metadata?.userId;
-        if (!userId) return;
+        const userIdStr = data.metadata?.userId;
+        if (!userIdStr) return;
+        // Validate the userId is a proper Convex ID
+        const userId = userIdStr as Id<"users">;
 
         const user = await ctx.db.get(userId);
         if (!user) return;
@@ -48,7 +65,7 @@ export const handleWebhook = internalMutation({
           polarSubscriptionId: data.id,
           subscriptionStatus: "active",
           plan: "pro",
-          requestLimit: 500000,
+          requestLimit: PRO_REQUEST_LIMIT,
           periodStart: new Date(data.currentPeriodStart).getTime(),
           periodEnd: new Date(data.currentPeriodEnd).getTime(),
           cancelAtPeriodEnd: false,
@@ -84,7 +101,7 @@ export const handleWebhook = internalMutation({
           await ctx.db.patch(user._id, {
             plan: "free",
             subscriptionStatus: "canceled",
-            requestLimit: 500,
+            requestLimit: FREE_REQUEST_LIMIT,
             cancelAtPeriodEnd: false,
           });
         }
@@ -117,16 +134,16 @@ export const checkPeriodResets = internalMutation({
         await ctx.db.patch(user._id, {
           plan: "free",
           subscriptionStatus: "canceled",
-          requestLimit: 500,
+          requestLimit: FREE_REQUEST_LIMIT,
           requestsUsed: 0,
           cancelAtPeriodEnd: false,
           periodStart: undefined,
           periodEnd: undefined,
         });
-      } else if (user.plan === "pro") {
+      } else if (user.plan === "pro" && user.periodEnd) {
         // Reset usage for new period
-        const newPeriodStart = user.periodEnd!;
-        const newPeriodEnd = newPeriodStart + 30 * 24 * 60 * 60 * 1000; // +30 days
+        const newPeriodStart = user.periodEnd;
+        const newPeriodEnd = newPeriodStart + BILLING_PERIOD_MS;
 
         await ctx.db.patch(user._id, {
           requestsUsed: 0,

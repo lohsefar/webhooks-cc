@@ -5,10 +5,26 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 	"time"
 
 	"webhooks.cc/shared/types"
 )
+
+// maxResponseBodySize limits the response body to prevent memory exhaustion
+const maxResponseBodySize = 100 * 1024 * 1024 // 100MB
+
+// sensitiveHeaders that should not be forwarded to local services
+// These headers from captured webhooks could expose credentials or cause security issues
+var sensitiveHeaders = map[string]bool{
+	"Authorization":       true,
+	"Cookie":              true,
+	"Set-Cookie":          true,
+	"X-Api-Key":           true,
+	"Proxy-Authorization": true,
+	"X-Auth-Token":        true,
+	"X-Access-Token":      true,
+}
 
 type Tunnel struct {
 	endpointSlug string
@@ -30,8 +46,18 @@ func New(endpointSlug, targetURL string) *Tunnel {
 func (t *Tunnel) Forward(req *types.CapturedRequest) (*ForwardResult, error) {
 	start := time.Now()
 
-	// Build the target URL
-	targetURL := t.targetURL + req.Path
+	// Parse the base target URL
+	base, err := url.Parse(t.targetURL)
+	if err != nil {
+		return nil, fmt.Errorf("invalid target URL: %w", err)
+	}
+
+	// Safely join the path to prevent path traversal attacks
+	// url.JoinPath properly handles ".." and other malicious path segments
+	targetURL, err := url.JoinPath(base.String(), req.Path)
+	if err != nil {
+		return nil, fmt.Errorf("invalid request path: %w", err)
+	}
 
 	// Create the forwarded request
 	httpReq, err := http.NewRequest(req.Method, targetURL, bytes.NewBufferString(req.Body))
@@ -39,9 +65,11 @@ func (t *Tunnel) Forward(req *types.CapturedRequest) (*ForwardResult, error) {
 		return nil, fmt.Errorf("failed to create request: %w", err)
 	}
 
-	// Copy headers (except Host)
+	// Copy headers (except Host and sensitive security headers)
+	// We filter sensitive headers to prevent forwarding credentials from
+	// captured webhooks to the local target service
 	for key, value := range req.Headers {
-		if key != "Host" {
+		if key != "Host" && !sensitiveHeaders[key] {
 			httpReq.Header.Set(key, value)
 		}
 	}
@@ -57,7 +85,14 @@ func (t *Tunnel) Forward(req *types.CapturedRequest) (*ForwardResult, error) {
 	}
 	defer resp.Body.Close()
 
-	body, _ := io.ReadAll(resp.Body)
+	body, err := io.ReadAll(io.LimitReader(resp.Body, maxResponseBodySize))
+	if err != nil {
+		return &ForwardResult{
+			Success:  false,
+			Error:    fmt.Sprintf("failed to read response: %v", err),
+			Duration: time.Since(start),
+		}, nil
+	}
 
 	return &ForwardResult{
 		Success:    true,

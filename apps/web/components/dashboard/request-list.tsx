@@ -2,6 +2,7 @@
 
 import { cn } from "@/lib/utils";
 import { Circle, ArrowUpDown } from "lucide-react";
+import { getMethodColor, formatRelativeTime } from "@/types/request";
 
 interface Request {
   _id: string;
@@ -26,28 +27,6 @@ interface RequestListProps {
   onToggleSort: () => void;
   newCount?: number;
   onJumpToNew?: () => void;
-}
-
-const METHOD_COLORS: Record<string, string> = {
-  GET: "bg-primary text-primary-foreground",
-  POST: "bg-secondary text-secondary-foreground",
-  PUT: "bg-accent text-accent-foreground",
-  DELETE: "bg-destructive text-destructive-foreground",
-  PATCH: "bg-accent text-accent-foreground",
-  HEAD: "bg-muted text-muted-foreground",
-  OPTIONS: "bg-muted text-muted-foreground",
-};
-
-function formatRelativeTime(timestamp: number): string {
-  const diff = Date.now() - timestamp;
-  const seconds = Math.floor(diff / 1000);
-  if (seconds < 5) return "just now";
-  if (seconds < 60) return `${seconds}s ago`;
-  const minutes = Math.floor(seconds / 60);
-  if (minutes < 60) return `${minutes}m ago`;
-  const hours = Math.floor(minutes / 60);
-  if (hours < 24) return `${hours}h ago`;
-  return new Date(timestamp).toLocaleDateString();
 }
 
 export function RequestList({
@@ -125,7 +104,7 @@ export function RequestList({
             <span
               className={cn(
                 "px-1.5 py-0.5 text-[10px] font-mono font-bold border-2 border-foreground shrink-0 w-14 text-center",
-                METHOD_COLORS[request.method] || "bg-muted"
+                getMethodColor(request.method)
               )}
             >
               {request.method}

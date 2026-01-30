@@ -44,7 +44,7 @@ export default function Home() {
               <code>
                 <span className="text-muted-foreground"># Create an endpoint and start capturing webhooks</span>
                 {"\n"}
-                <span className="text-primary">$</span> curl -X POST https://webhooks.cc/w/abc123 \{"\n"}
+                <span className="text-primary">$</span> curl -X POST https://your-receiver.example.com/w/abc123 \{"\n"}
                 {"  "}-H <span className="text-secondary">&quot;Content-Type: application/json&quot;</span> \{"\n"}
                 {"  "}-d <span className="text-secondary">&apos;{`{"event": "payment.success", "amount": 4999}`}&apos;</span>
               </code>

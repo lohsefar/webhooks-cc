@@ -1,3 +1,6 @@
+// Package api provides a client for interacting with the webhooks.cc API.
+// It handles authentication, request signing, and response parsing for
+// endpoint management operations.
 package api
 
 import (
@@ -6,21 +9,51 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
+	"os"
+	"strings"
+	"time"
 
 	"webhooks.cc/cli/internal/auth"
 )
 
-const defaultBaseURL = "https://webhooks.cc"
+const (
+	defaultBaseURL         = "https://webhooks.cc"
+	httpTimeout            = 30 * time.Second
+	maxErrorResponseSize   = 1024 * 1024  // 1MB for error responses
+	maxSuccessResponseSize = 10 * 1024 * 1024 // 10MB for success responses
+)
 
+// Client provides methods to interact with the webhooks.cc API.
+// Create a new Client using NewClient().
 type Client struct {
 	baseURL    string
 	httpClient *http.Client
 }
 
+// NewClient creates a new API client. By default it connects to
+// https://webhooks.cc, but this can be overridden by setting the
+// WHK_API_URL environment variable for self-hosted deployments.
 func NewClient() *Client {
+	baseURL := os.Getenv("WHK_API_URL")
+	if baseURL == "" {
+		baseURL = defaultBaseURL
+	}
+
+	// Strip trailing slash to prevent double slashes in URLs
+	baseURL = strings.TrimSuffix(baseURL, "/")
+
+	// Validate URL format early to provide clear error messages
+	if _, err := url.Parse(baseURL); err != nil {
+		// Fall back to default if WHK_API_URL is malformed
+		baseURL = defaultBaseURL
+	}
+
 	return &Client{
-		baseURL:    defaultBaseURL,
-		httpClient: &http.Client{},
+		baseURL: baseURL,
+		httpClient: &http.Client{
+			Timeout: httpTimeout,
+		},
 	}
 }
 
@@ -62,12 +95,16 @@ func (c *Client) request(method, path string, body interface{}, result interface
 	defer resp.Body.Close()
 
 	if resp.StatusCode >= 400 {
-		body, _ := io.ReadAll(resp.Body)
+		body, err := io.ReadAll(io.LimitReader(resp.Body, maxErrorResponseSize))
+		if err != nil {
+			return fmt.Errorf("API error (%d): failed to read response", resp.StatusCode)
+		}
 		return fmt.Errorf("API error (%d): %s", resp.StatusCode, string(body))
 	}
 
 	if result != nil {
-		if err := json.NewDecoder(resp.Body).Decode(result); err != nil {
+		limitedReader := io.LimitReader(resp.Body, maxSuccessResponseSize)
+		if err := json.NewDecoder(limitedReader).Decode(result); err != nil {
 			return fmt.Errorf("failed to parse response: %w", err)
 		}
 	}
@@ -97,9 +134,11 @@ func (c *Client) ListEndpoints() ([]Endpoint, error) {
 
 // DeleteEndpoint deletes an endpoint
 func (c *Client) DeleteEndpoint(slug string) error {
-	return c.request("DELETE", "/api/endpoints/"+slug, nil, nil)
+	// Escape the slug to prevent path injection attacks
+	return c.request("DELETE", "/api/endpoints/"+url.PathEscape(slug), nil, nil)
 }
 
+// Endpoint represents a webhook endpoint in the webhooks.cc system.
 type Endpoint struct {
 	ID   string `json:"id"`
 	Slug string `json:"slug"`

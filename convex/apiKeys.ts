@@ -1,12 +1,15 @@
 import { getAuthUserId } from "@convex-dev/auth/server";
 import { v } from "convex/values";
-import { mutation, query } from "./_generated/server";
+import { mutation, query, internalMutation } from "./_generated/server";
 
 function generateApiKey(): string {
   const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
+  // Use crypto.getRandomValues for cryptographically secure random key generation
+  const randomBytes = new Uint8Array(32);
+  crypto.getRandomValues(randomBytes);
   let key = "whcc_";
   for (let i = 0; i < 32; i++) {
-    key += chars.charAt(Math.floor(Math.random() * chars.length));
+    key += chars.charAt(randomBytes[i] % chars.length);
   }
   return key;
 }
@@ -83,8 +86,8 @@ export const revoke = mutation({
   },
 });
 
-// Validate an API key (for internal use)
-export const validate = mutation({
+// Validate an API key (internal use only - called from HTTP actions)
+export const validate = internalMutation({
   args: {
     key: v.string(),
   },

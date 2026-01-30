@@ -10,6 +10,8 @@ services:
     environment:
       - NEXT_PUBLIC_CONVEX_URL=${NEXT_PUBLIC_CONVEX_URL}
       - CONVEX_DEPLOYMENT=${CONVEX_DEPLOYMENT}
+      - NEXT_PUBLIC_WEBHOOK_URL=${NEXT_PUBLIC_WEBHOOK_URL}
+      - NEXT_PUBLIC_APP_URL=${NEXT_PUBLIC_APP_URL}
     restart: unless-stopped
 
   receiver:
@@ -19,5 +21,6 @@ services:
     ports:
       - "3001:3001"
     environment:
-      - CONVEX_URL=${CONVEX_URL}
+      - CONVEX_SITE_URL=${CONVEX_SITE_URL}
+      - PORT=3001
     restart: unless-stopped

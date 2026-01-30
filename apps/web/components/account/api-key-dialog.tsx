@@ -16,6 +16,7 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { Copy, Check, AlertTriangle } from "lucide-react";
+import { copyToClipboard } from "@/lib/clipboard";
 
 export function ApiKeyDialog() {
   const [open, setOpen] = useState(false);
@@ -48,9 +49,11 @@ export function ApiKeyDialog() {
 
   const copyKey = async () => {
     if (!createdKey) return;
-    await navigator.clipboard.writeText(createdKey);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
+    const success = await copyToClipboard(createdKey);
+    if (success) {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    }
   };
 
   const handleClose = () => {

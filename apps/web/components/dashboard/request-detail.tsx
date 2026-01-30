@@ -4,6 +4,9 @@ import { useState } from "react";
 import { cn } from "@/lib/utils";
 import { Copy, Check } from "lucide-react";
 import { ReplayDialog } from "./replay-dialog";
+import { copyToClipboard } from "@/lib/clipboard";
+import { formatBytes } from "@/types/request";
+import { WEBHOOK_BASE_URL, SKIP_HEADERS_FOR_CURL } from "@/lib/constants";
 
 interface Request {
   _id: string;
@@ -20,14 +23,6 @@ interface Request {
 
 interface RequestDetailProps {
   request: Request;
-}
-
-const WEBHOOK_BASE_URL =
-  process.env.NEXT_PUBLIC_WEBHOOK_URL || "https://go.webhooks.cc";
-
-function formatBytes(bytes: number): string {
-  if (bytes < 1024) return `${bytes} B`;
-  return `${(bytes / 1024).toFixed(1)} KB`;
 }
 
 function formatBody(body: string, contentType?: string): string {
@@ -48,9 +43,8 @@ function formatBody(body: string, contentType?: string): string {
 
 function generateCurlCommand(request: Request): string {
   const parts = [`curl -X ${request.method}`];
-  const skipHeaders = ["host", "content-length", "connection"];
   for (const [key, value] of Object.entries(request.headers)) {
-    if (!skipHeaders.includes(key.toLowerCase())) {
+    if (!SKIP_HEADERS_FOR_CURL.includes(key.toLowerCase())) {
       parts.push(`-H "${key}: ${value.replace(/"/g, '\\"')}"`);
     }
   }
@@ -70,10 +64,12 @@ export function RequestDetail({ request }: RequestDetailProps) {
   const [tab, setTab] = useState<Tab>("body");
   const [copied, setCopied] = useState<string | null>(null);
 
-  const copyToClipboard = (text: string, key: string) => {
-    navigator.clipboard.writeText(text);
-    setCopied(key);
-    setTimeout(() => setCopied(null), 2000);
+  const handleCopy = async (text: string, key: string) => {
+    const success = await copyToClipboard(text);
+    if (success) {
+      setCopied(key);
+      setTimeout(() => setCopied(null), 2000);
+    }
   };
 
   const curlCommand = generateCurlCommand(request);
@@ -96,7 +92,7 @@ export function RequestDetail({ request }: RequestDetailProps) {
           </div>
           <div className="flex items-center gap-2 shrink-0">
             <button
-              onClick={() => copyToClipboard(curlCommand, "curl")}
+              onClick={() => handleCopy(curlCommand, "curl")}
               className="neo-btn-outline !py-1.5 !px-3 text-xs flex items-center gap-1.5"
             >
               {copied === "curl" ? (
@@ -144,7 +140,7 @@ export function RequestDetail({ request }: RequestDetailProps) {
           <div className="relative">
             {request.body && (
               <button
-                onClick={() => copyToClipboard(request.body!, "body")}
+                onClick={() => handleCopy(request.body!, "body")}
                 className="absolute top-2 right-2 neo-btn-outline !py-1 !px-2 text-xs flex items-center gap-1"
               >
                 {copied === "body" ? (

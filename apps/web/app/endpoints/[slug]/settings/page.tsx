@@ -8,6 +8,9 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { parseStatusCode } from "@/lib/http";
+import { copyToClipboard } from "@/lib/clipboard";
+import { WEBHOOK_BASE_URL } from "@/lib/constants";
 import {
   Dialog,
   DialogContent,
@@ -46,12 +49,14 @@ export default function EndpointSettingsPage() {
     }
   }, [endpoint]);
 
-  const webhookUrl = `${process.env.NEXT_PUBLIC_WEBHOOK_URL || "https://go.webhooks.cc"}/w/${slug}`;
+  const webhookUrl = `${WEBHOOK_BASE_URL}/w/${slug}`;
 
   const copyUrl = async () => {
-    await navigator.clipboard.writeText(webhookUrl);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
+    const success = await copyToClipboard(webhookUrl);
+    if (success) {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    }
   };
 
   const handleSave = async () => {
@@ -66,9 +71,9 @@ export default function EndpointSettingsPage() {
         name: name || undefined,
         mockResponse: mockBody
           ? {
-              status: parseInt(mockStatus) || 200,
+              status: parseStatusCode(mockStatus, 200),
               body: mockBody,
-              headers: endpoint.mockResponse?.headers || {},
+              headers: endpoint.mockResponse?.headers ?? {},
             }
           : undefined,
       });

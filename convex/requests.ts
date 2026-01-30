@@ -1,7 +1,9 @@
+import { getAuthUserId } from "@convex-dev/auth/server";
 import { v } from "convex/values";
 import { mutation, query, internalMutation } from "./_generated/server";
 
-export const capture = mutation({
+// Internal mutation - only called from the HTTP action in http.ts
+export const capture = internalMutation({
   args: {
     slug: v.string(),
     method: v.string(),
@@ -34,15 +36,11 @@ export const capture = mutation({
         return { error: "limit_exceeded" };
       }
 
-      // Increment usage with TOCTOU protection:
-      // Re-read user to get latest requestsUsed value before incrementing
+      // Increment usage - Convex mutations are already atomic/serializable
       if (user) {
-        const freshUser = await ctx.db.get(endpoint.userId);
-        if (freshUser) {
-          await ctx.db.patch(endpoint.userId, {
-            requestsUsed: freshUser.requestsUsed + 1,
-          });
-        }
+        await ctx.db.patch(endpoint.userId, {
+          requestsUsed: user.requestsUsed + 1,
+        });
       }
     }
 
@@ -80,6 +78,22 @@ export const list = query({
     limit: v.optional(v.number()),
   },
   handler: async (ctx, { endpointId, limit = 50 }) => {
+    const userId = await getAuthUserId(ctx);
+
+    // Verify the user has access to this endpoint
+    const endpoint = await ctx.db.get(endpointId);
+    if (!endpoint) return [];
+
+    // Authorization rules:
+    // 1. Ephemeral endpoints can be viewed by anyone (for the live demo)
+    // 2. Endpoints with an owner can only be viewed by that owner
+    // 3. Unowned non-ephemeral endpoints should not exist, but if they do, deny access
+    if (!endpoint.isEphemeral) {
+      if (!endpoint.userId || !userId || endpoint.userId !== userId) {
+        return [];
+      }
+    }
+
     const requests = await ctx.db
       .query("requests")
       .withIndex("by_endpoint_time", (q) => q.eq("endpointId", endpointId))
@@ -93,7 +107,26 @@ export const list = query({
 export const get = query({
   args: { id: v.id("requests") },
   handler: async (ctx, { id }) => {
-    return await ctx.db.get(id);
+    const userId = await getAuthUserId(ctx);
+    const request = await ctx.db.get(id);
+
+    if (!request) return null;
+
+    // Verify the user has access to the endpoint this request belongs to
+    const endpoint = await ctx.db.get(request.endpointId);
+    if (!endpoint) return null;
+
+    // Authorization rules:
+    // 1. Ephemeral endpoints can be viewed by anyone
+    // 2. Endpoints with an owner can only be viewed by that owner
+    // 3. Unowned non-ephemeral endpoints should not exist, but if they do, deny access
+    if (!endpoint.isEphemeral) {
+      if (!endpoint.userId || !userId || endpoint.userId !== userId) {
+        return null;
+      }
+    }
+
+    return request;
   },
 });
 

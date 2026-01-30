@@ -4,6 +4,8 @@ import { useState } from "react";
 import { Copy, Check } from "lucide-react";
 import { Id } from "@convex/_generated/dataModel";
 import { EndpointSettingsDialog } from "./endpoint-settings-dialog";
+import { copyToClipboard } from "@/lib/clipboard";
+import { WEBHOOK_BASE_URL } from "@/lib/constants";
 
 interface UrlBarProps {
   endpointId: Id<"endpoints">;
@@ -16,9 +18,6 @@ interface UrlBarProps {
   };
 }
 
-const WEBHOOK_BASE_URL =
-  process.env.NEXT_PUBLIC_WEBHOOK_URL || "https://go.webhooks.cc";
-
 export function UrlBar({
   endpointId,
   endpointName,
@@ -28,10 +27,12 @@ export function UrlBar({
   const [copied, setCopied] = useState(false);
   const url = `${WEBHOOK_BASE_URL}/w/${slug}`;
 
-  const copyUrl = () => {
-    navigator.clipboard.writeText(url);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
+  const copyUrl = async () => {
+    const success = await copyToClipboard(url);
+    if (success) {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    }
   };
 
   return (

@@ -1,0 +1,20 @@
+# Dependencies
+node_modules/
+.pnpm-store/
+
+# Build outputs
+dist/
+.next/
+.turbo/
+*.tsbuildinfo
+
+# Generated files
+convex/_generated/
+pnpm-lock.yaml
+
+# Go files (use gofmt instead)
+*.go
+
+# Other
+.git/
+coverage/

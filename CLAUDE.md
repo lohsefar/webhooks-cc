@@ -38,19 +38,19 @@ npx convex data           # List all tables
 ## Architecture
 
 ### Service Layout
-- **webhooks.cc (port 3000)**: Next.js frontend/dashboard
-- **go.webhooks.cc (port 3001)**: Go receiver that captures webhooks
+- **Web app (port 3000)**: Next.js frontend/dashboard
+- **Receiver (port 3001)**: Go server that captures webhooks
 - **Convex**: Backend database, auth, real-time subscriptions
 
 ### Data Flow
-1. External service sends webhook to `go.webhooks.cc/w/{slug}`
+1. External service sends webhook to receiver at `/w/{slug}`
 2. Go receiver captures request, calls Convex HTTP action at `/capture`
 3. Convex stores request in `requests` table
 4. Frontend receives real-time update via Convex subscription
 
 ### Key Directories
 - `convex/` - Backend: schema, mutations, queries, HTTP actions, crons
-- `apps/web/` - Next.js 16 with App Router, Tailwind v4, shadcn/ui
+- `apps/web/` - Next.js 15 with App Router, Tailwind v4, shadcn/ui
 - `apps/receiver/` - Go Fiber server that captures webhooks
 - `apps/cli/` - Go CLI tool (Cobra) for tunneling
 - `packages/sdk/` - TypeScript SDK for programmatic access
@@ -67,16 +67,13 @@ npx convex data           # List all tables
 The `.env.local` file (root and apps/web) must include:
 - `CONVEX_DEPLOYMENT` / `NEXT_PUBLIC_CONVEX_URL` - Convex project
 - `CONVEX_SITE_URL` - For Go receiver to call HTTP actions (`.site` domain)
-- `NEXT_PUBLIC_WEBHOOK_URL` - Base URL for webhooks (https://go.webhooks.cc)
+- `NEXT_PUBLIC_WEBHOOK_URL` - Base URL for webhook receiver
+- `NEXT_PUBLIC_APP_URL` - Base URL for web application
 
 ### Convex Specifics
 - Optional fields must be `undefined`, not `null`
 - HTTP actions are served from `.convex.site` domain, not `.convex.cloud`
 - Use `internalMutation` for cron jobs, `httpAction` for HTTP endpoints
-
-### Systemd Services
-- `webhooks-receiver.service` - Go receiver on port 3001
-- Caddy on separate LXC (192.168.0.95) proxies to this machine (192.168.0.110)
 
 ## Development Phases
 

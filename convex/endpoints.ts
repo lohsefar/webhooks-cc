@@ -2,6 +2,7 @@ import { getAuthUserId } from "@convex-dev/auth/server";
 import { v } from "convex/values";
 import { mutation, query } from "./_generated/server";
 import { nanoid } from "nanoid";
+import { EPHEMERAL_TTL_MS, FREE_REQUEST_LIMIT } from "./config";
 
 export const create = mutation({
   args: {
@@ -27,7 +28,7 @@ export const create = mutation({
       name: args.name,
       mockResponse: args.mockResponse,
       isEphemeral,
-      expiresAt: isEphemeral ? Date.now() + 10 * 60 * 1000 : undefined, // 10 min
+      expiresAt: isEphemeral ? Date.now() + EPHEMERAL_TTL_MS : undefined,
       createdAt: Date.now(),
     });
 
@@ -58,17 +59,53 @@ export const list = query({
 export const getBySlug = query({
   args: { slug: v.string() },
   handler: async (ctx, { slug }) => {
-    return await ctx.db
+    const userId = await getAuthUserId(ctx);
+    const endpoint = await ctx.db
       .query("endpoints")
       .withIndex("by_slug", (q) => q.eq("slug", slug))
       .first();
+
+    if (!endpoint) return null;
+
+    // Authorization rules:
+    // 1. Ephemeral endpoints can be viewed by anyone (for the live demo)
+    // 2. Endpoints with an owner can only be viewed by that owner
+    // 3. Unowned non-ephemeral endpoints should not exist, but if they do, deny access
+    if (endpoint.isEphemeral) {
+      return endpoint;
+    }
+
+    // For non-ephemeral endpoints, require ownership
+    if (!endpoint.userId || !userId || endpoint.userId !== userId) {
+      return null;
+    }
+
+    return endpoint;
   },
 });
 
 export const get = query({
   args: { id: v.id("endpoints") },
   handler: async (ctx, { id }) => {
-    return await ctx.db.get(id);
+    const userId = await getAuthUserId(ctx);
+    const endpoint = await ctx.db.get(id);
+
+    if (!endpoint) return null;
+
+    // Authorization rules:
+    // 1. Ephemeral endpoints can be viewed by anyone
+    // 2. Endpoints with an owner can only be viewed by that owner
+    // 3. Unowned non-ephemeral endpoints should not exist, but if they do, deny access
+    if (endpoint.isEphemeral) {
+      return endpoint;
+    }
+
+    // For non-ephemeral endpoints, require ownership
+    if (!endpoint.userId || !userId || endpoint.userId !== userId) {
+      return null;
+    }
+
+    return endpoint;
   },
 });
 

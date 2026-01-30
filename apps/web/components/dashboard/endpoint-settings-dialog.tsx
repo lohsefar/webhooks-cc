@@ -10,6 +10,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { StatusCodePicker } from "./status-code-picker";
 import { Settings } from "lucide-react";
+import { parseStatusCode } from "@/lib/http";
 import {
   Dialog,
   DialogContent,
@@ -73,7 +74,7 @@ export function EndpointSettingsDialog({
         name: name || undefined,
         mockResponse: mockBody
           ? {
-              status: parseInt(mockStatus) || 200,
+              status: parseStatusCode(mockStatus, 200),
               body: mockBody,
               headers: mockResponse?.headers || {},
             }

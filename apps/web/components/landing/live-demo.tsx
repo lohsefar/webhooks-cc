@@ -5,6 +5,9 @@ import { useQuery, useMutation } from "convex/react";
 import { api } from "@convex/_generated/api";
 import { cn } from "@/lib/utils";
 import { Copy, Send, Plus, ChevronDown, ChevronRight } from "lucide-react";
+import { copyToClipboard } from "@/lib/clipboard";
+import { getMethodColor } from "@/types/request";
+import { WEBHOOK_BASE_URL } from "@/lib/constants";
 
 export function LiveDemo() {
   const [endpointSlug, setEndpointSlug] = useState<string | null>(null);
@@ -81,9 +84,8 @@ export function LiveDemo() {
     }
   };
 
-  const webhookBaseUrl = process.env.NEXT_PUBLIC_WEBHOOK_URL || "https://webhooks.cc";
   const endpointUrl = endpointSlug
-    ? `${webhookBaseUrl}/w/${endpointSlug}`
+    ? `${WEBHOOK_BASE_URL}/w/${endpointSlug}`
     : null;
 
   const curlCommand = endpointUrl
@@ -114,10 +116,12 @@ export function LiveDemo() {
     }
   }, [endpointUrl, sendCount]);
 
-  const copyToClipboard = (text: string, key: string) => {
-    navigator.clipboard.writeText(text);
-    setCopied(key);
-    setTimeout(() => setCopied(null), 2000);
+  const handleCopy = async (text: string, key: string) => {
+    const success = await copyToClipboard(text);
+    if (success) {
+      setCopied(key);
+      setTimeout(() => setCopied(null), 2000);
+    }
   };
 
   return (
@@ -150,7 +154,7 @@ export function LiveDemo() {
                 {endpointUrl}
               </div>
               <button
-                onClick={() => copyToClipboard(endpointUrl!, "url")}
+                onClick={() => handleCopy(endpointUrl!, "url")}
                 className="neo-btn-outline py-2 px-4"
               >
                 {copied === "url" ? "Copied!" : <Copy className="h-5 w-5" />}
@@ -181,7 +185,7 @@ export function LiveDemo() {
                 {curlCommand}
               </div>
               <button
-                onClick={() => copyToClipboard(curlCommand!, "curl")}
+                onClick={() => handleCopy(curlCommand!, "curl")}
                 className="neo-btn-outline py-2 px-4 self-start"
               >
                 {copied === "curl" ? "Copied!" : <Copy className="h-5 w-5" />}
@@ -249,14 +253,6 @@ function DemoRequestList({ slug }: { slug: string }) {
   return <SimpleDemoList requests={requests} />;
 }
 
-const METHOD_COLORS: Record<string, string> = {
-  GET: "bg-primary text-primary-foreground",
-  POST: "bg-secondary text-secondary-foreground",
-  PUT: "bg-accent text-accent-foreground",
-  DELETE: "bg-destructive text-destructive-foreground",
-  PATCH: "bg-accent text-accent-foreground",
-};
-
 function SimpleDemoList({ requests }: { requests: Array<{
   _id: string;
   method: string;
@@ -290,7 +286,7 @@ function SimpleDemoList({ requests }: { requests: Array<{
               <span
                 className={cn(
                   "px-2 py-1 text-xs font-mono font-bold border-2 border-foreground",
-                  METHOD_COLORS[request.method] || "bg-muted"
+                  getMethodColor(request.method)
                 )}
               >
                 {request.method}

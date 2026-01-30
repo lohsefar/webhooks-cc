@@ -1,6 +1,7 @@
 import GitHub from "@auth/core/providers/github";
 import Google from "@auth/core/providers/google";
 import { convexAuth } from "@convex-dev/auth/server";
+import { FREE_REQUEST_LIMIT } from "./config";
 
 export const { auth, signIn, signOut, store } = convexAuth({
   providers: [GitHub, Google],
@@ -21,6 +22,9 @@ export const { auth, signIn, signOut, store } = convexAuth({
       // Security note: This relies on OAuth providers verifying email ownership.
       // Both GitHub and Google verify emails before returning them in profile.
       if (profile.email) {
+        // Note: Using filter here because the auth callback context has a different
+        // type that doesn't expose the custom indexes. The by_email index exists
+        // in the schema and Convex will optimize this query automatically.
         const existingUser = await ctx.db
           .query("users")
           .filter((q) => q.eq(q.field("email"), profile.email!))
@@ -42,13 +46,16 @@ export const { auth, signIn, signOut, store } = convexAuth({
       }
 
       // Case 3: Completely new user - create account
+      if (!profile.email) {
+        throw new Error("Email is required for registration");
+      }
       return await ctx.db.insert("users", {
-        email: profile.email!,
+        email: profile.email,
         name: profile.name,
         image: profile.image,
         plan: "free",
         requestsUsed: 0,
-        requestLimit: 500,
+        requestLimit: FREE_REQUEST_LIMIT,
         createdAt: Date.now(),
       });
     },

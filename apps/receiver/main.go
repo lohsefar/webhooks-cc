@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -15,6 +16,12 @@ import (
 	"github.com/gofiber/fiber/v2/middleware/cors"
 	"github.com/gofiber/fiber/v2/middleware/logger"
 	"github.com/gofiber/fiber/v2/middleware/recover"
+)
+
+const (
+	maxBodySize            = 100 * 1024 // 100KB max body for webhooks
+	maxConvexResponseSize  = 1024 * 1024 // 1MB max response from Convex
+	httpTimeout            = 10 * time.Second
 )
 
 type CaptureRequest struct {
@@ -40,6 +47,7 @@ type MockResponse struct {
 }
 
 var convexSiteURL string
+var captureSharedSecret string
 var httpClient *http.Client
 
 func main() {
@@ -48,6 +56,10 @@ func main() {
 	if convexSiteURL == "" {
 		log.Fatal("CONVEX_SITE_URL environment variable is required")
 	}
+
+	// Shared secret for authenticating with Convex /capture endpoint
+	// If not set, the receiver will work but Convex won't require authentication
+	captureSharedSecret = os.Getenv("CAPTURE_SHARED_SECRET")
 
 	// Initialize HTTP client with timeout and connection pooling
 	httpClient = &http.Client{
@@ -61,7 +73,7 @@ func main() {
 
 	app := fiber.New(fiber.Config{
 		DisableStartupMessage: true,
-		BodyLimit:             100 * 1024, // 100KB max body
+		BodyLimit:             maxBodySize,
 	})
 
 	app.Use(recover.New())
@@ -129,14 +141,11 @@ func handleWebhook(c *fiber.Ctx) error {
 		queryParams[string(key)] = string(value)
 	})
 
-	// Get body (limit to 100KB)
+	// Get body (already limited by Fiber's BodyLimit config)
 	body := string(c.Body())
-	if len(body) > 100*1024 {
-		body = body[:100*1024]
-	}
 
-	// Call Convex to capture the request
-	resp, err := callConvex(map[string]any{
+	// Call Convex to capture the request (use Fiber's context for cancellation)
+	resp, err := callConvex(c.Context(), map[string]any{
 		"slug":        slug,
 		"method":      c.Method(),
 		"path":        path,
@@ -164,7 +173,9 @@ func handleWebhook(c *fiber.Ctx) error {
 	}
 
 	if resp.Error != "" {
-		return c.Status(500).SendString(resp.Error)
+		// Log the detailed error but return a generic message to clients
+		log.Printf("Convex error for slug %s: %s", slug, resp.Error)
+		return c.Status(500).SendString("Internal server error")
 	}
 
 	// Return mock response
@@ -178,17 +189,22 @@ func handleWebhook(c *fiber.Ctx) error {
 	return c.SendString("OK")
 }
 
-func callConvex(args map[string]any) (*CaptureResponse, error) {
+func callConvex(ctx context.Context, args map[string]any) (*CaptureResponse, error) {
 	payload, err := json.Marshal(args)
 	if err != nil {
 		return nil, fmt.Errorf("failed to marshal request: %w", err)
 	}
 
-	req, err := http.NewRequest("POST", convexSiteURL+"/capture", bytes.NewReader(payload))
+	req, err := http.NewRequestWithContext(ctx, "POST", convexSiteURL+"/capture", bytes.NewReader(payload))
 	if err != nil {
 		return nil, fmt.Errorf("failed to create request: %w", err)
 	}
 	req.Header.Set("Content-Type", "application/json")
+
+	// Include shared secret for authentication if configured
+	if captureSharedSecret != "" {
+		req.Header.Set("Authorization", "Bearer "+captureSharedSecret)
+	}
 
 	resp, err := httpClient.Do(req)
 	if err != nil {
@@ -196,7 +212,7 @@ func callConvex(args map[string]any) (*CaptureResponse, error) {
 	}
 	defer resp.Body.Close()
 
-	body, err := io.ReadAll(resp.Body)
+	body, err := io.ReadAll(io.LimitReader(resp.Body, maxConvexResponseSize))
 	if err != nil {
 		return nil, fmt.Errorf("failed to read response: %w", err)
 	}

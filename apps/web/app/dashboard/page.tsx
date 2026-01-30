@@ -13,9 +13,7 @@ import {
 } from "@/components/dashboard/request-detail";
 import Link from "next/link";
 import { Copy, Check, Send } from "lucide-react";
-
-const WEBHOOK_BASE_URL =
-  process.env.NEXT_PUBLIC_WEBHOOK_URL || "https://go.webhooks.cc";
+import { WEBHOOK_BASE_URL } from "@/lib/constants";
 
 export default function DashboardPage() {
   const endpoints = useQuery(api.endpoints.list);
