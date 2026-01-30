@@ -39,3 +39,10 @@ export const BILLING_PERIOD_MS = safeParseInt(
   86400000,
   31536000000
 ); // 1 day to 1 year
+
+// Polar.sh Configuration
+export const POLAR_SANDBOX = process.env.POLAR_SANDBOX === "true";
+export const POLAR_API_URL = POLAR_SANDBOX
+  ? "https://sandbox-api.polar.sh"
+  : "https://api.polar.sh";
+export const POLAR_ORGANIZATION_ID = process.env.POLAR_ORGANIZATION_ID ?? "";
