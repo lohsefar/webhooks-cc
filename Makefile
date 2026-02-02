@@ -12,7 +12,7 @@ dev-convex:
 	pnpm convex dev
 
 dev-receiver:
-	cd apps/receiver && go run .
+	@set -a && . ./.env.local && set +a && cd apps/receiver && go run .
 
 dev-cli:
 	cd apps/cli && go run ./cmd/whk $(ARGS)

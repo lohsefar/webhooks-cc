@@ -5,7 +5,7 @@ export default function AccountLayout({ children }: { children: React.ReactNode 
   return (
     <RequireAuth>
       <div className="min-h-screen">
-        <AppHeader backLink={{ href: "/dashboard", label: "Back to Dashboard" }} />
+        <AppHeader showBackToDashboard />
         {children}
       </div>
     </RequireAuth>

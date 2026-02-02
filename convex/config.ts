@@ -40,6 +40,12 @@ export const BILLING_PERIOD_MS = safeParseInt(
   31536000000
 ); // 1 day to 1 year
 
+// Free user rolling period (24 hours in milliseconds)
+export const FREE_PERIOD_MS = 24 * 60 * 60 * 1000;
+
+// Pro user request retention (30 days in milliseconds)
+export const PRO_REQUEST_RETENTION_MS = 30 * 24 * 60 * 60 * 1000;
+
 // Polar.sh Configuration
 export const POLAR_SANDBOX = process.env.POLAR_SANDBOX === "true";
 export const POLAR_API_URL = POLAR_SANDBOX

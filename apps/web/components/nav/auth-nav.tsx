@@ -23,13 +23,13 @@ export function AuthNav() {
       </Link>
       <ThemeToggle />
       {isLoading ? (
-        <span className="neo-btn-outline text-sm py-2 px-4 opacity-50">...</span>
+        <span className="neo-btn-outline text-sm py-2 px-4 w-28 text-center opacity-50">...</span>
       ) : isAuthenticated ? (
-        <Link href="/dashboard" className="neo-btn-primary text-sm py-2 px-4">
+        <Link href="/dashboard" className="neo-btn-primary text-sm py-2 px-4 w-28 text-center">
           Dashboard
         </Link>
       ) : (
-        <Link href="/login" className="neo-btn-outline text-sm py-2 px-4">
+        <Link href="/login" className="neo-btn-outline text-sm py-2 px-4 w-28 text-center">
           Sign In
         </Link>
       )}

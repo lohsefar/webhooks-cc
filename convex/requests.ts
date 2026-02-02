@@ -2,6 +2,8 @@ import { getAuthUserId } from "@convex-dev/auth/server";
 import { v } from "convex/values";
 import { query, internalMutation, internalQuery } from "./_generated/server";
 import { internal } from "./_generated/api";
+import { EPHEMERAL_RATE_LIMIT } from "./rateLimiter";
+import { FREE_PERIOD_MS, PRO_REQUEST_RETENTION_MS } from "./config";
 
 // Internal mutation - only called from the HTTP action in http.ts
 export const capture = internalMutation({
@@ -30,7 +32,9 @@ export const capture = internalMutation({
       return { error: "expired" };
     }
 
-    // Note: Quota limits are now enforced by the Go receiver via the quota cache.
+    // Note: Rate limits for both ephemeral and authenticated endpoints are enforced
+    // by the Go receiver via the quota cache. This avoids reading user/rate limit
+    // state here, preventing OCC conflicts when many concurrent webhooks hit.
     // This avoids reading the user document here, preventing OCC conflicts when
     // many concurrent webhooks hit the same user's endpoints.
 
@@ -72,7 +76,8 @@ export const capture = internalMutation({
 });
 
 // Get quota information for a slug - used by Go receiver for rate limiting.
-// Returns remaining quota, limit, and period end for caching in the receiver.
+// Returns remaining quota, limit, period end, and plan for caching in the receiver.
+// For free users, also indicates if period needs to be started.
 export const getQuota = internalQuery({
   args: {
     slug: v.string(),
@@ -84,16 +89,38 @@ export const getQuota = internalQuery({
       .first();
 
     if (!endpoint) {
-      return { error: "not_found" };
+      return { error: "not_found" as const };
     }
 
-    // Ephemeral endpoints or endpoints without a user are unlimited
-    if (endpoint.isEphemeral || !endpoint.userId) {
+    // Ephemeral endpoints get 50 requests for their lifetime
+    // Count actual requests to track usage across Go receiver cache refreshes
+    // Cap read to EPHEMERAL_RATE_LIMIT + 1 to avoid loading excess data
+    if (endpoint.isEphemeral) {
+      const requests = await ctx.db
+        .query("requests")
+        .withIndex("by_endpoint_time", (q) => q.eq("endpointId", endpoint._id))
+        .take(EPHEMERAL_RATE_LIMIT + 1);
+      const used = requests.length;
+      const remaining = Math.max(0, EPHEMERAL_RATE_LIMIT - used);
       return {
         userId: null,
-        remaining: -1,
-        limit: -1,
+        remaining,
+        limit: EPHEMERAL_RATE_LIMIT,
+        periodEnd: endpoint.expiresAt ?? null,
+        plan: "ephemeral",
+        needsPeriodStart: false,
+      };
+    }
+
+    // Endpoints without a user (shouldn't happen, but handle gracefully)
+    if (!endpoint.userId) {
+      return {
+        userId: null,
+        remaining: EPHEMERAL_RATE_LIMIT,
+        limit: EPHEMERAL_RATE_LIMIT,
         periodEnd: null,
+        plan: null,
+        needsPeriodStart: false,
       };
     }
 
@@ -105,6 +132,23 @@ export const getQuota = internalQuery({
         remaining: -1,
         limit: -1,
         periodEnd: null,
+        plan: null,
+        needsPeriodStart: false,
+      };
+    }
+
+    const now = Date.now();
+    const periodExpired = !user.periodEnd || user.periodEnd < now;
+
+    // For free users, check if period needs to start/restart
+    if (user.plan === "free" && periodExpired) {
+      return {
+        userId: endpoint.userId,
+        remaining: user.requestLimit, // Full quota after period restart
+        limit: user.requestLimit,
+        periodEnd: null,
+        plan: user.plan,
+        needsPeriodStart: true,
       };
     }
 
@@ -113,23 +157,91 @@ export const getQuota = internalQuery({
       remaining: Math.max(0, user.requestLimit - user.requestsUsed),
       limit: user.requestLimit,
       periodEnd: user.periodEnd ?? null,
+      plan: user.plan,
+      needsPeriodStart: false,
+    };
+  },
+});
+
+// Check and start a new period for a free user if needed.
+// Called by Go receiver before capturing requests when needsPeriodStart is true.
+// Returns the new quota information after potentially starting a new period.
+// This mutation is idempotent - concurrent calls will detect if period was already started.
+export const checkAndStartPeriod = internalMutation({
+  args: {
+    userId: v.id("users"),
+  },
+  handler: async (ctx, { userId }) => {
+    const user = await ctx.db.get(userId);
+    if (!user) {
+      return { error: "not_found" as const };
+    }
+
+    // Only process free users
+    if (user.plan !== "free") {
+      return {
+        remaining: Math.max(0, user.requestLimit - user.requestsUsed),
+        limit: user.requestLimit,
+        periodEnd: user.periodEnd ?? null,
+      };
+    }
+
+    const now = Date.now();
+
+    // Check if period is still valid (another concurrent request may have started it)
+    if (user.periodEnd && user.periodEnd > now) {
+      // Period already active - check quota and return current state
+      if (user.requestsUsed >= user.requestLimit) {
+        return {
+          error: "quota_exceeded" as const,
+          retryAfter: user.periodEnd - now,
+          periodEnd: user.periodEnd,
+        };
+      }
+      return {
+        remaining: Math.max(0, user.requestLimit - user.requestsUsed),
+        limit: user.requestLimit,
+        periodEnd: user.periodEnd,
+      };
+    }
+
+    // Period expired or never started - start new 24-hour period
+    const newPeriodEnd = now + FREE_PERIOD_MS;
+    await ctx.db.patch(userId, {
+      periodStart: now,
+      periodEnd: newPeriodEnd,
+      requestsUsed: 0,
+    });
+
+    // Schedule reset mutation for when period expires
+    await ctx.scheduler.runAt(newPeriodEnd, internal.users.resetFreeUserPeriod, {
+      userId,
+    });
+
+    return {
+      remaining: user.requestLimit,
+      limit: user.requestLimit,
+      periodEnd: newPeriodEnd,
     };
   },
 });
 
 // Increment user's request usage counter.
 // Called via scheduler from capture to avoid OCC conflicts.
-// Supports batch increments via the count parameter.
+// Supports batch increments via the count parameter (capped at 1000 per call).
 export const incrementUsage = internalMutation({
   args: {
     userId: v.id("users"),
     count: v.optional(v.number()),
   },
   handler: async (ctx, { userId, count = 1 }) => {
+    // Validate count is a reasonable positive integer (cap at 1000 per batch)
+    const validCount = Math.max(1, Math.min(Math.floor(count), 1000));
+
     const user = await ctx.db.get(userId);
     if (user) {
       await ctx.db.patch(userId, {
-        requestsUsed: user.requestsUsed + count,
+        requestsUsed: user.requestsUsed + validCount,
       });
     }
   },
@@ -199,6 +311,8 @@ export const captureBatch = internalMutation({
       return { error: "expired", inserted: 0 };
     }
 
+    // Note: Rate limits enforced by Go receiver via quota cache
+
     // Insert all requests
     let inserted = 0;
     for (const req of requests) {
@@ -234,6 +348,38 @@ export const captureBatch = internalMutation({
 
 // Maximum number of requests that can be fetched at once
 const MAX_LIST_LIMIT = 100;
+
+// Maximum count to avoid loading too much data into memory
+const MAX_COUNT = 10000;
+
+export const count = query({
+  args: {
+    endpointId: v.id("endpoints"),
+  },
+  handler: async (ctx, { endpointId }) => {
+    const userId = await getAuthUserId(ctx);
+
+    // Verify the user has access to this endpoint
+    const endpoint = await ctx.db.get(endpointId);
+    if (!endpoint) return 0;
+
+    // Authorization rules (same as list)
+    if (!endpoint.isEphemeral) {
+      if (!endpoint.userId || !userId || endpoint.userId !== userId) {
+        return 0;
+      }
+    }
+
+    // Use take() with a cap to avoid loading unlimited data into memory
+    const requests = await ctx.db
+      .query("requests")
+      .withIndex("by_endpoint_time", (q) => q.eq("endpointId", endpointId))
+      .take(MAX_COUNT + 1);
+
+    // Return actual count, or MAX_COUNT if there are more
+    return Math.min(requests.length, MAX_COUNT);
+  },
+});
 
 export const list = query({
   args: {
@@ -315,6 +461,14 @@ export const cleanupExpired = internalMutation({
     let deletedRequests = 0;
 
     for (const endpoint of expired) {
+      // Safety: only delete ephemeral endpoints
+      if (!endpoint.isEphemeral) {
+        console.warn(
+          `Skipping non-ephemeral endpoint ${endpoint._id} with expiresAt=${endpoint.expiresAt}`
+        );
+        continue;
+      }
+
       // Delete requests in batches to avoid timeout
       const requests = await ctx.db
         .query("requests")
@@ -335,5 +489,93 @@ export const cleanupExpired = internalMutation({
     }
 
     return { deletedEndpoints, deletedRequests };
+  },
+});
+
+// Delete all requests for a user's endpoints.
+// Called when free user period resets to clean up old requests.
+// Processes in batches and reschedules if more remain.
+// Limits endpoints per run to avoid timeout on users with many endpoints.
+export const cleanupUserRequests = internalMutation({
+  args: { userId: v.id("users") },
+  handler: async (ctx, { userId }) => {
+    // Limit endpoints per run to avoid timeout
+    const endpoints = await ctx.db
+      .query("endpoints")
+      .withIndex("by_user", (q) => q.eq("userId", userId))
+      .take(20);
+
+    let deleted = 0;
+    for (const endpoint of endpoints) {
+      const requests = await ctx.db
+        .query("requests")
+        .withIndex("by_endpoint_time", (q) => q.eq("endpointId", endpoint._id))
+        .take(CLEANUP_BATCH_SIZE);
+
+      for (const req of requests) {
+        await ctx.db.delete(req._id);
+        deleted++;
+      }
+
+      // If we hit the batch limit on any endpoint, reschedule
+      if (requests.length === CLEANUP_BATCH_SIZE) {
+        await ctx.scheduler.runAfter(0, internal.requests.cleanupUserRequests, {
+          userId,
+        });
+        return { deleted, complete: false };
+      }
+    }
+
+    return { deleted, complete: true };
+  },
+});
+
+// Delete requests older than 30 days for pro users.
+// Runs daily to enforce retention policy.
+// Uses pagination to process all pro users across multiple cron invocations.
+export const cleanupOldRequests = internalMutation({
+  args: {
+    cursor: v.optional(v.string()),
+  },
+  handler: async (ctx, { cursor }) => {
+    const cutoff = Date.now() - PRO_REQUEST_RETENTION_MS;
+
+    // Use index for efficient lookup and paginate through users
+    const result = await ctx.db
+      .query("users")
+      .withIndex("by_plan", (q) => q.eq("plan", "pro"))
+      .paginate({ cursor: cursor ?? null, numItems: 20 });
+
+    let totalDeleted = 0;
+    for (const user of result.page) {
+      // Limit endpoints per user to avoid timeout
+      const endpoints = await ctx.db
+        .query("endpoints")
+        .withIndex("by_user", (q) => q.eq("userId", user._id))
+        .take(20);
+
+      for (const endpoint of endpoints) {
+        const oldRequests = await ctx.db
+          .query("requests")
+          .withIndex("by_endpoint_time", (q) =>
+            q.eq("endpointId", endpoint._id).lt("receivedAt", cutoff)
+          )
+          .take(CLEANUP_BATCH_SIZE);
+
+        for (const req of oldRequests) {
+          await ctx.db.delete(req._id);
+          totalDeleted++;
+        }
+      }
+    }
+
+    // Schedule continuation if there are more users
+    if (!result.isDone) {
+      await ctx.scheduler.runAfter(100, internal.requests.cleanupOldRequests, {
+        cursor: result.continueCursor,
+      });
+    }
+
+    return { deleted: totalDeleted, done: result.isDone };
   },
 });

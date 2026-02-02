@@ -47,7 +47,8 @@ export default defineSchema({
   })
     .index("by_email", ["email"])
     .index("by_polar_customer", ["polarCustomerId"])
-    .index("by_period_end", ["periodEnd"]),
+    .index("by_period_end", ["periodEnd"])
+    .index("by_plan", ["plan"]),
 
   apiKeys: defineTable({
     userId: v.id("users"),

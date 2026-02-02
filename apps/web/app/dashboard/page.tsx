@@ -24,6 +24,11 @@ export default function DashboardPage() {
     currentEndpoint ? { endpointId: currentEndpoint._id, limit: 50 } : "skip"
   );
 
+  const requestCount = useQuery(
+    api.requests.count,
+    currentEndpoint ? { endpointId: currentEndpoint._id } : "skip"
+  );
+
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [liveMode, setLiveMode] = useState(true);
   const [sortNewest, setSortNewest] = useState(true);
@@ -122,6 +127,7 @@ export default function DashboardPage() {
                 onToggleSort={() => setSortNewest(!sortNewest)}
                 newCount={newCount}
                 onJumpToNew={handleJumpToNew}
+                totalCount={requestCount}
               />
             </div>
             <div className="flex-1 overflow-hidden">
@@ -158,6 +164,7 @@ export default function DashboardPage() {
                 onToggleSort={() => setSortNewest(!sortNewest)}
                 newCount={newCount}
                 onJumpToNew={handleJumpToNew}
+                totalCount={requestCount}
               />
             )}
           </div>
