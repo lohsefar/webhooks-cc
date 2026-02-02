@@ -37,5 +37,8 @@
   "packageManager": "pnpm@10.28.2",
   "engines": {
     "node": ">=20"
+  },
+  "dependencies": {
+    "@convex-dev/rate-limiter": "^0.3.2"
   }
 }

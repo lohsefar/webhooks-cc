@@ -100,8 +100,25 @@
   * {
     @apply border-border;
   }
+  html {
+    scrollbar-gutter: stable;
+  }
   body {
     @apply bg-background text-foreground;
+    /* Ben-Day dot pattern */
+    background-image: radial-gradient(
+      circle at center,
+      hsl(var(--foreground) / 0.05) 2px,
+      transparent 2px
+    );
+    background-size: 8px 8px;
+  }
+  :is(.dark) body {
+    background-image: radial-gradient(
+      circle at center,
+      hsl(var(--foreground) / 0.04) 2px,
+      transparent 2px
+    );
   }
 }
 
@@ -201,4 +218,12 @@
   transition-property: all;
   transition-duration: 150ms;
   transition-timing-function: ease-out;
+}
+
+/* Code syntax highlighting - darker yellow for light mode readability */
+@utility text-code-string {
+  color: hsl(45 100% 35%);
+}
+.dark .text-code-string {
+  color: hsl(var(--secondary));
 }

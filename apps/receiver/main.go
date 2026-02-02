@@ -14,6 +14,7 @@ import (
 	"net/url"
 	"os"
 	"os/signal"
+	"path/filepath"
 	"strings"
 	"sync"
 	"syscall"
@@ -29,7 +30,7 @@ const (
 	maxBodySize           = 100 * 1024       // 100KB max body for webhooks
 	maxConvexResponseSize = 1024 * 1024      // 1MB max response from Convex
 	httpTimeout           = 10 * time.Second // HTTP client timeout
-	quotaCacheTTL         = 30 * time.Second // How long to cache quota data
+	quotaStaleTTL         = 30 * time.Second // How long before refreshing quota from Convex
 	endpointCacheTTL      = 60 * time.Second // How long to cache endpoint info
 	batchFlushInterval    = 100 * time.Millisecond
 	batchMaxSize          = 50    // Flush when batch reaches this size
@@ -37,6 +38,7 @@ const (
 	shutdownTimeout       = 10 * time.Second
 	maxCacheEntries       = 10000 // Maximum cache entries before cleanup
 	cacheCleanupInterval  = 5 * time.Minute
+	quotaFileMaxAge       = 1 * time.Hour // Maximum age of quota files before cleanup
 )
 
 // BufferedRequest holds request data waiting to be sent to Convex.
@@ -65,23 +67,42 @@ type MockResponse struct {
 	Headers map[string]string `json:"headers"`
 }
 
-// QuotaEntry holds cached quota information for an endpoint's user.
-type QuotaEntry struct {
-	UserID      string
-	Remaining   int64
-	Limit       int64
-	PeriodEnd   int64
-	LastSync    time.Time
-	IsUnlimited bool
+// QuotaFile represents the quota data persisted to disk for each slug.
+// File-based storage eliminates the pointer aliasing data race that existed
+// in the in-memory cache when multiple goroutines held pointers to the same entry.
+type QuotaFile struct {
+	Remaining   int64 `json:"remaining"`
+	Limit       int64 `json:"limit"`
+	PeriodEnd   int64 `json:"periodEnd"`
+	LastSync    int64 `json:"lastSync"`
+	IsUnlimited bool  `json:"isUnlimited"`
+	UserID      string `json:"userId"`
+}
+
+// QuotaCheckResult contains the result of a quota check.
+type QuotaCheckResult struct {
+	Allowed    bool
+	RetryAfter int64 // Milliseconds until quota resets (for 429 response)
 }
 
 // QuotaResponse is the JSON structure returned by Convex /quota endpoint.
 type QuotaResponse struct {
-	Error     string `json:"error,omitempty"`
-	UserID    string `json:"userId"`
-	Remaining int64  `json:"remaining"`
-	Limit     int64  `json:"limit"`
-	PeriodEnd *int64 `json:"periodEnd"`
+	Error            string  `json:"error,omitempty"`
+	UserID           string  `json:"userId"`
+	Remaining        int64   `json:"remaining"`
+	Limit            int64   `json:"limit"`
+	PeriodEnd        *int64  `json:"periodEnd"`
+	Plan             *string `json:"plan"`
+	NeedsPeriodStart bool    `json:"needsPeriodStart"`
+}
+
+// CheckPeriodResponse is the JSON structure returned by Convex /check-period endpoint.
+type CheckPeriodResponse struct {
+	Error      string `json:"error,omitempty"`
+	Remaining  int64  `json:"remaining"`
+	Limit      int64  `json:"limit"`
+	PeriodEnd  *int64 `json:"periodEnd"`
+	RetryAfter *int64 `json:"retryAfter"`
 }
 
 // EndpointInfo holds cached endpoint configuration.
@@ -220,7 +241,9 @@ func (c *EndpointCache) Get(ctx context.Context, slug string) (*EndpointInfo, er
 	// Update cache and notify waiters
 	c.mu.Lock()
 	delete(c.inFlight, slug)
-	if err == nil && newEntry != nil {
+	// Only cache successful responses - don't cache "not_found" errors
+	// This prevents caching transient failures or race conditions during endpoint creation
+	if err == nil && newEntry != nil && newEntry.Error == "" {
 		c.entries[slug] = newEntry
 	}
 	req.result = newEntry
@@ -239,148 +262,123 @@ func (c *EndpointCache) Get(ctx context.Context, slug string) (*EndpointInfo, er
 	return newEntry, nil
 }
 
-// QuotaCache provides thread-safe caching of user quota information.
-// Uses single-flight pattern to prevent thundering herd on cache refresh.
-// Implements size-bounded caching with periodic cleanup of stale entries.
-type QuotaCache struct {
-	mu       sync.RWMutex
-	entries  map[string]*QuotaEntry
-	inFlight map[string]*inFlightRequest
-	ttl      time.Duration
-	maxSize  int
+// FileQuotaStore provides thread-safe file-based quota tracking per slug.
+// Each slug's quota is stored in a separate JSON file, eliminating the
+// pointer aliasing data race that existed in the in-memory cache.
+// Uses a global mutex for simplicity and correctness.
+type FileQuotaStore struct {
+	dir string
+	mu  sync.Mutex
 }
 
-func NewQuotaCache(ttl time.Duration) *QuotaCache {
-	c := &QuotaCache{
-		entries:  make(map[string]*QuotaEntry),
-		inFlight: make(map[string]*inFlightRequest),
-		ttl:      ttl,
-		maxSize:  maxCacheEntries,
+// NewFileQuotaStore creates a new file-based quota store.
+// Creates the directory if it doesn't exist and starts a cleanup goroutine.
+func NewFileQuotaStore(dir string) *FileQuotaStore {
+	if err := os.MkdirAll(dir, 0700); err != nil {
+		log.Printf("Warning: failed to create quota directory %s: %v", dir, err)
 	}
-	// Start background cleanup goroutine
-	go c.cleanupLoop()
-	return c
+	s := &FileQuotaStore{dir: dir}
+	go s.cleanupLoop()
+	return s
 }
 
-// cleanupLoop periodically removes stale entries to prevent unbounded growth.
-func (c *QuotaCache) cleanupLoop() {
+// cleanupLoop periodically removes stale quota files.
+func (s *FileQuotaStore) cleanupLoop() {
 	ticker := time.NewTicker(cacheCleanupInterval)
 	defer ticker.Stop()
 	for range ticker.C {
-		c.cleanup()
+		s.cleanup()
 	}
 }
 
-// cleanup removes entries older than 2x TTL and enforces max size.
-func (c *QuotaCache) cleanup() {
-	c.mu.Lock()
-	defer c.mu.Unlock()
+// cleanup removes quota files older than quotaFileMaxAge.
+func (s *FileQuotaStore) cleanup() {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	entries, err := os.ReadDir(s.dir)
+	if err != nil {
+		log.Printf("Warning: failed to read quota directory: %v", err)
+		return
+	}
 
 	now := time.Now()
-	staleThreshold := c.ttl * 2
-
-	// Remove stale entries
-	for slug, entry := range c.entries {
-		if now.Sub(entry.LastSync) > staleThreshold {
-			delete(c.entries, slug)
+	for _, entry := range entries {
+		if entry.IsDir() || !strings.HasSuffix(entry.Name(), ".json") {
+			continue
 		}
-	}
 
-	// If still over max size, remove oldest entries
-	for len(c.entries) > c.maxSize {
-		var oldestSlug string
-		var oldestTime time.Time
-		for slug, entry := range c.entries {
-			if oldestSlug == "" || entry.LastSync.Before(oldestTime) {
-				oldestSlug = slug
-				oldestTime = entry.LastSync
+		info, err := entry.Info()
+		if err != nil {
+			continue
+		}
+
+		if now.Sub(info.ModTime()) > quotaFileMaxAge {
+			path := filepath.Join(s.dir, entry.Name())
+			if err := os.Remove(path); err != nil {
+				log.Printf("Warning: failed to remove stale quota file %s: %v", path, err)
 			}
-		}
-		if oldestSlug != "" {
-			delete(c.entries, oldestSlug)
 		}
 	}
 }
 
-func (c *QuotaCache) Check(ctx context.Context, slug string) (*QuotaEntry, error) {
-	// Fast path: check if we have a valid cached entry
-	c.mu.RLock()
-	entry, exists := c.entries[slug]
-	isStale := !exists || time.Since(entry.LastSync) > c.ttl
-	c.mu.RUnlock()
-
-	if !isStale && entry != nil {
-		return entry, nil
-	}
-
-	// Slow path: need to refresh - use single-flight pattern
-	c.mu.Lock()
-	// Double-check after acquiring write lock
-	entry, exists = c.entries[slug]
-	isStale = !exists || time.Since(entry.LastSync) > c.ttl
-	if !isStale && entry != nil {
-		c.mu.Unlock()
-		return entry, nil
-	}
-
-	// Check if another goroutine is already fetching this slug
-	if req, ok := c.inFlight[slug]; ok {
-		c.mu.Unlock()
-		// Wait for the in-flight request to complete or context cancellation
-		select {
-		case <-req.done:
-			if req.err != nil {
-				// On error, return stale cache if available
-				if exists && entry != nil {
-					return entry, nil
-				}
-				return nil, req.err
-			}
-			if req.result == nil {
-				return nil, nil
-			}
-			return req.result.(*QuotaEntry), nil
-		case <-ctx.Done():
-			// Context cancelled while waiting - return stale cache or error
-			if exists && entry != nil {
-				return entry, nil
-			}
-			return nil, ctx.Err()
-		}
-	}
-
-	// We're the first - create in-flight tracker
-	req := &inFlightRequest{done: make(chan struct{})}
-	c.inFlight[slug] = req
-	c.mu.Unlock()
-
-	// Fetch from Convex
-	newEntry, err := c.fetchQuota(ctx, slug)
-
-	// Update cache and notify waiters
-	c.mu.Lock()
-	delete(c.inFlight, slug)
-	if err == nil && newEntry != nil {
-		c.entries[slug] = newEntry
-	}
-	req.result = newEntry
-	req.err = err
-	c.mu.Unlock()
-	close(req.done)
-
+// readQuotaFile reads a quota file from disk.
+// Returns nil if the file doesn't exist.
+func (s *FileQuotaStore) readQuotaFile(path string) (*QuotaFile, error) {
+	data, err := os.ReadFile(path)
 	if err != nil {
-		if exists && entry != nil {
-			log.Printf("Quota refresh failed for %s, using stale cache: %v", slug, err)
-			return entry, nil
+		if os.IsNotExist(err) {
+			return nil, nil
 		}
 		return nil, err
 	}
 
-	return newEntry, nil
+	var quota QuotaFile
+	if err := json.Unmarshal(data, &quota); err != nil {
+		return nil, err
+	}
+
+	return &quota, nil
 }
 
-// fetchQuota retrieves quota information from Convex.
-func (c *QuotaCache) fetchQuota(ctx context.Context, slug string) (*QuotaEntry, error) {
+// writeQuotaFile writes a quota file to disk atomically.
+// Uses a unique temp file and fsync for data integrity.
+func (s *FileQuotaStore) writeQuotaFile(path string, quota *QuotaFile) error {
+	data, err := json.Marshal(quota)
+	if err != nil {
+		return err
+	}
+
+	// Use unique temp file name to avoid conflicts
+	tmpPath := fmt.Sprintf("%s.%d.tmp", path, os.Getpid())
+	f, err := os.OpenFile(tmpPath, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0600)
+	if err != nil {
+		return err
+	}
+
+	if _, err := f.Write(data); err != nil {
+		f.Close()
+		os.Remove(tmpPath)
+		return err
+	}
+
+	// Sync to disk before rename for durability
+	if err := f.Sync(); err != nil {
+		f.Close()
+		os.Remove(tmpPath)
+		return err
+	}
+
+	if err := f.Close(); err != nil {
+		os.Remove(tmpPath)
+		return err
+	}
+
+	return os.Rename(tmpPath, path)
+}
+
+// fetchAndCreateQuota fetches quota from Convex and creates a QuotaFile.
+func (s *FileQuotaStore) fetchAndCreateQuota(ctx context.Context, slug string) (*QuotaFile, error) {
 	resp, err := fetchQuota(ctx, slug)
 	if err != nil {
 		return nil, err
@@ -390,39 +388,167 @@ func (c *QuotaCache) fetchQuota(ctx context.Context, slug string) (*QuotaEntry, 
 		return nil, nil
 	}
 
-	entry := &QuotaEntry{
+	// For free users who need period start, call check-period to initialize
+	if resp.NeedsPeriodStart && resp.UserID != "" {
+		log.Printf("Starting period for free user %s (needsPeriodStart=true)", resp.UserID)
+		periodResp, err := callCheckPeriod(ctx, resp.UserID)
+		if err != nil {
+			log.Printf("Failed to start period for user %s: %v", resp.UserID, err)
+			// Fall through and use the original response
+		} else if periodResp.Error == "quota_exceeded" {
+			// User is over quota
+			quota := &QuotaFile{
+				UserID:      resp.UserID,
+				Remaining:   0,
+				Limit:       periodResp.Limit,
+				LastSync:    time.Now().UnixMilli(),
+				IsUnlimited: false,
+			}
+			if periodResp.PeriodEnd != nil {
+				quota.PeriodEnd = *periodResp.PeriodEnd
+			}
+			return quota, nil
+		} else if periodResp.Error == "" {
+			// Period started successfully, use the new quota info
+			log.Printf("Period started for user %s, periodEnd=%v, remaining=%d", resp.UserID, periodResp.PeriodEnd, periodResp.Remaining)
+			quota := &QuotaFile{
+				UserID:      resp.UserID,
+				Remaining:   periodResp.Remaining,
+				Limit:       periodResp.Limit,
+				LastSync:    time.Now().UnixMilli(),
+				IsUnlimited: false,
+			}
+			if periodResp.PeriodEnd != nil {
+				quota.PeriodEnd = *periodResp.PeriodEnd
+			}
+			return quota, nil
+		} else {
+			log.Printf("Unexpected error from check-period for user %s: %s", resp.UserID, periodResp.Error)
+		}
+	}
+
+	quota := &QuotaFile{
 		UserID:      resp.UserID,
 		Remaining:   resp.Remaining,
 		Limit:       resp.Limit,
-		LastSync:    time.Now(),
+		LastSync:    time.Now().UnixMilli(),
 		IsUnlimited: resp.Remaining == -1,
 	}
 	if resp.PeriodEnd != nil {
-		entry.PeriodEnd = *resp.PeriodEnd
+		quota.PeriodEnd = *resp.PeriodEnd
 	}
 
-	return entry, nil
+	log.Printf("[fetchAndCreateQuota] Created quota for slug: IsUnlimited=%v Remaining=%d Limit=%d", quota.IsUnlimited, quota.Remaining, quota.Limit)
+
+	return quota, nil
 }
 
-// CheckAndDecrement atomically checks if quota allows a request and decrements if so.
-// Returns true if the request is allowed, false if quota is exceeded.
-// Returns true for unlimited quotas or if no entry exists (fail-open).
-func (c *QuotaCache) CheckAndDecrement(slug string) bool {
-	c.mu.Lock()
-	defer c.mu.Unlock()
-
-	entry, exists := c.entries[slug]
-	if !exists {
-		return true // Fail-open if no cached entry
-	}
-	if entry.IsUnlimited {
-		return true
-	}
-	if entry.Remaining <= 0 {
+// isValidSlug validates that slug contains only safe characters for filenames.
+// This prevents path traversal attacks when constructing file paths.
+func isValidSlug(slug string) bool {
+	if len(slug) == 0 || len(slug) > 64 {
 		return false
 	}
-	entry.Remaining--
+	for _, r := range slug {
+		if !((r >= 'a' && r <= 'z') || (r >= 'A' && r <= 'Z') ||
+			(r >= '0' && r <= '9') || r == '-' || r == '_') {
+			return false
+		}
+	}
 	return true
+}
+
+// GetAndDecrement atomically reads quota, decrements if allowed, and writes back.
+// Returns QuotaCheckResult indicating if request is allowed and retry info for 429s.
+// Fail-open on errors for availability.
+func (s *FileQuotaStore) GetAndDecrement(ctx context.Context, slug string) QuotaCheckResult {
+	// Validate slug to prevent path traversal attacks
+	if !isValidSlug(slug) {
+		log.Printf("Warning: invalid slug format: %s", slug)
+		return QuotaCheckResult{Allowed: true} // Fail-open
+	}
+
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	path := filepath.Join(s.dir, slug+".json")
+
+	// Read existing quota file
+	quota, err := s.readQuotaFile(path)
+	if err != nil {
+		log.Printf("Warning: failed to read quota file for %s: %v", slug, err)
+		// Fall through to fetch from Convex
+	}
+
+	// Check if we need to fetch from Convex (no file or stale)
+	needsFetch := quota == nil
+	if quota != nil {
+		staleDuration := time.Now().UnixMilli() - quota.LastSync
+		if staleDuration > quotaStaleTTL.Milliseconds() {
+			needsFetch = true
+			log.Printf("[GetAndDecrement] slug=%s quota stale (age=%dms), refreshing", slug, staleDuration)
+		}
+	}
+
+	if needsFetch {
+		newQuota, err := s.fetchAndCreateQuota(ctx, slug)
+		if err != nil {
+			log.Printf("Warning: failed to fetch quota for %s: %v", slug, err)
+			// If we have stale data, use it; otherwise fail-open
+			if quota == nil {
+				log.Printf("[GetAndDecrement] slug=%s no cached data, fail-open", slug)
+				return QuotaCheckResult{Allowed: true}
+			}
+			log.Printf("[GetAndDecrement] slug=%s using stale quota data", slug)
+		} else if newQuota == nil {
+			// Endpoint not found
+			log.Printf("[GetAndDecrement] slug=%s endpoint not found, fail-open", slug)
+			return QuotaCheckResult{Allowed: true}
+		} else {
+			quota = newQuota
+			// Write the fresh quota to disk
+			if err := s.writeQuotaFile(path, quota); err != nil {
+				log.Printf("Warning: failed to write quota file for %s: %v", slug, err)
+			}
+		}
+	}
+
+	// If still no quota (shouldn't happen), fail-open
+	if quota == nil {
+		log.Printf("[GetAndDecrement] slug=%s no quota data, fail-open", slug)
+		return QuotaCheckResult{Allowed: true}
+	}
+
+	log.Printf("[GetAndDecrement] slug=%s IsUnlimited=%v Remaining=%d Limit=%d PeriodEnd=%d",
+		slug, quota.IsUnlimited, quota.Remaining, quota.Limit, quota.PeriodEnd)
+
+	// Unlimited quota
+	if quota.IsUnlimited {
+		return QuotaCheckResult{Allowed: true}
+	}
+
+	// Check if over quota
+	if quota.Remaining <= 0 {
+		var retryAfter int64
+		if quota.PeriodEnd > 0 {
+			retryAfter = quota.PeriodEnd - time.Now().UnixMilli()
+			if retryAfter < 0 {
+				retryAfter = 0
+			}
+		}
+		log.Printf("[GetAndDecrement] slug=%s QUOTA_EXCEEDED retryAfter=%d", slug, retryAfter)
+		return QuotaCheckResult{Allowed: false, RetryAfter: retryAfter}
+	}
+
+	// Decrement and save
+	quota.Remaining--
+	if err := s.writeQuotaFile(path, quota); err != nil {
+		log.Printf("Warning: failed to write quota file for %s: %v", slug, err)
+		// Still allow the request since we already decremented in memory
+	}
+
+	log.Printf("[GetAndDecrement] slug=%s ALLOWED remaining=%d", slug, quota.Remaining)
+	return QuotaCheckResult{Allowed: true}
 }
 
 // RequestBatcher buffers requests per slug and flushes them in batches.
@@ -540,7 +666,7 @@ func (b *RequestBatcher) Wait() {
 }
 
 var (
-	quotaCache          *QuotaCache
+	quotaStore          *FileQuotaStore
 	endpointCache       *EndpointCache
 	requestBatcher      *RequestBatcher
 	convexSiteURL       string
@@ -568,7 +694,11 @@ func main() {
 		},
 	}
 
-	quotaCache = NewQuotaCache(quotaCacheTTL)
+	quotaDir := os.Getenv("QUOTA_STORAGE_DIR")
+	if quotaDir == "" {
+		quotaDir = "/tmp/webhooks-quota"
+	}
+	quotaStore = NewFileQuotaStore(quotaDir)
 	endpointCache = NewEndpointCache(endpointCacheTTL)
 	requestBatcher = NewRequestBatcher(batchMaxSize, batchFlushInterval)
 
@@ -653,6 +783,7 @@ func realIP(c *fiber.Ctx) string {
 // the request for batch processing.
 func handleWebhook(c *fiber.Ctx) error {
 	slug := c.Params("slug")
+	log.Printf("[handleWebhook] Processing request for slug=%s", slug)
 	path := c.Params("*")
 	if path == "" {
 		path = "/"
@@ -675,16 +806,20 @@ func handleWebhook(c *fiber.Ctx) error {
 		return c.Status(410).SendString("Endpoint expired")
 	}
 
-	// Check and refresh quota cache (fail-open on errors for availability)
-	_, err = quotaCache.Check(c.Context(), slug)
-	if err != nil {
-		log.Printf("Quota check failed for %s, allowing request: %v", slug, err)
-	}
-
 	// Atomically check quota and decrement if allowed
-	// This prevents the race condition where multiple goroutines check > 0 then all decrement
-	if !quotaCache.CheckAndDecrement(slug) {
-		return c.Status(429).SendString("Request limit exceeded")
+	// File-based storage eliminates the pointer aliasing race condition
+	quotaResult := quotaStore.GetAndDecrement(c.Context(), slug)
+	if !quotaResult.Allowed {
+		log.Printf("[handleWebhook] QUOTA_EXCEEDED for slug=%s retryAfter=%d", slug, quotaResult.RetryAfter)
+		if quotaResult.RetryAfter > 0 {
+			retryAfterSecs := (quotaResult.RetryAfter + 999) / 1000 // Round up to seconds
+			c.Set("Retry-After", fmt.Sprintf("%d", retryAfterSecs))
+		}
+		return c.Status(429).JSON(fiber.Map{
+			"error":      "quota_exceeded",
+			"retryAfter": quotaResult.RetryAfter,
+			"slug":       slug,
+		})
 	}
 
 	// Collect headers
@@ -712,7 +847,13 @@ func handleWebhook(c *fiber.Ctx) error {
 
 	// Return mock response immediately from cache
 	if endpointInfo.MockResponse != nil {
+		const maxHeaderKeyLen = 256
+		const maxHeaderValueLen = 8192
 		for key, value := range endpointInfo.MockResponse.Headers {
+			// Skip headers that exceed length limits
+			if len(key) > maxHeaderKeyLen || len(value) > maxHeaderValueLen {
+				continue
+			}
 			keyLower := strings.ToLower(key)
 			if keyLower == "set-cookie" || keyLower == "strict-transport-security" ||
 				keyLower == "content-security-policy" || keyLower == "x-frame-options" {
@@ -767,7 +908,49 @@ func fetchEndpointInfo(ctx context.Context, slug string) (*EndpointInfo, error) 
 	return &result, nil
 }
 
+// callCheckPeriod calls the Convex /check-period endpoint to start a free user's period.
+func callCheckPeriod(ctx context.Context, userID string) (*CheckPeriodResponse, error) {
+	payload, err := json.Marshal(map[string]string{"userId": userID})
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal check-period request: %w", err)
+	}
+
+	req, err := http.NewRequestWithContext(ctx, "POST", convexSiteURL+"/check-period", bytes.NewReader(payload))
+	if err != nil {
+		return nil, fmt.Errorf("failed to create check-period request: %w", err)
+	}
+	req.Header.Set("Content-Type", "application/json")
+
+	if captureSharedSecret != "" {
+		req.Header.Set("Authorization", "Bearer "+captureSharedSecret)
+	}
+
+	resp, err := httpClient.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("failed to call check-period: %w", err)
+	}
+	defer resp.Body.Close()
+
+	body, err := io.ReadAll(io.LimitReader(resp.Body, maxConvexResponseSize))
+	if err != nil {
+		return nil, fmt.Errorf("failed to read check-period response: %w", err)
+	}
+
+	// 429 responses contain valid quota_exceeded JSON
+	if resp.StatusCode != 200 && resp.StatusCode != 429 {
+		return nil, fmt.Errorf("check-period endpoint returned status %d: %s", resp.StatusCode, string(body))
+	}
+
+	var result CheckPeriodResponse
+	if err := json.Unmarshal(body, &result); err != nil {
+		return nil, fmt.Errorf("failed to parse check-period response: %w", err)
+	}
+
+	return &result, nil
+}
+
 func fetchQuota(ctx context.Context, slug string) (*QuotaResponse, error) {
+	log.Printf("[fetchQuota] Fetching quota for slug=%s", slug)
 	req, err := http.NewRequestWithContext(ctx, "GET", convexSiteURL+"/quota?slug="+url.QueryEscape(slug), nil)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create quota request: %w", err)
@@ -796,6 +979,9 @@ func fetchQuota(ctx context.Context, slug string) (*QuotaResponse, error) {
 	if err := json.Unmarshal(body, &result); err != nil {
 		return nil, fmt.Errorf("failed to parse quota response: %w", err)
 	}
+
+	log.Printf("[fetchQuota] slug=%s response: userId=%s remaining=%d limit=%d needsPeriodStart=%v error=%s",
+		slug, result.UserID, result.Remaining, result.Limit, result.NeedsPeriodStart, result.Error)
 
 	return &result, nil
 }

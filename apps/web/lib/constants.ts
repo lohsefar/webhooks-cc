@@ -23,7 +23,9 @@ const SLUG_REGEX = /^[a-zA-Z0-9_-]{1,50}$/;
  */
 export function getWebhookUrl(slug: string): string {
   if (!SLUG_REGEX.test(slug)) {
-    throw new Error("Invalid slug: must contain only alphanumeric characters, hyphens, and underscores (1-50 chars)");
+    throw new Error(
+      "Invalid slug: must contain only alphanumeric characters, hyphens, and underscores (1-50 chars)"
+    );
   }
   return `${WEBHOOK_BASE_URL}/w/${slug}`;
 }
@@ -41,4 +43,7 @@ export const SKIP_HEADERS_FOR_CURL: readonly string[] = ["host", "content-length
  * Extends SKIP_HEADERS_FOR_CURL with:
  * - accept-encoding: let the HTTP client handle compression negotiation
  */
-export const SKIP_HEADERS_FOR_REPLAY: readonly string[] = [...SKIP_HEADERS_FOR_CURL, "accept-encoding"];
+export const SKIP_HEADERS_FOR_REPLAY: readonly string[] = [
+  ...SKIP_HEADERS_FOR_CURL,
+  "accept-encoding",
+];

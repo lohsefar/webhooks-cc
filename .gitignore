@@ -41,3 +41,6 @@ feat/
 
 # Documentation (internal planning docs)
 docs/
+
+# Temporary files
+tmp/

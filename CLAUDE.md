@@ -38,6 +38,19 @@ npx convex run <fn> '{}'  # Run a function (e.g., endpoints:create)
 npx convex data           # List all tables
 ```
 
+### Systemd Services
+
+The Go receiver runs as a systemd service in the dev environment:
+
+```bash
+sudo systemctl restart webhooks-receiver  # Restart receiver (clears cache)
+sudo systemctl status webhooks-receiver   # Check status
+sudo journalctl -u webhooks-receiver -f   # Follow logs
+sudo journalctl -u webhooks-receiver --since "5 minutes ago"  # Recent logs
+```
+
+**Important**: After rebuilding the receiver (`make build-receiver`), restart the service to apply changes.
+
 ## Architecture
 
 ### Service Layout

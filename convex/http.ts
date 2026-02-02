@@ -68,6 +68,41 @@ async function secureCompare(a: string, b: string): Promise<boolean> {
   }
 }
 
+/**
+ * Creates an HTTP error response for capture mutation results.
+ * Returns null if the result is successful (no error).
+ */
+function createCaptureErrorResponse(result: {
+  error?: string;
+  retryAfter?: number;
+  periodEnd?: number | null;
+}): Response | null {
+  if (result.error === "rate_limited" || result.error === "quota_exceeded") {
+    return new Response(JSON.stringify(result), {
+      status: 429,
+      headers: {
+        "Content-Type": "application/json",
+        ...(result.retryAfter
+          ? { "Retry-After": String(Math.ceil(result.retryAfter / 1000)) }
+          : {}),
+      },
+    });
+  }
+  if (result.error === "not_found") {
+    return new Response(JSON.stringify(result), {
+      status: 404,
+      headers: { "Content-Type": "application/json" },
+    });
+  }
+  if (result.error === "expired") {
+    return new Response(JSON.stringify(result), {
+      status: 410,
+      headers: { "Content-Type": "application/json" },
+    });
+  }
+  return null;
+}
+
 // HTTP endpoint for Go receiver to fetch quota information for rate limiting.
 // Returns remaining quota for a given slug, enabling the receiver to enforce
 // limits locally and avoid OCC conflicts from concurrent user doc reads.
@@ -110,6 +145,75 @@ http.route({
 
     // Look up endpoint and user quota
     const result = await ctx.runQuery(internal.requests.getQuota, { slug });
+
+    return new Response(JSON.stringify(result), {
+      headers: { "Content-Type": "application/json" },
+    });
+  }),
+});
+
+// HTTP endpoint for Go receiver to check and start a free user's period if needed.
+// Called when getQuota returns needsPeriodStart=true.
+// Usage: POST /check-period with { userId: string }
+http.route({
+  path: "/check-period",
+  method: "POST",
+  handler: httpAction(async (ctx, request) => {
+    // Verify shared secret from Go receiver
+    const authHeader = request.headers.get("Authorization");
+    const expectedSecret = process.env.CAPTURE_SHARED_SECRET;
+
+    if (!expectedSecret) {
+      console.error("CAPTURE_SHARED_SECRET is not configured - denying request");
+      return new Response(JSON.stringify({ error: "server_misconfiguration" }), {
+        status: 500,
+        headers: { "Content-Type": "application/json" },
+      });
+    }
+
+    const providedSecret = authHeader?.startsWith("Bearer ") ? authHeader.slice(7) : "";
+    const isValid = await secureCompare(providedSecret, expectedSecret);
+    if (!isValid) {
+      return new Response(JSON.stringify({ error: "unauthorized" }), {
+        status: 401,
+        headers: { "Content-Type": "application/json" },
+      });
+    }
+
+    let body;
+    try {
+      body = await request.json();
+    } catch {
+      return new Response(JSON.stringify({ error: "invalid_json" }), {
+        status: 400,
+        headers: { "Content-Type": "application/json" },
+      });
+    }
+
+    // Basic validation - Convex's v.id() validator will verify the actual ID format
+    if (typeof body.userId !== "string" || body.userId.length === 0) {
+      return new Response(JSON.stringify({ error: "invalid_user_id" }), {
+        status: 400,
+        headers: { "Content-Type": "application/json" },
+      });
+    }
+
+    let result;
+    try {
+      result = await ctx.runMutation(internal.requests.checkAndStartPeriod, {
+        userId: body.userId,
+      });
+    } catch (error) {
+      // Invalid ID format will throw from v.id() validator
+      console.error("checkAndStartPeriod error:", error);
+      return new Response(JSON.stringify({ error: "invalid_user_id" }), {
+        status: 400,
+        headers: { "Content-Type": "application/json" },
+      });
+    }
+
+    const errorResponse = createCaptureErrorResponse(result);
+    if (errorResponse) return errorResponse;
 
     return new Response(JSON.stringify(result), {
       headers: { "Content-Type": "application/json" },
@@ -270,7 +374,10 @@ http.route({
       }
 
       // Validate query params count, structure, and values are all strings
-      if (!isStringRecord(req.queryParams) || Object.keys(req.queryParams).length > MAX_QUERY_PARAMS) {
+      if (
+        !isStringRecord(req.queryParams) ||
+        Object.keys(req.queryParams).length > MAX_QUERY_PARAMS
+      ) {
         return new Response(JSON.stringify({ error: "invalid_query_params" }), {
           status: 400,
           headers: { "Content-Type": "application/json" },
@@ -295,6 +402,10 @@ http.route({
     }
 
     const result = await ctx.runMutation(internal.requests.captureBatch, body);
+
+    const errorResponse = createCaptureErrorResponse(result);
+    if (errorResponse) return errorResponse;
+
     return new Response(JSON.stringify(result), {
       headers: { "Content-Type": "application/json" },
     });
@@ -402,6 +513,10 @@ http.route({
     }
 
     const result = await ctx.runMutation(internal.requests.capture, body);
+
+    const errorResponse = createCaptureErrorResponse(result);
+    if (errorResponse) return errorResponse;
+
     return new Response(JSON.stringify(result), {
       headers: { "Content-Type": "application/json" },
     });

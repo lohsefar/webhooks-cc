@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
+import { ThemeToggle } from "@/components/ui/theme-toggle";
 
 export default function LoginPage() {
   const { isAuthenticated, isLoading } = useConvexAuth();
@@ -41,15 +42,35 @@ export default function LoginPage() {
 
   return (
     <div className="min-h-screen flex flex-col">
-      <nav className="border-b">
-        <div className="container mx-auto px-4 h-16 flex items-center">
-          <Link href="/" className="font-bold text-xl">
-            webhooks.cc
-          </Link>
+      <nav className="fixed top-4 left-4 right-4 z-50">
+        <div className="max-w-6xl mx-auto border-2 border-foreground bg-background shadow-neo">
+          <div className="px-6 h-16 flex items-center justify-between">
+            <Link href="/" className="font-bold text-xl tracking-tight">
+              webhooks.cc
+            </Link>
+            <div className="flex items-center gap-6">
+              <Link
+                href="/docs"
+                className="text-muted-foreground hover:text-foreground font-medium transition-colors"
+              >
+                Docs
+              </Link>
+              <Link
+                href="/installation"
+                className="text-muted-foreground hover:text-foreground font-medium transition-colors"
+              >
+                Install
+              </Link>
+              <ThemeToggle />
+              <Link href="/" className="neo-btn-outline text-sm py-2 px-4 w-28 text-center">
+                Home
+              </Link>
+            </div>
+          </div>
         </div>
       </nav>
 
-      <main className="flex-1 flex items-center justify-center px-4">
+      <main className="flex-1 flex items-center justify-center px-4 pt-24">
         <div className="w-full max-w-sm">
           <div className="text-center mb-8">
             <h1 className="text-2xl font-bold mb-2">Sign in to webhooks.cc</h1>

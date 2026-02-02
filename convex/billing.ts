@@ -120,7 +120,10 @@ export const handleWebhook = internalMutation({
             plan: "free",
             subscriptionStatus: "canceled",
             requestLimit: FREE_REQUEST_LIMIT,
+            requestsUsed: 0,
             cancelAtPeriodEnd: false,
+            periodStart: undefined,
+            periodEnd: undefined,
           });
         }
         break;
@@ -136,8 +139,10 @@ export const handleWebhook = internalMutation({
  * - If cancelAtPeriodEnd is true, downgrades to free tier
  * - Otherwise, starts a new billing period and resets usage
  *
- * For free users whose period ended:
- * - Resets requestsUsed to 0 and starts a new 30-day period
+ * Free users are handled via lazy activation:
+ * - When a free user's period expires, resetFreeUserPeriod clears periodEnd
+ * - On next request, checkAndStartPeriod starts a new 24-hour period
+ * - This avoids unnecessary period resets for inactive users
  *
  * Processes up to 100 users per run to avoid timeout.
  */
@@ -149,14 +154,19 @@ export const checkPeriodResets = internalMutation({
 
     // Find users whose period has ended using the index for efficient range query
     // Note: The index only returns users where periodEnd is defined AND < now
-    const proUsers = await ctx.db
+    const expiredUsers = await ctx.db
       .query("users")
       .withIndex("by_period_end", (q) => q.lt("periodEnd", now))
       .take(100);
 
-    for (const user of proUsers) {
+    for (const user of expiredUsers) {
+      // Skip free users - they use lazy activation via scheduled mutations
+      if (user.plan === "free") {
+        continue;
+      }
+
       if (user.cancelAtPeriodEnd) {
-        // Downgrade to free
+        // Downgrade to free - clear period so it starts fresh on next request
         await ctx.db.patch(user._id, {
           plan: "free",
           subscriptionStatus: "canceled",
@@ -179,33 +189,6 @@ export const checkPeriodResets = internalMutation({
         });
         processed++;
       }
-    }
-
-    // Reset free users who have exceeded their limit
-    // Free users get a rolling 30-day period, reset when their period ends
-    const freeUsers = await ctx.db
-      .query("users")
-      .filter((q) =>
-        q.and(
-          q.eq(q.field("plan"), "free"),
-          q.or(
-            // Never had a period set (legacy users)
-            q.eq(q.field("periodStart"), undefined),
-            // Period has ended
-            q.and(q.neq(q.field("periodEnd"), undefined), q.lt(q.field("periodEnd"), now))
-          )
-        )
-      )
-      .take(100);
-
-    for (const user of freeUsers) {
-      // Reset usage and set a new 30-day period
-      await ctx.db.patch(user._id, {
-        requestsUsed: 0,
-        periodStart: now,
-        periodEnd: now + BILLING_PERIOD_MS,
-      });
-      processed++;
     }
 
     return { processed };

@@ -14,6 +14,7 @@ interface RequestListProps {
   onToggleSort: () => void;
   newCount?: number;
   onJumpToNew?: () => void;
+  totalCount?: number;
 }
 
 export function RequestList({
@@ -26,15 +27,17 @@ export function RequestList({
   onToggleSort,
   newCount,
   onJumpToNew,
+  totalCount,
 }: RequestListProps) {
   const sorted = sortNewest ? requests : [...requests].reverse();
+  const displayCount = totalCount ?? requests.length;
 
   return (
     <div className="flex flex-col h-full">
       {/* Toolbar */}
       <div className="border-b-2 border-foreground px-3 py-2 flex items-center justify-between shrink-0">
         <span className="text-sm font-bold">
-          {requests.length} request{requests.length !== 1 ? "s" : ""}
+          {displayCount} request{displayCount !== 1 ? "s" : ""}
         </span>
         <div className="flex items-center gap-2">
           <button

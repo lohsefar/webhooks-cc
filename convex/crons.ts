@@ -13,4 +13,12 @@ crons.daily(
   internal.billing.checkPeriodResets
 );
 
+// Clean up old requests for pro users (30-day retention)
+crons.daily(
+  "cleanup old requests",
+  { hourUTC: 1, minuteUTC: 0 },
+  internal.requests.cleanupOldRequests,
+  { cursor: undefined }
+);
+
 export default crons;
