@@ -29,6 +29,12 @@ make build-cli            # Build CLI with goreleaser
 make test                 # Run all tests (TS + Go)
 ```
 
+**IMPORTANT**: After running `make build-receiver`, you MUST restart the systemd service for changes to take effect:
+
+```bash
+make build-receiver && sudo systemctl restart webhooks-receiver
+```
+
 ### Convex
 
 ```bash
@@ -40,16 +46,22 @@ npx convex data           # List all tables
 
 ### Systemd Services
 
-The Go receiver runs as a systemd service in the dev environment:
+The Go receiver runs as a systemd service in the dev environment. The service runs the binary at `dist/receiver`, so rebuilding alone does NOT apply changes - you must restart the service.
 
 ```bash
-sudo systemctl restart webhooks-receiver  # Restart receiver (clears cache)
+sudo systemctl restart webhooks-receiver  # Restart receiver (applies rebuild, clears cache)
 sudo systemctl status webhooks-receiver   # Check status
 sudo journalctl -u webhooks-receiver -f   # Follow logs
 sudo journalctl -u webhooks-receiver --since "5 minutes ago"  # Recent logs
 ```
 
-**Important**: After rebuilding the receiver (`make build-receiver`), restart the service to apply changes.
+**CRITICAL**: After ANY rebuild of the receiver (`make build-receiver`), you MUST restart the systemd service:
+
+```bash
+sudo systemctl restart webhooks-receiver
+```
+
+Without this step, the old binary continues running and your code changes have no effect.
 
 ## Architecture
 
