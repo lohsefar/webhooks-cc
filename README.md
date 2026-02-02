@@ -1,169 +1,75 @@
 # webhooks.cc
 
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+Inspect and debug webhooks without deploying to production.
 
-Inspect and test webhooks. Capture incoming requests, view their details, configure mock responses, and forward them to localhost.
+Get a unique URL, point your webhook there, and see every request in real-time. No signup required.
+
+**[Try it now →](https://webhooks.cc)**
+
+## Getting Started
+
+1. Visit [webhooks.cc](https://webhooks.cc)
+2. Copy your unique webhook URL
+3. Send a test request: `curl -X POST https://hooks.webhooks.cc/w/your-slug -d '{"test": true}'`
+4. Watch it appear in the dashboard
 
 ## Features
 
-- **Capture webhooks** — Store incoming HTTP requests
-- **Real-time updates** — See requests instantly via WebSocket
-- **Request inspection** — View headers, body, query params, and metadata
-- **Mock responses** — Return custom status codes, headers, and body
-- **Localhost tunneling** — Forward webhooks to your local server
-- **CLI** — Manage endpoints and tunnel from the terminal
-- **TypeScript SDK** — Access webhook data programmatically
+- **Capture requests** — Store incoming webhooks with headers, body, query params, and metadata
+- **Inspect in real-time** — See requests the moment they arrive via WebSocket
+- **Configure responses** — Return custom status codes, headers, and body for testing error paths
+- **Forward to localhost** — Tunnel webhooks to your local server during development
+- **CLI** — Manage endpoints and tunnel from your terminal with `whk`
+- **TypeScript SDK** — Access webhook data programmatically for automation and testing
 
-## Architecture
+## Use Cases
 
-```
-┌─────────────────┐     ┌─────────────────┐     ┌─────────────────┐
-│  External       │────▶│  Go Receiver    │────▶│  Convex         │
-│  Service        │     │  (port 3001)    │     │  Backend        │
-└─────────────────┘     └─────────────────┘     └────────┬────────┘
-                                                         │
-                                                         ▼
-┌─────────────────┐     ┌─────────────────┐     ┌─────────────────┐
-│  CLI            │◀───▶│  Next.js Web    │◀────│  Real-time      │
-│  (tunneling)    │     │  (port 3000)    │     │  Subscriptions  │
-└─────────────────┘     └─────────────────┘     └─────────────────┘
-```
+**Testing payment integrations** — Point Stripe's test webhooks at your endpoint. Inspect the payload structure before writing handlers.
 
-1. External services send webhooks to the Go receiver
-2. The receiver stores requests via Convex
-3. The web dashboard displays requests in real-time
-4. The CLI tunnels requests to localhost
+**Debugging CI/CD hooks** — See exactly what GitHub sends when a push, PR, or deployment occurs.
 
-## Prerequisites
+**Developing locally** — Forward production-like webhooks to localhost without exposing your machine to the internet.
 
-- Node.js 20+
-- pnpm 8+ (`npm install -g pnpm`)
-- Go 1.21+
-- Make
-- A [Convex](https://convex.dev) account
+**Mocking failure scenarios** — Configure your endpoint to return 500 errors and test your retry logic.
 
-## Quick Start
+## Pricing
 
-```bash
-git clone https://github.com/your-username/webhooks-cc.git
-cd webhooks-cc
+**Free** — 200 requests/day, 24-hour data retention. Enough for development and testing.
 
-pnpm install
+**Pro ($8/month)** — 500,000 requests/month, 30-day retention. For production monitoring and high-volume testing.
 
-cp .env.example .env.local
-# Edit .env.local with your Convex credentials
-
-# Terminal 1: Start Convex
-pnpm dev:convex
-
-# Terminal 2: Start the web app
-pnpm dev:web
-
-# Terminal 3: Start the receiver
-make dev-receiver
-```
-
-## Project Structure
-
-```
-webhooks-cc/
-├── apps/
-│   ├── web/          # Next.js dashboard (port 3000)
-│   ├── receiver/     # Go webhook receiver (port 3001)
-│   ├── cli/          # Go CLI
-│   └── go-shared/    # Shared Go types
-├── packages/
-│   └── sdk/          # TypeScript SDK
-├── convex/           # Backend functions
-└── docs/             # Documentation
-```
-
-## Tech Stack
-
-| Component | Technology                          |
-| --------- | ----------------------------------- |
-| Frontend  | Next.js 15, Tailwind CSS, shadcn/ui |
-| Backend   | Convex (database, auth, real-time)  |
-| Receiver  | Go, Fiber                           |
-| CLI       | Go, Cobra                           |
-| SDK       | TypeScript                          |
-| Payments  | Polar.sh (optional)                 |
-
-## Environment Variables
-
-Copy `.env.example` to `.env.local` and set:
-
-| Variable                  | Required | Description                        |
-| ------------------------- | -------- | ---------------------------------- |
-| `CONVEX_DEPLOYMENT`       | Yes      | Convex deployment identifier       |
-| `NEXT_PUBLIC_CONVEX_URL`  | Yes      | Convex cloud URL (`.convex.cloud`) |
-| `CONVEX_SITE_URL`         | Yes      | Convex site URL (`.convex.site`)   |
-| `NEXT_PUBLIC_WEBHOOK_URL` | Yes      | Public URL of your receiver        |
-| `NEXT_PUBLIC_APP_URL`     | Yes      | Public URL of your web app         |
-| `POLAR_ACCESS_TOKEN`      | No       | Polar.sh billing                   |
-| `SMTP_*`                  | No       | Email settings                     |
-
-### Convex Environment Variables
-
-Set via dashboard or `npx convex env set`:
-
-| Variable             | Default    | Description                          |
-| -------------------- | ---------- | ------------------------------------ |
-| `FREE_REQUEST_LIMIT` | 200        | Requests per period (free tier)      |
-| `PRO_REQUEST_LIMIT`  | 500000     | Requests per period (pro tier)       |
-| `EPHEMERAL_TTL_MS`   | 600000     | Anonymous endpoint lifetime (10 min) |
-| `BILLING_PERIOD_MS`  | 2592000000 | Billing cycle (30 days)              |
-
-## Commands
-
-```bash
-# Development
-pnpm dev:web              # Start web app
-pnpm dev:convex           # Start Convex
-make dev-receiver         # Start receiver
-make dev-cli ARGS="..."   # Run CLI
-
-# Build
-pnpm build                # Build TypeScript packages
-pnpm typecheck            # Type-check all packages
-make build                # Build everything
-make build-receiver       # Build receiver
-make build-cli            # Build CLI
-
-# Test
-make test                 # Run all tests
-
-# Deploy
-npx convex deploy         # Deploy Convex functions
-docker compose up -d      # Deploy with Docker
-```
+See [webhooks.cc/pricing](https://webhooks.cc/pricing) for details.
 
 ## CLI
 
 ```bash
-go install ./apps/cli
-
 whk login
 whk endpoints list
-whk endpoints create --name "my-webhook"
+whk endpoints create --name "stripe-test"
 whk tunnel 8080
 ```
 
-Set `WHK_API_URL` to point to your deployment.
+## SDK
 
-## Docker
+```typescript
+import { WebhooksClient } from '@webhooks-cc/sdk';
 
-```bash
-cp .env.example .env
-# Edit .env with production values
+const client = new WebhooksClient({ apiKey: 'your-api-key' });
 
-docker compose up -d
+const endpoint = await client.endpoints.create({ name: 'my-webhook' });
+console.log(endpoint.url);
+
+const requests = await client.requests.list(endpoint.id);
 ```
 
-## Contributing
+## Open Source
 
-See [CONTRIBUTING.md](CONTRIBUTING.md).
+This project is MIT licensed. The source is available for transparency and community contributions, not as a deployment guide.
+
+If you want to contribute, see [CONTRIBUTING.md](CONTRIBUTING.md).
+
+If you need to self-host for compliance or air-gapped environments, the code is here. But for most use cases, the hosted service at [webhooks.cc](https://webhooks.cc) is the easier path.
 
 ## License
 
-MIT — see [LICENSE](LICENSE).
+[MIT](LICENSE)
