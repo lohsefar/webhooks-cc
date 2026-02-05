@@ -76,6 +76,7 @@ function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
                   <Link
                     href={item.href}
                     onClick={onNavigate}
+                    aria-current={isActive ? "page" : undefined}
                     className={cn(
                       "block px-3 py-1.5 text-sm font-medium border-l-4 transition-colors",
                       isActive
@@ -100,19 +101,19 @@ export function DocsSidebar() {
 
   return (
     <>
-      {/* Mobile toggle */}
+      {/* Mobile toggle - below navbar (h-16 + top-4 + gap) */}
       <button
         onClick={() => setMobileOpen(!mobileOpen)}
-        className="md:hidden fixed top-[72px] left-4 z-40 p-2 border-2 border-foreground bg-background shadow-neo-sm cursor-pointer"
+        className="md:hidden fixed top-28 left-4 z-40 p-2 border-2 border-foreground bg-background shadow-neo-sm cursor-pointer"
         aria-label="Toggle docs navigation"
       >
         {mobileOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
       </button>
 
-      {/* Mobile overlay */}
+      {/* Mobile overlay - starts below navbar to keep navbar clickable */}
       {mobileOpen && (
         <div
-          className="md:hidden fixed inset-0 z-30 bg-background/80"
+          className="md:hidden fixed top-24 left-0 right-0 bottom-0 z-30 bg-background/80"
           onClick={() => setMobileOpen(false)}
         />
       )}
@@ -120,15 +121,15 @@ export function DocsSidebar() {
       {/* Mobile sidebar */}
       <aside
         className={cn(
-          "md:hidden fixed top-[56px] left-0 bottom-0 z-30 w-64 border-r-2 border-foreground bg-background overflow-y-auto py-6 transition-transform",
+          "md:hidden fixed top-24 left-4 bottom-4 z-[35] w-64 border-2 border-foreground bg-background shadow-neo overflow-y-auto py-6 transition-transform",
           mobileOpen ? "translate-x-0" : "-translate-x-full"
         )}
       >
         <SidebarContent onNavigate={() => setMobileOpen(false)} />
       </aside>
 
-      {/* Desktop sidebar */}
-      <aside className="hidden md:block w-64 shrink-0 border-r-2 border-foreground overflow-y-auto py-6">
+      {/* Desktop floating sidebar */}
+      <aside className="hidden md:block w-64 shrink-0 sticky top-24 self-start max-h-[calc(100vh-7rem)] border-2 border-foreground bg-background shadow-neo overflow-y-auto py-6">
         <SidebarContent />
       </aside>
     </>

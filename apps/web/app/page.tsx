@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { AuthNav } from "@/components/nav/auth-nav";
+import { FloatingNavbar } from "@/components/nav/floating-navbar";
 import { AuthAwareDemo } from "@/components/landing/auth-aware-demo";
 import { HeroCTA } from "@/components/landing/hero-cta";
 import { Zap, Eye, Terminal, ArrowRight, Check } from "lucide-react";
@@ -8,16 +8,7 @@ export default function Home() {
   return (
     <main className="min-h-screen">
       {/* Navigation */}
-      <nav className="fixed top-4 left-4 right-4 z-50">
-        <div className="max-w-6xl mx-auto border-2 border-foreground bg-background shadow-neo">
-          <div className="px-6 h-16 flex items-center justify-between">
-            <Link href="/" className="font-bold text-xl tracking-tight">
-              webhooks.cc
-            </Link>
-            <AuthNav />
-          </div>
-        </div>
-      </nav>
+      <FloatingNavbar />
 
       {/* Hero */}
       <section className="pt-32 pb-20 px-4">
@@ -238,14 +229,6 @@ export default function Home() {
                 <li>
                   <Link href="/docs/sdk" className="text-muted-foreground hover:text-foreground">
                     SDK Reference
-                  </Link>
-                </li>
-                <li>
-                  <Link
-                    href="/docs/webhooks"
-                    className="text-muted-foreground hover:text-foreground"
-                  >
-                    Webhook Guides
                   </Link>
                 </li>
               </ul>
