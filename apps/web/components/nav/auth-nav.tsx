@@ -2,25 +2,29 @@
 
 import { useConvexAuth } from "convex/react";
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 import { ThemeToggle } from "@/components/ui/theme-toggle";
+
+const NAV_LINKS = [
+  { href: "/docs", label: "Docs" },
+  { href: "/installation", label: "Install" },
+];
 
 export function AuthNav() {
   const { isAuthenticated, isLoading } = useConvexAuth();
+  const pathname = usePathname();
 
   return (
     <div className="flex items-center gap-6">
-      <Link
-        href="/docs"
-        className="text-muted-foreground hover:text-foreground font-medium transition-colors"
-      >
-        Docs
-      </Link>
-      <Link
-        href="/installation"
-        className="text-muted-foreground hover:text-foreground font-medium transition-colors"
-      >
-        Install
-      </Link>
+      {NAV_LINKS.filter((link) => pathname !== link.href).map((link) => (
+        <Link
+          key={link.href}
+          href={link.href}
+          className="text-muted-foreground hover:text-foreground font-medium transition-colors"
+        >
+          {link.label}
+        </Link>
+      ))}
       <ThemeToggle />
       {isLoading ? (
         <span className="neo-btn-outline text-sm py-2 px-4 w-28 text-center opacity-50">...</span>
