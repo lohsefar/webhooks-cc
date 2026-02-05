@@ -362,6 +362,38 @@ export const getForUser = internalQuery({
   },
 });
 
+export const listForUser = internalQuery({
+  args: {
+    endpointId: v.id("endpoints"),
+    userId: v.id("users"),
+    limit: v.optional(v.number()),
+    since: v.optional(v.number()),
+  },
+  handler: async (ctx, { endpointId, userId, limit = 50, since }) => {
+    const endpoint = await ctx.db.get(endpointId);
+    if (!endpoint) return [];
+    if (endpoint.userId !== userId) return [];
+
+    const actualLimit = Math.min(Math.max(1, limit), 1000);
+
+    if (since !== undefined) {
+      return await ctx.db
+        .query("requests")
+        .withIndex("by_endpoint_time", (q) =>
+          q.eq("endpointId", endpointId).gt("receivedAt", since)
+        )
+        .order("desc")
+        .take(actualLimit);
+    }
+
+    return await ctx.db
+      .query("requests")
+      .withIndex("by_endpoint_time", (q) => q.eq("endpointId", endpointId))
+      .order("desc")
+      .take(actualLimit);
+  },
+});
+
 export const listNewForUser = internalQuery({
   args: {
     endpointId: v.id("endpoints"),
