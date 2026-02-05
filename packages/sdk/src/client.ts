@@ -64,9 +64,9 @@ function validatePathSegment(segment: string, name: string): void {
  * response validation.
  */
 export class WebhooksCC {
-  private apiKey: string;
-  private baseUrl: string;
-  private timeout: number;
+  private readonly apiKey: string;
+  private readonly baseUrl: string;
+  private readonly timeout: number;
 
   constructor(options: ClientOptions) {
     this.apiKey = options.apiKey;

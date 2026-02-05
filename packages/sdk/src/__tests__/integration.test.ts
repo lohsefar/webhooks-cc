@@ -19,6 +19,7 @@ describe.skipIf(!API_KEY)("SDK integration tests", () => {
     // Create endpoint
     const endpoint = await client.endpoints.create({ name: "Integration Test" });
     expect(endpoint.slug).toBeTruthy();
+    expect(endpoint.url).toBeDefined();
     expect(endpoint.url).toContain(endpoint.slug);
 
     try {

@@ -28,8 +28,8 @@ export async function POST(request: Request) {
     return Response.json({ error: "Invalid JSON" }, { status: 400 });
   }
 
-  const name = typeof body.name === "string" ? body.name.trim() : "";
-  if (name.length === 0 || name.length > 100) {
+  const name = typeof body.name === "string" ? body.name.trim() : undefined;
+  if (name !== undefined && (name.length === 0 || name.length > 100)) {
     return Response.json({ error: "Name must be between 1 and 100 characters" }, { status: 400 });
   }
 

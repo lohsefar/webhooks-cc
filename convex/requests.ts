@@ -375,12 +375,13 @@ export const listForUser = internalQuery({
     if (endpoint.userId !== userId) return [];
 
     const actualLimit = Math.min(Math.max(1, limit), 1000);
+    const actualSince = since !== undefined ? Math.max(0, since) : undefined;
 
-    if (since !== undefined) {
+    if (actualSince !== undefined) {
       return await ctx.db
         .query("requests")
         .withIndex("by_endpoint_time", (q) =>
-          q.eq("endpointId", endpointId).gt("receivedAt", since)
+          q.eq("endpointId", endpointId).gt("receivedAt", actualSince)
         )
         .order("desc")
         .take(actualLimit);
