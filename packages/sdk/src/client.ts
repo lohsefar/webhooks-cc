@@ -13,12 +13,20 @@
  */
 import type {
   ClientOptions,
+  ClientHooks,
   Endpoint,
   Request,
   CreateEndpointOptions,
   ListRequestsOptions,
   WaitForOptions,
 } from "./types";
+import {
+  WebhooksCCError,
+  UnauthorizedError,
+  NotFoundError,
+  RateLimitError,
+  TimeoutError,
+} from "./errors";
 
 const DEFAULT_BASE_URL = "https://webhooks.cc";
 const DEFAULT_TIMEOUT = 30000;
@@ -38,6 +46,22 @@ export class ApiError extends Error {
   ) {
     super(`API error (${statusCode}): ${message}`);
     this.name = "ApiError";
+  }
+}
+
+/** Map HTTP status codes to typed errors. */
+function mapStatusToError(status: number, message: string, response: Response): WebhooksCCError {
+  switch (status) {
+    case 401:
+      return new UnauthorizedError(message);
+    case 404:
+      return new NotFoundError(message);
+    case 429: {
+      const retryAfter = response.headers.get("retry-after");
+      return new RateLimitError(retryAfter ? parseInt(retryAfter, 10) : undefined);
+    }
+    default:
+      return new WebhooksCCError(status, message);
   }
 }
 
@@ -67,19 +91,29 @@ export class WebhooksCC {
   private readonly apiKey: string;
   private readonly baseUrl: string;
   private readonly timeout: number;
+  private readonly hooks: ClientHooks;
 
   constructor(options: ClientOptions) {
     this.apiKey = options.apiKey;
     this.baseUrl = options.baseUrl ?? DEFAULT_BASE_URL;
     this.timeout = options.timeout ?? DEFAULT_TIMEOUT;
+    this.hooks = options.hooks ?? {};
   }
 
   private async request<T>(method: string, path: string, body?: unknown): Promise<T> {
+    const url = `${this.baseUrl}/api${path}`;
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), this.timeout);
+    const start = Date.now();
 
     try {
-      const response = await fetch(`${this.baseUrl}/api${path}`, {
+      this.hooks.onRequest?.({ method, url });
+    } catch {
+      // Hooks must not break the request flow
+    }
+
+    try {
+      const response = await fetch(url, {
         method,
         headers: {
           Authorization: `Bearer ${this.apiKey}`,
@@ -89,11 +123,24 @@ export class WebhooksCC {
         signal: controller.signal,
       });
 
+      const durationMs = Date.now() - start;
+
       if (!response.ok) {
-        const error = await response.text();
-        // Truncate error to prevent potential sensitive data leakage in logs
-        const sanitizedError = error.length > 200 ? error.slice(0, 200) + "..." : error;
-        throw new ApiError(response.status, sanitizedError);
+        const errorText = await response.text();
+        const sanitizedError = errorText.length > 200 ? errorText.slice(0, 200) + "..." : errorText;
+        const error = mapStatusToError(response.status, sanitizedError, response);
+        try {
+          this.hooks.onError?.({ method, url, error, durationMs });
+        } catch {
+          // Hooks must not break the request flow
+        }
+        throw error;
+      }
+
+      try {
+        this.hooks.onResponse?.({ method, url, status: response.status, durationMs });
+      } catch {
+        // Hooks must not break the request flow
       }
 
       // Handle empty responses (204 No Content)
@@ -109,7 +156,13 @@ export class WebhooksCC {
       return response.json() as Promise<T>;
     } catch (error) {
       if (error instanceof Error && error.name === "AbortError") {
-        throw new Error(`Request timed out after ${this.timeout}ms`);
+        const timeoutError = new TimeoutError(this.timeout);
+        try {
+          this.hooks.onError?.({ method, url, error: timeoutError, durationMs: Date.now() - start });
+        } catch {
+          // Hooks must not break the request flow
+        }
+        throw timeoutError;
       }
       throw error;
     } finally {
@@ -199,18 +252,15 @@ export class WebhooksCC {
           }
         } catch (error) {
           // Throw on non-transient errors - don't continue polling with invalid credentials
-          if (error instanceof ApiError) {
-            if (error.statusCode === 401) {
-              throw new Error("Authentication failed: invalid or expired API key");
+          if (error instanceof WebhooksCCError) {
+            if (error instanceof UnauthorizedError) {
+              throw error;
             }
-            if (error.statusCode === 403) {
-              throw new Error("Access denied: insufficient permissions for this endpoint");
+            if (error instanceof NotFoundError) {
+              throw error;
             }
-            if (error.statusCode === 404) {
-              throw new Error(`Endpoint "${endpointSlug}" not found`);
-            }
-            // Continue polling only for transient errors (5xx)
-            if (error.statusCode < 500) {
+            // Continue polling only for transient errors (5xx, rate limit)
+            if (error.statusCode < 500 && !(error instanceof RateLimitError)) {
               throw error;
             }
           }

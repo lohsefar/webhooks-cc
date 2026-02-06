@@ -17,6 +17,7 @@ import { generateApiKey, hashKey, MAX_KEYS_PER_USER } from "./apiKeys";
 import { customAlphabet } from "nanoid";
 
 const DEVICE_CODE_TTL_MS = 15 * 60 * 1000; // 15 minutes
+const API_KEY_TTL_MS = 90 * 24 * 60 * 60 * 1000; // 90 days
 
 // Alphanumeric for device codes (URL-safe, no ambiguous chars)
 const generateDeviceCode = customAlphabet(
@@ -33,8 +34,11 @@ const MAX_PENDING_CODES = 500;
 export const createDeviceCode = mutation({
   args: {},
   handler: async (ctx) => {
-    // Check table size to prevent flooding (this mutation is unauthenticated)
-    const pendingCodes = await ctx.db.query("deviceCodes").take(MAX_PENDING_CODES + 1);
+    // Check pending codes to prevent flooding (this mutation is unauthenticated)
+    const pendingCodes = await ctx.db
+      .query("deviceCodes")
+      .withIndex("by_status", (q) => q.eq("status", "pending"))
+      .take(MAX_PENDING_CODES + 1);
     if (pendingCodes.length > MAX_PENDING_CODES) {
       throw new Error("Too many pending device codes, please try again later");
     }
@@ -144,6 +148,7 @@ export const claimDeviceCode = mutation({
       keyHash,
       keyPrefix,
       name: "CLI (device auth)",
+      expiresAt: Date.now() + API_KEY_TTL_MS,
       createdAt: Date.now(),
     });
 

@@ -40,8 +40,9 @@ export const MAX_KEYS_PER_USER = 10;
 export const create = mutation({
   args: {
     name: v.string(),
+    expiresAt: v.optional(v.number()),
   },
-  handler: async (ctx, { name }) => {
+  handler: async (ctx, { name, expiresAt }) => {
     const userId = await getAuthUserId(ctx);
     if (!userId) throw new Error("Not authenticated");
 
@@ -69,6 +70,7 @@ export const create = mutation({
       keyHash,
       keyPrefix,
       name: trimmedName,
+      expiresAt,
       createdAt: Date.now(),
     });
 
@@ -94,6 +96,7 @@ export const list = query({
       name: key.name,
       keyPrefix: key.keyPrefix,
       lastUsedAt: key.lastUsedAt,
+      expiresAt: key.expiresAt,
       createdAt: key.createdAt,
     }));
   },
@@ -134,9 +137,33 @@ export const validate = internalMutation({
 
     if (!apiKey) return null;
 
+    // Check expiration
+    if (apiKey.expiresAt && apiKey.expiresAt < Date.now()) return null;
+
     // Update last used timestamp
     await ctx.db.patch(apiKey._id, { lastUsedAt: Date.now() });
 
     return { userId: apiKey.userId };
+  },
+});
+
+/**
+ * Clean up expired API keys. Called by daily cron.
+ * Processes up to 100 keys per run to avoid timeout.
+ */
+export const cleanupExpired = internalMutation({
+  args: {},
+  handler: async (ctx) => {
+    const now = Date.now();
+    const expired = await ctx.db
+      .query("apiKeys")
+      .withIndex("by_expires", (q) => q.lt("expiresAt", now))
+      .take(100);
+
+    for (const key of expired) {
+      await ctx.db.delete(key._id);
+    }
+
+    return { deleted: expired.length };
   },
 });

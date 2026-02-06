@@ -1,17 +1,10 @@
+import { publicEnv } from "./env";
+
 /**
  * Webhook receiver base URL.
- * Must access directly (not via dynamic key) for Next.js bundler to inline the value.
+ * Validated at startup via centralized env validation.
  */
-export const WEBHOOK_BASE_URL = (() => {
-  const value = process.env.NEXT_PUBLIC_WEBHOOK_URL;
-  if (!value) {
-    throw new Error(
-      `Required environment variable NEXT_PUBLIC_WEBHOOK_URL is not set. ` +
-        `Please add it to your .env.local file.`
-    );
-  }
-  return value;
-})();
+export const WEBHOOK_BASE_URL = publicEnv.NEXT_PUBLIC_WEBHOOK_URL;
 
 /** Valid slug format: alphanumeric with hyphens/underscores, 1-50 chars */
 const SLUG_REGEX = /^[a-zA-Z0-9_-]{1,50}$/;

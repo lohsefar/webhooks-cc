@@ -27,6 +27,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/getsentry/sentry-go"
 	"github.com/spf13/cobra"
 	"webhooks.cc/cli/internal/api"
 	"webhooks.cc/cli/internal/auth"
@@ -38,7 +39,25 @@ import (
 
 var version = "dev"
 
+// sentryDSN is set at build time via ldflags for release builds.
+// Can be overridden by the WHK_SENTRY_DSN environment variable.
+var sentryDSN string
+
 func main() {
+	// Initialize Sentry: env var takes precedence over build-time DSN
+	if dsn := os.Getenv("WHK_SENTRY_DSN"); dsn != "" {
+		sentryDSN = dsn
+	}
+	if dsn := sentryDSN; dsn != "" {
+		if err := sentry.Init(sentry.ClientOptions{
+			Dsn:     dsn,
+			Release: "whk@" + version,
+		}); err == nil {
+			defer sentry.Flush(2 * time.Second)
+			defer sentry.Recover()
+		}
+	}
+
 	rootCmd := &cobra.Command{
 		Use:     "whk",
 		Short:   "webhooks.cc CLI - Inspect and forward webhooks",
@@ -83,6 +102,7 @@ func main() {
 	rootCmd.AddCommand(updateCmd)
 
 	if err := rootCmd.Execute(); err != nil {
+		sentry.CaptureException(err)
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
 	}

@@ -188,7 +188,7 @@ export const setCancelAtPeriodEnd = internalMutation({
 function requireStringField(data: any, field: string, context: string): string {
   const value = data?.[field];
   if (typeof value !== "string" || value.length === 0) {
-    throw new Error(`[billing] Missing or invalid ${field} in ${context} webhook data`);
+    throw new Error(`[billing:error] Missing or invalid ${field} in ${context} webhook data`);
   }
   return value;
 }
@@ -201,35 +201,35 @@ export const handleWebhook = internalMutation({
   handler: async (ctx, { event, data }) => {
     // Basic data validation - all webhook events should have an object payload
     if (typeof data !== "object" || data === null) {
-      console.error(`[billing] Invalid webhook data for event ${event}: not an object`);
+      console.error(`[billing:error] Invalid webhook data for event ${event}: not an object`);
       return;
     }
-    console.log(`[billing.handleWebhook] Processing event: ${event}`);
+    console.log(`[billing:info] Processing event: ${event}`);
 
     switch (event) {
       // Customer events
       case "customer.created": {
-        const id = requireStringField(data, "id", "customer.created");
-        console.log(`[billing] Customer created: ${id}`);
+        requireStringField(data, "id", "customer.created");
+        console.log(`[billing:info] customer.created processed`);
         break;
       }
 
       case "customer.updated": {
-        const id = requireStringField(data, "id", "customer.updated");
-        console.log(`[billing] Customer updated: ${id}`);
+        requireStringField(data, "id", "customer.updated");
+        console.log(`[billing:info] customer.updated processed`);
         break;
       }
 
       // Order events
       case "order.paid": {
         requireStringField(data, "customer_id", "order.paid");
-        console.log(`[billing] Order paid for customer: ${data.customer_id}`);
+        console.log(`[billing:info] order.paid processed`);
         break;
       }
 
       case "order.refunded": {
-        const id = requireStringField(data, "id", "order.refunded");
-        console.log(`[billing] Order refunded: ${id}`);
+        requireStringField(data, "id", "order.refunded");
+        console.log(`[billing:info] order.refunded processed`);
         break;
       }
 
@@ -245,7 +245,7 @@ export const handleWebhook = internalMutation({
           // This can happen for subscriptions created directly in Polar dashboard
           // or legacy customers without metadata
           console.log(
-            `[billing] Ignoring ${event} - no userId in metadata (customer: ${data.customer_id}, subscription: ${data.id})`
+            `[billing:info] Ignoring ${event} - no userId in metadata`
           );
           return;
         }
@@ -254,7 +254,7 @@ export const handleWebhook = internalMutation({
         const normalizedId = ctx.db.normalizeId("users", userId);
         if (!normalizedId) {
           console.log(
-            `[billing] Ignoring ${event} - invalid userId format: ${userId} (customer: ${data.customer_id})`
+            `[billing:info] Ignoring ${event} - invalid userId format`
           );
           return;
         }
@@ -264,14 +264,14 @@ export const handleWebhook = internalMutation({
           user = await ctx.db.get(normalizedId);
         } catch {
           console.log(
-            `[billing] Ignoring ${event} - failed to get user: ${userId} (customer: ${data.customer_id})`
+            `[billing:info] Ignoring ${event} - failed to get user`
           );
           return;
         }
         if (!user) {
           // User was deleted or this is orphaned sandbox data
           console.log(
-            `[billing] Ignoring ${event} - user not found: ${userId} (customer: ${data.customer_id})`
+            `[billing:info] Ignoring ${event} - user not found`
           );
           return;
         }
@@ -280,7 +280,7 @@ export const handleWebhook = internalMutation({
         const periodEnd = new Date(data.current_period_end).getTime();
         if (isNaN(periodStart) || isNaN(periodEnd)) {
           console.error(
-            `[billing] Invalid period dates in ${event}: start=${data.current_period_start}, end=${data.current_period_end}`
+            `[billing:error] Invalid period dates in ${event}`
           );
           return;
         }
@@ -295,7 +295,7 @@ export const handleWebhook = internalMutation({
           periodEnd,
           cancelAtPeriodEnd: data.cancel_at_period_end ?? false,
         });
-        console.log(`[billing] User ${userId} upgraded to Pro`);
+        console.log(`[billing:info] User upgraded to Pro via ${event}`);
         break;
       }
 
@@ -311,7 +311,7 @@ export const handleWebhook = internalMutation({
             cancelAtPeriodEnd: true,
             subscriptionStatus: "canceled",
           });
-          console.log(`[billing] User ${user._id} subscription canceled`);
+          console.log(`[billing:info] subscription.canceled processed`);
         }
         break;
       }
@@ -328,7 +328,7 @@ export const handleWebhook = internalMutation({
             cancelAtPeriodEnd: false,
             subscriptionStatus: "active",
           });
-          console.log(`[billing] User ${user._id} subscription reactivated`);
+          console.log(`[billing:info] subscription.uncanceled processed`);
         }
         break;
       }
@@ -351,7 +351,7 @@ export const handleWebhook = internalMutation({
             periodEnd: undefined,
             polarSubscriptionId: undefined,
           });
-          console.log(`[billing] User ${user._id} subscription revoked - downgraded to free`);
+          console.log(`[billing:info] subscription.revoked processed - downgraded to free`);
         }
         break;
       }
@@ -367,13 +367,13 @@ export const handleWebhook = internalMutation({
           await ctx.db.patch(user._id, {
             subscriptionStatus: "active",
           });
-          console.log(`[billing] User ${user._id} subscription now active`);
+          console.log(`[billing:info] subscription.active processed`);
         }
         break;
       }
 
       default: {
-        console.log(`[billing] Unhandled event: ${event}`);
+        console.log(`[billing:info] Unhandled event: ${event}`);
       }
     }
   },
@@ -422,7 +422,7 @@ export const checkPeriodResets = internalMutation({
           periodEnd: undefined,
           polarSubscriptionId: undefined,
         });
-        console.log(`[billing] User ${user._id} downgraded to free after period end`);
+        console.log(`[billing:info] User downgraded to free after period end`);
         processed++;
       } else if (user.plan === "pro" && user.periodEnd) {
         // Reset usage for new period
@@ -434,7 +434,7 @@ export const checkPeriodResets = internalMutation({
           periodStart: newPeriodStart,
           periodEnd: newPeriodEnd,
         });
-        console.log(`[billing] User ${user._id} period reset`);
+        console.log(`[billing:info] User period reset`);
         processed++;
       }
     }
@@ -483,9 +483,9 @@ export const createPolarCustomer = internalAction({
         polarCustomerId: customer.id,
       });
 
-      console.log(`[billing] Created Polar customer ${customer.id} for user ${userId}`);
+      console.log(`[billing:info] Created Polar customer for new user`);
     } catch (error) {
-      console.error(`[billing] Failed to create Polar customer for user ${userId}:`, error);
+      console.error(`[billing:error] Failed to create Polar customer:`, error);
       // Don't throw - user can still use the app, customer will be created on checkout
     }
   },

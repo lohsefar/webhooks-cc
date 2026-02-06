@@ -4,6 +4,7 @@
  * Validates API keys by calling the Convex /validate-api-key HTTP action,
  * and provides a helper to call /cli/* Convex HTTP actions with the shared secret.
  */
+import { serverEnv } from "./env";
 
 /** Extract Bearer token from Authorization header */
 export function extractBearerToken(request: Request): string | null {
@@ -13,15 +14,11 @@ export function extractBearerToken(request: Request): string | null {
 }
 
 function getConvexSiteUrl(): string {
-  const url = process.env.CONVEX_SITE_URL;
-  if (!url) throw new Error("CONVEX_SITE_URL is not configured");
-  return url;
+  return serverEnv().CONVEX_SITE_URL;
 }
 
 function getSharedSecret(): string {
-  const secret = process.env.CAPTURE_SHARED_SECRET;
-  if (!secret) throw new Error("CAPTURE_SHARED_SECRET is not configured");
-  return secret;
+  return serverEnv().CAPTURE_SHARED_SECRET;
 }
 
 /** Validate an API key via Convex HTTP action. Returns userId or null. */

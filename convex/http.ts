@@ -105,7 +105,7 @@ http.route({
     const webhookSecret = process.env.POLAR_WEBHOOK_SECRET;
 
     if (!webhookSecret) {
-      console.error("[polar-webhook] POLAR_WEBHOOK_SECRET is not configured");
+      console.error("[http:error] POLAR_WEBHOOK_SECRET is not configured");
       return new Response(JSON.stringify({ error: "internal_error" }), {
         status: 500,
         headers: { "Content-Type": "application/json" },
@@ -121,7 +121,7 @@ http.route({
     // Verify webhook signature
     const verification = await verifyWebhookSignature(body, headers, webhookSecret);
     if (!verification.verified) {
-      console.error("[polar-webhook] Signature verification failed:", verification.error);
+      console.error("[http:error] Polar webhook signature verification failed:", verification.error);
       return new Response(JSON.stringify({ error: "invalid_signature" }), {
         status: 401,
         headers: { "Content-Type": "application/json" },
@@ -133,7 +133,7 @@ http.route({
     try {
       event = JSON.parse(body);
     } catch {
-      console.error("[polar-webhook] Invalid JSON payload");
+      console.error("[http:error] Polar webhook invalid JSON payload");
       return new Response(JSON.stringify({ error: "invalid_payload" }), {
         status: 400,
         headers: { "Content-Type": "application/json" },
@@ -141,7 +141,7 @@ http.route({
     }
 
     if (!event.type || !event.data) {
-      console.error("[polar-webhook] Missing type or data in payload");
+      console.error("[http:error] Polar webhook missing type or data in payload");
       return new Response(JSON.stringify({ error: "invalid_payload" }), {
         status: 400,
         headers: { "Content-Type": "application/json" },
@@ -155,9 +155,23 @@ http.route({
         data: event.data,
       });
     } catch (error) {
-      console.error("[polar-webhook] Failed to process event:", error);
-      // Return 200 to prevent Polar from retrying - we've logged the error
-      // Retrying with the same data would just fail again
+      const message = error instanceof Error ? error.message : String(error);
+      // Transient errors: return 500 so Polar retries
+      const isTransient =
+        message.includes("write conflict") ||
+        message.includes("overloaded") ||
+        message.includes("timeout") ||
+        message.includes("ETIMEDOUT") ||
+        message.includes("rate limit");
+      if (isTransient) {
+        console.error(`[http:error] Polar webhook transient error (will retry): ${message}`);
+        return new Response(JSON.stringify({ error: "transient_error" }), {
+          status: 500,
+          headers: { "Content-Type": "application/json" },
+        });
+      }
+      // Permanent errors: return 200 to prevent futile retries
+      console.error(`[http:error] Polar webhook permanent error: ${message}`);
     }
 
     return new Response(JSON.stringify({ received: true }), {
@@ -328,7 +342,7 @@ http.route({
       });
     } catch (error) {
       // Invalid ID format will throw from v.id() validator
-      console.error("checkAndStartPeriod error:", error);
+      console.error("[http:error] checkAndStartPeriod error:", error);
       return new Response(JSON.stringify({ error: "invalid_user_id" }), {
         status: 400,
         headers: { "Content-Type": "application/json" },
@@ -598,7 +612,7 @@ async function verifySharedSecret(request: Request): Promise<Response | null> {
   const expectedSecret = process.env.CAPTURE_SHARED_SECRET;
 
   if (!expectedSecret) {
-    console.error("CAPTURE_SHARED_SECRET is not configured - denying request");
+    console.error("[http:error] CAPTURE_SHARED_SECRET is not configured - denying request");
     return new Response(JSON.stringify({ error: "internal_error" }), {
       status: 500,
       headers: { "Content-Type": "application/json" },
@@ -690,7 +704,7 @@ http.route({
         headers: { "Content-Type": "application/json" },
       });
     } catch (error) {
-      console.error("[cli/endpoints POST]", error);
+      console.error("[http:error] cli/endpoints POST:", error);
       return new Response(JSON.stringify({ error: "Failed to create endpoint" }), {
         status: 500,
         headers: { "Content-Type": "application/json" },
@@ -724,7 +738,7 @@ http.route({
         headers: { "Content-Type": "application/json" },
       });
     } catch (error) {
-      console.error("[cli/endpoints GET]", error);
+      console.error("[http:error] cli/endpoints GET:", error);
       return new Response(JSON.stringify({ error: "Failed to list endpoints" }), {
         status: 500,
         headers: { "Content-Type": "application/json" },
@@ -767,7 +781,7 @@ http.route({
         headers: { "Content-Type": "application/json" },
       });
     } catch (error) {
-      console.error("[cli/endpoints DELETE]", error);
+      console.error("[http:error] cli/endpoints DELETE:", error);
       return new Response(JSON.stringify({ error: "Failed to delete endpoint" }), {
         status: 500,
         headers: { "Content-Type": "application/json" },
@@ -810,7 +824,7 @@ http.route({
         headers: { "Content-Type": "application/json" },
       });
     } catch (error) {
-      console.error("[cli/requests GET]", error);
+      console.error("[http:error] cli/requests GET:", error);
       return new Response(JSON.stringify({ error: "Failed to get request" }), {
         status: 500,
         headers: { "Content-Type": "application/json" },
@@ -857,7 +871,7 @@ http.route({
         headers: { "Content-Type": "application/json" },
       });
     } catch (error) {
-      console.error("[cli/requests-since GET]", error);
+      console.error("[http:error] cli/requests-since GET:", error);
       return new Response(JSON.stringify({ error: "Failed to get requests" }), {
         status: 500,
         headers: { "Content-Type": "application/json" },
@@ -933,7 +947,7 @@ http.route({
         headers: { "Content-Type": "application/json" },
       });
     } catch (error) {
-      console.error("[cli/requests-list GET]", error);
+      console.error("[http:error] cli/requests-list GET:", error);
       return new Response(JSON.stringify({ error: "Failed to list requests" }), {
         status: 500,
         headers: { "Content-Type": "application/json" },
@@ -983,7 +997,7 @@ http.route({
         headers: { "Content-Type": "application/json" },
       });
     } catch (error) {
-      console.error("[cli/endpoint-by-slug GET]", error);
+      console.error("[http:error] cli/endpoint-by-slug GET:", error);
       return new Response(JSON.stringify({ error: "Failed to get endpoint" }), {
         status: 500,
         headers: { "Content-Type": "application/json" },
