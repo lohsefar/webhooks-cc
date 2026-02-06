@@ -245,7 +245,7 @@ export const handleWebhook = internalMutation({
           // This can happen for subscriptions created directly in Polar dashboard
           // or legacy customers without metadata
           console.log(
-            `[billing:info] Ignoring ${event} - no userId in metadata`
+            `[billing:info] Ignoring ${event} - no userId in metadata (customer_id=${data.customer_id})`
           );
           return;
         }
@@ -254,7 +254,7 @@ export const handleWebhook = internalMutation({
         const normalizedId = ctx.db.normalizeId("users", userId);
         if (!normalizedId) {
           console.log(
-            `[billing:info] Ignoring ${event} - invalid userId format`
+            `[billing:info] Ignoring ${event} - invalid userId format: ${userId}`
           );
           return;
         }
@@ -280,7 +280,7 @@ export const handleWebhook = internalMutation({
         const periodEnd = new Date(data.current_period_end).getTime();
         if (isNaN(periodStart) || isNaN(periodEnd)) {
           console.error(
-            `[billing:error] Invalid period dates in ${event}`
+            `[billing:error] Invalid period dates in ${event}: start=${data.current_period_start} end=${data.current_period_end}`
           );
           return;
         }
@@ -295,7 +295,7 @@ export const handleWebhook = internalMutation({
           periodEnd,
           cancelAtPeriodEnd: data.cancel_at_period_end ?? false,
         });
-        console.log(`[billing:info] User upgraded to Pro via ${event}`);
+        console.log(`[billing:info] User ${user._id} upgraded to Pro via ${event}`);
         break;
       }
 
@@ -422,7 +422,7 @@ export const checkPeriodResets = internalMutation({
           periodEnd: undefined,
           polarSubscriptionId: undefined,
         });
-        console.log(`[billing:info] User downgraded to free after period end`);
+        console.log(`[billing:info] User ${user._id} downgraded to free after period end`);
         processed++;
       } else if (user.plan === "pro" && user.periodEnd) {
         // Reset usage for new period

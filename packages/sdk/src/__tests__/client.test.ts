@@ -254,7 +254,7 @@ describe("WebhooksCC", () => {
       const client = createClient();
       await expect(
         client.requests.waitFor("abc123", { timeout: 50, pollInterval: 10 })
-      ).rejects.toThrow(/Timeout/i);
+      ).rejects.toThrow(/timed out/i);
     });
 
     it("throws on 401 instead of retrying", async () => {

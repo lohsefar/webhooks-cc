@@ -4,7 +4,7 @@ import { publicEnv } from "./env";
  * Webhook receiver base URL.
  * Validated at startup via centralized env validation.
  */
-export const WEBHOOK_BASE_URL = publicEnv.NEXT_PUBLIC_WEBHOOK_URL;
+export const WEBHOOK_BASE_URL = publicEnv().NEXT_PUBLIC_WEBHOOK_URL;
 
 /** Valid slug format: alphanumeric with hyphens/underscores, 1-50 chars */
 const SLUG_REGEX = /^[a-zA-Z0-9_-]{1,50}$/;

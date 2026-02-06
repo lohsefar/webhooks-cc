@@ -10,6 +10,7 @@
 import { getAuthUserId } from "@convex-dev/auth/server";
 import { v } from "convex/values";
 import { mutation, query, internalMutation } from "./_generated/server";
+import { internal } from "./_generated/api";
 import { customAlphabet } from "nanoid";
 
 // Generate unbiased random API key using nanoid (avoids modulo bias from Math.random)
@@ -45,6 +46,18 @@ export const create = mutation({
   handler: async (ctx, { name, expiresAt }) => {
     const userId = await getAuthUserId(ctx);
     if (!userId) throw new Error("Not authenticated");
+
+    // Validate expiresAt if provided
+    if (expiresAt !== undefined) {
+      const now = Date.now();
+      if (expiresAt <= now) {
+        throw new Error("Expiration must be in the future");
+      }
+      const MAX_LIFETIME_MS = 365 * 24 * 60 * 60 * 1000;
+      if (expiresAt > now + MAX_LIFETIME_MS) {
+        throw new Error("Expiration cannot be more than 1 year from now");
+      }
+    }
 
     // Validate name
     const trimmedName = name.trim();
@@ -137,8 +150,11 @@ export const validate = internalMutation({
 
     if (!apiKey) return null;
 
-    // Check expiration
-    if (apiKey.expiresAt && apiKey.expiresAt < Date.now()) return null;
+    // Check expiration - lazy cleanup on access
+    if (apiKey.expiresAt && apiKey.expiresAt < Date.now()) {
+      await ctx.db.delete(apiKey._id);
+      return null;
+    }
 
     // Update last used timestamp
     await ctx.db.patch(apiKey._id, { lastUsedAt: Date.now() });
@@ -155,13 +171,19 @@ export const cleanupExpired = internalMutation({
   args: {},
   handler: async (ctx) => {
     const now = Date.now();
+    // Use gt(0) as lower bound to exclude undefined values (which sort before numbers in Convex)
     const expired = await ctx.db
       .query("apiKeys")
-      .withIndex("by_expires", (q) => q.lt("expiresAt", now))
+      .withIndex("by_expires", (q) => q.gt("expiresAt", 0).lt("expiresAt", now))
       .take(100);
 
     for (const key of expired) {
       await ctx.db.delete(key._id);
+    }
+
+    // If we hit the batch limit, reschedule to process remaining
+    if (expired.length === 100) {
+      await ctx.scheduler.runAfter(100, internal.apiKeys.cleanupExpired, {});
     }
 
     return { deleted: expired.length };

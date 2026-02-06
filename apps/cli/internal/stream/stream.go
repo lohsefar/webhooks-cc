@@ -29,6 +29,9 @@ func (e *StatusError) Error() string {
 	return fmt.Sprintf("unexpected status: %d", e.Code)
 }
 
+// ErrEndpointDeleted is returned when the server signals the endpoint was deleted.
+var ErrEndpointDeleted = errors.New("endpoint was deleted")
+
 const (
 	scannerInitBufSize = 64 * 1024    // 64KB initial scanner buffer
 	scannerMaxBufSize  = 1024 * 1024  // 1MB max line size for large webhook bodies
@@ -97,7 +100,10 @@ func (s *Stream) Listen(ctx context.Context, handler RequestHandler) error {
 		if ctx.Err() != nil {
 			return ctx.Err()
 		}
-		// Non-retryable errors (e.g., 401, 404)
+		// Non-retryable errors
+		if errors.Is(err, ErrEndpointDeleted) {
+			return err
+		}
 		var statusErr *StatusError
 		if err != nil && errors.As(err, &statusErr) {
 			if statusErr.Code == 401 || statusErr.Code == 403 || statusErr.Code == 404 {
@@ -174,6 +180,10 @@ func (s *Stream) connect(ctx context.Context, handler RequestHandler) error {
 
 			// Empty line marks end of an SSE message — process accumulated data
 			if len(line) == 0 {
+				if currentEvent == "endpoint_deleted" {
+					errChan <- ErrEndpointDeleted
+					return
+				}
 				if currentEvent == "request" && len(dataLines) > 0 {
 					data := strings.Join(dataLines, "\n")
 					var capturedReq types.CapturedRequest

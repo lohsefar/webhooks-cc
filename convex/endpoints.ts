@@ -332,7 +332,7 @@ export const removeForUser = internalMutation({
       .withIndex("by_slug", (q) => q.eq("slug", slug))
       .first();
 
-    if (!endpoint) throw new Error("Endpoint not found");
+    if (!endpoint) return { success: true, alreadyDeleted: true };
     if (endpoint.userId !== userId) throw new Error("Not authorized");
 
     // Delete requests in batches

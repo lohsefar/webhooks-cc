@@ -802,7 +802,11 @@ func (b *RequestBatcher) flushLocked(slug string) {
 		resp, err := callConvexBatch(ctx, slug, requests)
 		if err != nil {
 			log.Printf("Batch capture failed for %s (%d requests): %v", slug, len(requests), err)
-			sentry.CaptureException(fmt.Errorf("batch capture failed for %s: %w", slug, err))
+			hub := sentry.CurrentHub().Clone()
+			hub.ConfigureScope(func(scope *sentry.Scope) {
+				scope.SetTag("slug", slug)
+			})
+			hub.CaptureException(fmt.Errorf("batch capture failed: %w", err))
 			return
 		}
 		if resp.Error != "" {
@@ -832,6 +836,9 @@ func (b *RequestBatcher) Wait() {
 	b.wg.Wait()
 }
 
+// version is set at build time via ldflags for release builds.
+var version = "dev"
+
 var (
 	quotaStore          *FileQuotaStore
 	endpointCache       *EndpointCache
@@ -847,6 +854,7 @@ func main() {
 	if dsn := os.Getenv("SENTRY_DSN"); dsn != "" {
 		if err := sentry.Init(sentry.ClientOptions{
 			Dsn:              dsn,
+			Release:          "receiver@" + version,
 			TracesSampleRate: 0.1,
 			Environment:      envOrDefault("SENTRY_ENVIRONMENT", "production"),
 		}); err != nil {
@@ -901,8 +909,9 @@ func main() {
 	app.Use(recover.New(recover.Config{
 		EnableStackTrace: true,
 		StackTraceHandler: func(c *fiber.Ctx, e any) {
-			sentry.CurrentHub().Recover(e)
-			sentry.Flush(2 * time.Second)
+			hub := sentry.CurrentHub().Clone()
+			hub.Recover(e)
+			hub.Flush(200 * time.Millisecond)
 		},
 	}))
 

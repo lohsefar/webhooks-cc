@@ -36,18 +36,9 @@ const MIN_POLL_INTERVAL = 10;
 const MAX_POLL_INTERVAL = 60000;
 
 /**
- * Error thrown when an API request fails with a specific HTTP status code.
- * Allows callers to distinguish between different error types.
+ * @deprecated Use {@link WebhooksCCError} instead. Kept for backward compatibility.
  */
-export class ApiError extends Error {
-  constructor(
-    public readonly statusCode: number,
-    message: string
-  ) {
-    super(`API error (${statusCode}): ${message}`);
-    this.name = "ApiError";
-  }
-}
+export const ApiError = WebhooksCCError;
 
 /** Map HTTP status codes to typed errors. */
 function mapStatusToError(status: number, message: string, response: Response): WebhooksCCError {
@@ -57,8 +48,13 @@ function mapStatusToError(status: number, message: string, response: Response): 
     case 404:
       return new NotFoundError(message);
     case 429: {
-      const retryAfter = response.headers.get("retry-after");
-      return new RateLimitError(retryAfter ? parseInt(retryAfter, 10) : undefined);
+      const retryAfterHeader = response.headers.get("retry-after");
+      let retryAfter: number | undefined;
+      if (retryAfterHeader) {
+        const parsed = parseInt(retryAfterHeader, 10);
+        retryAfter = Number.isNaN(parsed) ? undefined : parsed;
+      }
+      return new RateLimitError(retryAfter);
     }
     default:
       return new WebhooksCCError(status, message);
@@ -271,10 +267,7 @@ export class WebhooksCC {
         await sleep(safePollInterval);
       }
 
-      if (iterations >= MAX_ITERATIONS) {
-        throw new Error(`Max iterations (${MAX_ITERATIONS}) reached while waiting for request`);
-      }
-      throw new Error(`Timeout waiting for request after ${timeout}ms`);
+      throw new TimeoutError(timeout);
     },
   };
 }

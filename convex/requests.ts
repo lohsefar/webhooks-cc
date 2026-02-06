@@ -403,7 +403,7 @@ export const listNewForUser = internalQuery({
   },
   handler: async (ctx, { endpointId, userId, afterTimestamp }) => {
     const endpoint = await ctx.db.get(endpointId);
-    if (!endpoint) return [];
+    if (!endpoint) return null;
     if (endpoint.userId !== userId) return [];
 
     return await ctx.db

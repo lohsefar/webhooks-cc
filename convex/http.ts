@@ -157,12 +157,14 @@ http.route({
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       // Transient errors: return 500 so Polar retries
+      // Note: these match Convex error message patterns which may change across versions
+      const lowerMessage = message.toLowerCase();
       const isTransient =
-        message.includes("write conflict") ||
-        message.includes("overloaded") ||
-        message.includes("timeout") ||
-        message.includes("ETIMEDOUT") ||
-        message.includes("rate limit");
+        lowerMessage.includes("write conflict") ||
+        lowerMessage.includes("overloaded") ||
+        lowerMessage.includes("timeout") ||
+        lowerMessage.includes("etimedout") ||
+        lowerMessage.includes("rate limit");
       if (isTransient) {
         console.error(`[http:error] Polar webhook transient error (will retry): ${message}`);
         return new Response(JSON.stringify({ error: "transient_error" }), {
@@ -867,6 +869,12 @@ http.route({
         userId: userId as Id<"users">,
         afterTimestamp: parsedTimestamp,
       });
+      if (requests === null) {
+        return new Response(JSON.stringify({ error: "endpoint_not_found" }), {
+          status: 404,
+          headers: { "Content-Type": "application/json" },
+        });
+      }
       return new Response(JSON.stringify(requests), {
         headers: { "Content-Type": "application/json" },
       });

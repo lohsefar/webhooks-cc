@@ -9,6 +9,7 @@ export class WebhooksCCError extends Error {
   ) {
     super(message);
     this.name = "WebhooksCCError";
+    Object.setPrototypeOf(this, new.target.prototype);
   }
 }
 

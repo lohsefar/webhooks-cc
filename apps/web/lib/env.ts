@@ -6,6 +6,13 @@ import { z } from "zod";
  * NEXT_PUBLIC_ vars are available in both server and client contexts.
  * Server-only vars (CONVEX_SITE_URL, CAPTURE_SHARED_SECRET) are only
  * validated when accessed, since they are undefined in the browser.
+ *
+ * Both publicEnv() and serverEnv() are lazy-evaluated on first call
+ * to avoid module-level crashes in contexts where some vars are unset.
+ *
+ * SENTRY_DSN is the server-side DSN. NEXT_PUBLIC_SENTRY_DSN is the
+ * client-side DSN (exposed to the browser). They can be the same DSN
+ * or different projects; set both for full coverage.
  */
 
 const publicEnvSchema = z.object({
@@ -22,12 +29,18 @@ const serverEnvSchema = z.object({
 });
 
 /** Validated public env vars (available in both server and client). */
-export const publicEnv = publicEnvSchema.parse({
-  NEXT_PUBLIC_CONVEX_URL: process.env.NEXT_PUBLIC_CONVEX_URL,
-  NEXT_PUBLIC_WEBHOOK_URL: process.env.NEXT_PUBLIC_WEBHOOK_URL,
-  NEXT_PUBLIC_APP_URL: process.env.NEXT_PUBLIC_APP_URL,
-  NEXT_PUBLIC_SENTRY_DSN: process.env.NEXT_PUBLIC_SENTRY_DSN,
-});
+let _publicEnv: z.infer<typeof publicEnvSchema> | null = null;
+export function publicEnv() {
+  if (!_publicEnv) {
+    _publicEnv = publicEnvSchema.parse({
+      NEXT_PUBLIC_CONVEX_URL: process.env.NEXT_PUBLIC_CONVEX_URL,
+      NEXT_PUBLIC_WEBHOOK_URL: process.env.NEXT_PUBLIC_WEBHOOK_URL,
+      NEXT_PUBLIC_APP_URL: process.env.NEXT_PUBLIC_APP_URL,
+      NEXT_PUBLIC_SENTRY_DSN: process.env.NEXT_PUBLIC_SENTRY_DSN,
+    });
+  }
+  return _publicEnv;
+}
 
 /**
  * Validated server env vars. Only call this in server contexts (API routes,
