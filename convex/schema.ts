@@ -81,7 +81,8 @@ export default defineSchema({
   })
     .index("by_slug", ["slug"])
     .index("by_user", ["userId"])
-    .index("by_expires", ["expiresAt"]),
+    .index("by_expires", ["expiresAt"])
+    .index("by_ephemeral_expires", ["isEphemeral", "expiresAt"]),
 
   requests: defineTable({
     endpointId: v.id("endpoints"),
