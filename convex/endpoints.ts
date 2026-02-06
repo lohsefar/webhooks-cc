@@ -84,11 +84,12 @@ export const create = mutation({
 
     // Global cap on active ephemeral endpoints to prevent abuse
     if (isEphemeral) {
-      const candidates = await ctx.db
+      const activeEphemeral = await ctx.db
         .query("endpoints")
-        .withIndex("by_expires", (q) => q.gt("expiresAt", Date.now()))
+        .withIndex("by_ephemeral_expires", (q) =>
+          q.eq("isEphemeral", true).gt("expiresAt", Date.now())
+        )
         .take(MAX_EPHEMERAL_ENDPOINTS + 1);
-      const activeEphemeral = candidates.filter((e) => e.isEphemeral);
       if (activeEphemeral.length > MAX_EPHEMERAL_ENDPOINTS) {
         throw new Error("Too many active demo endpoints. Please try again later.");
       }

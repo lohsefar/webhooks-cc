@@ -166,13 +166,14 @@ func (s circuitState) String() string {
 // States: closed (normal), open (rejecting), half-open (probing with one request).
 // Only network errors and 5xx responses trip the circuit; 4xx are business errors.
 type CircuitBreaker struct {
-	mu            sync.Mutex
-	failures      int
-	threshold     int
-	state         circuitState
-	lastFailure   time.Time
-	cooldown      time.Duration
-	probeInFlight bool // true when a half-open probe is active
+	mu             sync.Mutex
+	failures       int
+	threshold      int
+	state          circuitState
+	lastFailure    time.Time
+	cooldown       time.Duration
+	probeInFlight  bool      // true when a half-open probe is active
+	probeStartedAt time.Time // when the half-open probe was allowed
 }
 
 func newCircuitBreaker(threshold int, cooldown time.Duration) *CircuitBreaker {
@@ -197,12 +198,20 @@ func (cb *CircuitBreaker) AllowRequest() bool {
 		if time.Since(cb.lastFailure) > cb.cooldown {
 			cb.state = circuitHalfOpen
 			cb.probeInFlight = true
+			cb.probeStartedAt = time.Now()
 			debugLog("[CircuitBreaker] Transitioning to half-open, sending probe")
 			return true
 		}
 		return false
 	case circuitHalfOpen:
-		return false // Probe already in progress; only one allowed via open→half-open transition
+		// If the previous probe was lost (no RecordSuccess/RecordFailure called),
+		// allow a new probe after cooldown to avoid getting stuck permanently.
+		if cb.probeInFlight && time.Since(cb.probeStartedAt) > cb.cooldown {
+			cb.probeStartedAt = time.Now()
+			debugLog("[CircuitBreaker] Half-open probe timed out, allowing new probe")
+			return true
+		}
+		return false
 	}
 	return true
 }
