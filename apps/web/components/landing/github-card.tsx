@@ -14,7 +14,7 @@ interface GitHubCardProps {
 
 export function GitHubCard({ stars }: GitHubCardProps) {
   return (
-    <div className="neo-card shrink-0 lg:mt-12 flex flex-col items-center text-center w-full lg:w-auto">
+    <div className="neo-card neo-card-static shrink-0 lg:mt-12 flex flex-col items-center text-center w-full lg:w-auto">
       <div className="w-14 h-14 border-2 border-foreground bg-foreground flex items-center justify-center mb-4 shadow-neo-sm">
         <Github className="h-7 w-7 text-background" />
       </div>

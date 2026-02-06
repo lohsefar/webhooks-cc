@@ -134,6 +134,11 @@
     transform: translate(-2px, -2px);
   }
 
+  .neo-card-static:hover {
+    box-shadow: 4px 4px 0 0 hsl(var(--foreground));
+    transform: none;
+  }
+
   /* Neubrutalism button base styles */
   .neo-btn {
     @apply border-2 border-foreground px-6 py-3 font-bold uppercase tracking-wide transition-all cursor-pointer;
