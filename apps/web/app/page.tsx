@@ -4,6 +4,7 @@ import { AuthAwareDemo } from "@/components/landing/auth-aware-demo";
 import { HeroCTA } from "@/components/landing/hero-cta";
 import { Zap, Eye, Terminal, ArrowRight, Check } from "lucide-react";
 import { GitHubCard } from "@/components/landing/github-card";
+import { InstallCards } from "@/components/landing/install-cards";
 
 interface GitHubRepoResponse {
   stargazers_count: number;
@@ -54,40 +55,7 @@ export default async function Home() {
           </div>
 
           {/* Install */}
-          <div className="mt-16 grid md:grid-cols-2 gap-6">
-            <div className="neo-card">
-              <p className="text-xs font-bold uppercase tracking-wide text-muted-foreground mb-3">
-                SDK
-              </p>
-              <div className="neo-code !p-3 !shadow-none">
-                <code className="text-sm">
-                  <span className="text-primary">$</span> npm install @webhooks-cc/sdk
-                </code>
-              </div>
-              <p className="text-xs text-muted-foreground mt-2">
-                Also works with{" "}
-                <Link href="/installation" className="text-primary hover:underline font-bold">
-                  pnpm, yarn, and bun
-                </Link>
-              </p>
-            </div>
-            <div className="neo-card">
-              <p className="text-xs font-bold uppercase tracking-wide text-muted-foreground mb-3">
-                CLI
-              </p>
-              <div className="neo-code !p-3 !shadow-none">
-                <code className="text-sm">
-                  <span className="text-primary">$</span> curl -fsSL https://webhooks.cc/install.sh | sh
-                </code>
-              </div>
-              <p className="text-xs text-muted-foreground mt-2">
-                Also available via{" "}
-                <Link href="/installation" className="text-primary hover:underline font-bold">
-                  Homebrew
-                </Link>
-              </p>
-            </div>
-          </div>
+          <InstallCards />
 
           {/* Code preview */}
           <div className="mt-6 neo-code overflow-x-auto">
