@@ -162,7 +162,11 @@ func TestClaimDeviceCode(t *testing.T) {
 		}
 
 		var body map[string]string
-		json.NewDecoder(r.Body).Decode(&body)
+		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+			t.Errorf("failed to decode request body: %v", err)
+			http.Error(w, "bad request", 400)
+			return
+		}
 		if body["deviceCode"] != "dev-code-456" {
 			t.Errorf("expected deviceCode=dev-code-456, got %q", body["deviceCode"])
 		}
