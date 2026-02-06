@@ -625,7 +625,7 @@ func TestBatcherAdd_MultipleSlugsIndependent(t *testing.T) {
 
 func TestEndpointCache_Hit(t *testing.T) {
 	mockServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		json.NewEncoder(w).Encode(EndpointInfo{
+		_ = json.NewEncoder(w).Encode(EndpointInfo{
 			EndpointID:  "ep-123",
 			IsEphemeral: true,
 		})
@@ -660,7 +660,7 @@ func TestEndpointCache_TTLExpiry(t *testing.T) {
 	var callCount atomic.Int32
 	mockServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		n := callCount.Add(1)
-		json.NewEncoder(w).Encode(EndpointInfo{
+		_ = json.NewEncoder(w).Encode(EndpointInfo{
 			EndpointID: fmt.Sprintf("ep-%d", n),
 		})
 	}))
@@ -696,12 +696,12 @@ func TestEndpointCache_ErrorDoesNotCache(t *testing.T) {
 	mockServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		n := callCount.Add(1)
 		if n == 1 {
-			json.NewEncoder(w).Encode(EndpointInfo{
+			_ = json.NewEncoder(w).Encode(EndpointInfo{
 				Error: "not_found",
 			})
 			return
 		}
-		json.NewEncoder(w).Encode(EndpointInfo{
+		_ = json.NewEncoder(w).Encode(EndpointInfo{
 			EndpointID: "ep-found",
 		})
 	}))
@@ -760,7 +760,7 @@ func TestEndpointCache_SingleFlight(t *testing.T) {
 	mockServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		callCount.Add(1)
 		time.Sleep(50 * time.Millisecond) // simulate slow response
-		json.NewEncoder(w).Encode(EndpointInfo{
+		_ = json.NewEncoder(w).Encode(EndpointInfo{
 			EndpointID: "ep-single",
 		})
 	}))
