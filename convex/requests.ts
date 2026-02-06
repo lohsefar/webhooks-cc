@@ -514,6 +514,31 @@ export const get = query({
 // Maximum requests to delete per endpoint in a single run to avoid timeout
 const CLEANUP_BATCH_SIZE = 100;
 
+// Drain remaining requests for a deleted endpoint.
+// Called when endpoint deletion found more than DELETE_BATCH_SIZE requests.
+// Reschedules itself until all requests are gone.
+export const drainOrphanedRequests = internalMutation({
+  args: { endpointId: v.id("endpoints") },
+  handler: async (ctx, { endpointId }) => {
+    const requests = await ctx.db
+      .query("requests")
+      .withIndex("by_endpoint_time", (q) => q.eq("endpointId", endpointId))
+      .take(CLEANUP_BATCH_SIZE);
+
+    for (const req of requests) {
+      await ctx.db.delete(req._id);
+    }
+
+    if (requests.length === CLEANUP_BATCH_SIZE) {
+      await ctx.scheduler.runAfter(0, internal.requests.drainOrphanedRequests, {
+        endpointId,
+      });
+    }
+
+    return { deleted: requests.length };
+  },
+});
+
 // Cleanup expired ephemeral endpoints and their requests
 export const cleanupExpired = internalMutation({
   args: {},
@@ -550,11 +575,15 @@ export const cleanupExpired = internalMutation({
         deletedRequests++;
       }
 
-      // Only delete endpoint if all requests have been cleaned
-      // If there are exactly CLEANUP_BATCH_SIZE requests, there might be more
-      if (requests.length < CLEANUP_BATCH_SIZE) {
-        await ctx.db.delete(endpoint._id);
-        deletedEndpoints++;
+      // Always delete the endpoint immediately so it stops appearing in queries.
+      // If more requests remain, schedule async drain to clean them up.
+      await ctx.db.delete(endpoint._id);
+      deletedEndpoints++;
+
+      if (requests.length === CLEANUP_BATCH_SIZE) {
+        await ctx.scheduler.runAfter(0, internal.requests.drainOrphanedRequests, {
+          endpointId: endpoint._id,
+        });
       }
     }
 
@@ -565,18 +594,25 @@ export const cleanupExpired = internalMutation({
 // Delete all requests for a user's endpoints.
 // Called when free user period resets to clean up old requests.
 // Processes in batches and reschedules if more remain.
-// Limits endpoints per run to avoid timeout on users with many endpoints.
+// Paginates through endpoints to handle users with many endpoints.
 export const cleanupUserRequests = internalMutation({
-  args: { userId: v.id("users") },
-  handler: async (ctx, { userId }) => {
-    // Limit endpoints per run to avoid timeout
-    const endpoints = await ctx.db
+  args: {
+    userId: v.id("users"),
+    endpointCursor: v.optional(v.string()),
+    hasRemainingRequests: v.optional(v.boolean()),
+  },
+  handler: async (ctx, { userId, endpointCursor, hasRemainingRequests = false }) => {
+    const ENDPOINT_PAGE_SIZE = 20;
+
+    const endpointResult = await ctx.db
       .query("endpoints")
       .withIndex("by_user", (q) => q.eq("userId", userId))
-      .take(20);
+      .paginate({ cursor: endpointCursor ?? null, numItems: ENDPOINT_PAGE_SIZE });
 
     let deleted = 0;
-    for (const endpoint of endpoints) {
+    let needsMoreRequests = hasRemainingRequests;
+
+    for (const endpoint of endpointResult.page) {
       const requests = await ctx.db
         .query("requests")
         .withIndex("by_endpoint_time", (q) => q.eq("endpointId", endpoint._id))
@@ -587,13 +623,27 @@ export const cleanupUserRequests = internalMutation({
         deleted++;
       }
 
-      // If we hit the batch limit on any endpoint, reschedule
       if (requests.length === CLEANUP_BATCH_SIZE) {
-        await ctx.scheduler.runAfter(0, internal.requests.cleanupUserRequests, {
-          userId,
-        });
-        return { deleted, complete: false };
+        needsMoreRequests = true;
       }
+    }
+
+    // More endpoints to process — continue to next page
+    if (!endpointResult.isDone) {
+      await ctx.scheduler.runAfter(0, internal.requests.cleanupUserRequests, {
+        userId,
+        endpointCursor: endpointResult.continueCursor,
+        hasRemainingRequests: needsMoreRequests,
+      });
+      return { deleted, complete: false };
+    }
+
+    // All endpoints visited. If any had remaining requests, do another full pass.
+    if (needsMoreRequests) {
+      await ctx.scheduler.runAfter(0, internal.requests.cleanupUserRequests, {
+        userId,
+      });
+      return { deleted, complete: false };
     }
 
     return { deleted, complete: true };
@@ -603,6 +653,9 @@ export const cleanupUserRequests = internalMutation({
 // Delete requests older than 30 days for pro users.
 // Runs daily to enforce retention policy.
 // Uses pagination to process all pro users across multiple cron invocations.
+// For users with >20 endpoints, schedules cleanupOldRequestsForUser for remaining.
+// User page size kept small (5) to stay within Convex's 16K write limit per mutation
+// (worst case: 5 users × 20 endpoints × 100 requests = 10,000 writes).
 export const cleanupOldRequests = internalMutation({
   args: {
     cursor: v.optional(v.string()),
@@ -614,17 +667,17 @@ export const cleanupOldRequests = internalMutation({
     const result = await ctx.db
       .query("users")
       .withIndex("by_plan", (q) => q.eq("plan", "pro"))
-      .paginate({ cursor: cursor ?? null, numItems: 20 });
+      .paginate({ cursor: cursor ?? null, numItems: 5 });
 
     let totalDeleted = 0;
     for (const user of result.page) {
-      // Limit endpoints per user to avoid timeout
-      const endpoints = await ctx.db
+      // Paginate endpoints to detect overflow beyond first page
+      const endpointResult = await ctx.db
         .query("endpoints")
         .withIndex("by_user", (q) => q.eq("userId", user._id))
-        .take(20);
+        .paginate({ cursor: null, numItems: 20 });
 
-      for (const endpoint of endpoints) {
+      for (const endpoint of endpointResult.page) {
         const oldRequests = await ctx.db
           .query("requests")
           .withIndex("by_endpoint_time", (q) =>
@@ -637,6 +690,14 @@ export const cleanupOldRequests = internalMutation({
           totalDeleted++;
         }
       }
+
+      // If user has more endpoints, schedule dedicated cleanup for remaining
+      if (!endpointResult.isDone) {
+        await ctx.scheduler.runAfter(0, internal.requests.cleanupOldRequestsForUser, {
+          userId: user._id,
+          endpointCursor: endpointResult.continueCursor,
+        });
+      }
     }
 
     // Schedule continuation if there are more users
@@ -647,5 +708,66 @@ export const cleanupOldRequests = internalMutation({
     }
 
     return { deleted: totalDeleted, done: result.isDone };
+  },
+});
+
+// Clean up old requests for a single user's endpoints beyond the first page.
+// Scheduled by cleanupOldRequests when a user has more than 20 endpoints.
+// Tracks whether any endpoint had remaining stale requests and does a full re-pass.
+export const cleanupOldRequestsForUser = internalMutation({
+  args: {
+    userId: v.id("users"),
+    endpointCursor: v.optional(v.string()),
+    hasRemainingRequests: v.optional(v.boolean()),
+  },
+  handler: async (ctx, { userId, endpointCursor, hasRemainingRequests = false }) => {
+    const cutoff = Date.now() - PRO_REQUEST_RETENTION_MS;
+    const ENDPOINT_PAGE_SIZE = 20;
+
+    const endpointResult = await ctx.db
+      .query("endpoints")
+      .withIndex("by_user", (q) => q.eq("userId", userId))
+      .paginate({ cursor: endpointCursor ?? null, numItems: ENDPOINT_PAGE_SIZE });
+
+    let deleted = 0;
+    let needsMoreRequests = hasRemainingRequests;
+
+    for (const endpoint of endpointResult.page) {
+      const oldRequests = await ctx.db
+        .query("requests")
+        .withIndex("by_endpoint_time", (q) =>
+          q.eq("endpointId", endpoint._id).lt("receivedAt", cutoff)
+        )
+        .take(CLEANUP_BATCH_SIZE);
+
+      for (const req of oldRequests) {
+        await ctx.db.delete(req._id);
+        deleted++;
+      }
+
+      if (oldRequests.length === CLEANUP_BATCH_SIZE) {
+        needsMoreRequests = true;
+      }
+    }
+
+    // More endpoints to process — continue to next page
+    if (!endpointResult.isDone) {
+      await ctx.scheduler.runAfter(0, internal.requests.cleanupOldRequestsForUser, {
+        userId,
+        endpointCursor: endpointResult.continueCursor,
+        hasRemainingRequests: needsMoreRequests,
+      });
+      return { deleted, done: false };
+    }
+
+    // All endpoints visited. If any had remaining old requests, do another full pass.
+    if (needsMoreRequests) {
+      await ctx.scheduler.runAfter(100, internal.requests.cleanupOldRequestsForUser, {
+        userId,
+      });
+      return { deleted, done: false };
+    }
+
+    return { deleted, done: true };
   },
 });

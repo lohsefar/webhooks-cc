@@ -714,7 +714,7 @@ func main() {
 
 	captureSharedSecret = os.Getenv("CAPTURE_SHARED_SECRET")
 	if captureSharedSecret == "" {
-		log.Println("WARNING: CAPTURE_SHARED_SECRET is not set. Internal API calls will be unauthenticated.")
+		log.Fatal("CAPTURE_SHARED_SECRET environment variable is required")
 	}
 
 	httpClient = &http.Client{
@@ -921,9 +921,7 @@ func fetchEndpointInfo(ctx context.Context, slug string) (*EndpointInfo, error) 
 		return nil, fmt.Errorf("failed to create endpoint info request: %w", err)
 	}
 
-	if captureSharedSecret != "" {
-		req.Header.Set("Authorization", "Bearer "+captureSharedSecret)
-	}
+	req.Header.Set("Authorization", "Bearer "+captureSharedSecret)
 
 	resp, err := httpClient.Do(req)
 	if err != nil {
@@ -962,9 +960,7 @@ func callCheckPeriod(ctx context.Context, userID string) (*CheckPeriodResponse, 
 	}
 	req.Header.Set("Content-Type", "application/json")
 
-	if captureSharedSecret != "" {
-		req.Header.Set("Authorization", "Bearer "+captureSharedSecret)
-	}
+	req.Header.Set("Authorization", "Bearer "+captureSharedSecret)
 
 	resp, err := httpClient.Do(req)
 	if err != nil {
@@ -997,9 +993,7 @@ func fetchQuota(ctx context.Context, slug string) (*QuotaResponse, error) {
 		return nil, fmt.Errorf("failed to create quota request: %w", err)
 	}
 
-	if captureSharedSecret != "" {
-		req.Header.Set("Authorization", "Bearer "+captureSharedSecret)
-	}
+	req.Header.Set("Authorization", "Bearer "+captureSharedSecret)
 
 	resp, err := httpClient.Do(req)
 	if err != nil {
@@ -1042,9 +1036,7 @@ func callConvexBatch(ctx context.Context, slug string, requests []BufferedReques
 	}
 	req.Header.Set("Content-Type", "application/json")
 
-	if captureSharedSecret != "" {
-		req.Header.Set("Authorization", "Bearer "+captureSharedSecret)
-	}
+	req.Header.Set("Authorization", "Bearer "+captureSharedSecret)
 
 	resp, err := httpClient.Do(req)
 	if err != nil {
