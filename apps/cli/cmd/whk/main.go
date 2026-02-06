@@ -27,6 +27,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/getsentry/sentry-go"
 	"github.com/spf13/cobra"
 	"webhooks.cc/cli/internal/api"
 	"webhooks.cc/cli/internal/auth"
@@ -38,7 +39,28 @@ import (
 
 var version = "dev"
 
+// sentryDSN is set at build time via ldflags for release builds.
+// Can be overridden by the WHK_SENTRY_DSN environment variable.
+var sentryDSN string
+
 func main() {
+	// Initialize Sentry: env var takes precedence over build-time DSN
+	if dsn := os.Getenv("WHK_SENTRY_DSN"); dsn != "" {
+		sentryDSN = dsn
+	}
+	if sentryDSN != "" {
+		if err := sentry.Init(sentry.ClientOptions{
+			Dsn:         sentryDSN,
+			Release:     "whk@" + version,
+			Environment: envOrDefault("WHK_SENTRY_ENVIRONMENT", "production"),
+		}); err != nil {
+			fmt.Fprintf(os.Stderr, "Warning: Sentry init failed: %v\n", err)
+		} else {
+			defer sentry.Flush(2 * time.Second)
+			defer sentry.Recover()
+		}
+	}
+
 	rootCmd := &cobra.Command{
 		Use:     "whk",
 		Short:   "webhooks.cc CLI - Inspect and forward webhooks",
@@ -83,6 +105,8 @@ func main() {
 	rootCmd.AddCommand(updateCmd)
 
 	if err := rootCmd.Execute(); err != nil {
+		sentry.CaptureException(err)
+		sentry.Flush(2 * time.Second) // Flush before os.Exit which bypasses defers
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
 	}
@@ -409,6 +433,10 @@ func tunnelCmd() *cobra.Command {
 			if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
 				return nil
 			}
+			if errors.Is(err, stream.ErrEndpointDeleted) {
+				fmt.Fprintln(os.Stderr, "Endpoint was deleted")
+				return nil
+			}
 			return err
 		},
 	}
@@ -460,6 +488,10 @@ func listenCmd() *cobra.Command {
 				fmt.Printf("  %s\n", stream.FormatRequest(req))
 			})
 			if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
+				return nil
+			}
+			if errors.Is(err, stream.ErrEndpointDeleted) {
+				fmt.Fprintln(os.Stderr, "Endpoint was deleted")
 				return nil
 			}
 			return err
@@ -587,4 +619,12 @@ func randomSuffix(n int) string {
 	b := make([]byte, (n+1)/2)
 	_, _ = rand.Read(b)
 	return hex.EncodeToString(b)[:n]
+}
+
+// envOrDefault returns the environment variable value, or fallback if unset/empty.
+func envOrDefault(key, fallback string) string {
+	if v := os.Getenv(key); v != "" {
+		return v
+	}
+	return fallback
 }

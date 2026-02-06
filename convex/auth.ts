@@ -34,8 +34,7 @@ export const { auth, signIn, signOut, store } = convexAuth({
         if (existingUser) {
           // Audit log: Account linking event for security monitoring
           console.log(
-            `[AUDIT] Account linked: userId=${existingUser._id} email=${profile.email} ` +
-              `newProvider=${profile.provider ?? "unknown"} timestamp=${Date.now()}`
+            `[auth:audit] Account linked: userId=${existingUser._id} provider=${profile.provider ?? "unknown"}`
           );
           // Update profile info and link this auth account to existing user
           await ctx.db.patch(existingUser._id, {

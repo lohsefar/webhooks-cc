@@ -16,6 +16,13 @@ crons.daily(
   internal.billing.checkPeriodResets
 );
 
+// Clean up expired API keys daily at 2 AM UTC
+crons.daily(
+  "cleanup expired api keys",
+  { hourUTC: 2, minuteUTC: 0 },
+  internal.apiKeys.cleanupExpired
+);
+
 // Clean up old requests for pro users (30-day retention)
 crons.daily(
   "cleanup old requests",

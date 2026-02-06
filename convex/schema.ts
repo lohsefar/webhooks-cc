@@ -7,6 +7,7 @@
  * - users.by_period_end: Find users with expired billing periods for reset cron
  * - apiKeys.by_key_hash: Validate API keys in O(1) time
  * - apiKeys.by_user: List API keys for a user's settings page
+ * - apiKeys.by_expires: Cleanup cron finds expired API keys
  * - endpoints.by_slug: Resolve endpoint from webhook URL path
  * - endpoints.by_user: List endpoints for dashboard
  * - endpoints.by_expires: Find expired ephemeral endpoints for cleanup cron
@@ -14,6 +15,7 @@
  * - deviceCodes.by_device_code: CLI polls by device code during OAuth device flow
  * - deviceCodes.by_user_code: Browser lookup when user enters code to authorize
  * - deviceCodes.by_expires: Cleanup cron finds expired device codes
+ * - deviceCodes.by_status: Efficient count of pending codes for flood protection
  */
 import { defineSchema, defineTable } from "convex/server";
 import { authTables } from "@convex-dev/auth/server";
@@ -59,10 +61,12 @@ export default defineSchema({
     keyPrefix: v.string(),
     name: v.string(),
     lastUsedAt: v.optional(v.number()),
+    expiresAt: v.optional(v.number()),
     createdAt: v.number(),
   })
     .index("by_key_hash", ["keyHash"])
-    .index("by_user", ["userId"]),
+    .index("by_user", ["userId"])
+    .index("by_expires", ["expiresAt"]),
 
   endpoints: defineTable({
     userId: v.optional(v.id("users")),
@@ -106,5 +110,6 @@ export default defineSchema({
   })
     .index("by_device_code", ["deviceCode"])
     .index("by_user_code", ["userCode"])
-    .index("by_expires", ["expiresAt"]),
+    .index("by_expires", ["expiresAt"])
+    .index("by_status", ["status"]),
 });

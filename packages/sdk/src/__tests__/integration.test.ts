@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeAll } from "vitest";
 import { WebhooksCC, ApiError } from "../client";
+import { WebhooksCCError } from "../errors";
 
 const API_KEY = process.env.WHK_API_KEY;
 const BASE_URL = process.env.WHK_BASE_URL ?? "https://webhooks.cc";
@@ -65,7 +66,7 @@ describe.skipIf(!API_KEY)("SDK integration tests", () => {
       expect.fail("Should have thrown 404");
     } catch (error) {
       expect(error).toBeInstanceOf(ApiError);
-      expect((error as ApiError).statusCode).toBe(404);
+      expect((error as WebhooksCCError).statusCode).toBe(404);
     }
   }, 30000);
 
@@ -75,7 +76,7 @@ describe.skipIf(!API_KEY)("SDK integration tests", () => {
       expect.fail("Should have thrown");
     } catch (error) {
       expect(error).toBeInstanceOf(ApiError);
-      expect((error as ApiError).statusCode).toBe(404);
+      expect((error as WebhooksCCError).statusCode).toBe(404);
     }
   });
 
@@ -90,7 +91,7 @@ describe.skipIf(!API_KEY)("SDK integration tests", () => {
       expect.fail("Should have thrown");
     } catch (error) {
       expect(error).toBeInstanceOf(ApiError);
-      expect((error as ApiError).statusCode).toBe(401);
+      expect((error as WebhooksCCError).statusCode).toBe(401);
     }
   });
 });
