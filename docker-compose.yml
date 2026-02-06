@@ -12,6 +12,8 @@ services:
       - CONVEX_DEPLOYMENT=${CONVEX_DEPLOYMENT}
       - NEXT_PUBLIC_WEBHOOK_URL=${NEXT_PUBLIC_WEBHOOK_URL}
       - NEXT_PUBLIC_APP_URL=${NEXT_PUBLIC_APP_URL}
+      - CONVEX_SITE_URL=${CONVEX_SITE_URL}
+      - CAPTURE_SHARED_SECRET=${CAPTURE_SHARED_SECRET}
     restart: unless-stopped
 
   receiver:
@@ -22,5 +24,6 @@ services:
       - "3001:3001"
     environment:
       - CONVEX_SITE_URL=${CONVEX_SITE_URL}
+      - CAPTURE_SHARED_SECRET=${CAPTURE_SHARED_SECRET}
       - PORT=3001
     restart: unless-stopped
