@@ -21,6 +21,7 @@ import (
 
 const (
 	defaultBaseURL         = "https://webhooks.cc"
+	defaultWebhookURL      = "https://go.webhooks.cc"
 	httpTimeout            = 30 * time.Second
 	maxErrorResponseSize   = 1024 * 1024    // 1MB for error responses
 	maxSuccessResponseSize = 10 * 1024 * 1024 // 10MB for success responses
@@ -63,6 +64,15 @@ func NewClient() *Client {
 // BaseURL returns the configured API base URL for use by the stream package.
 func (c *Client) BaseURL() string {
 	return c.baseURL
+}
+
+// WebhookURL returns the URL where webhooks are received (go.webhooks.cc).
+// This can be overridden with the WHK_WEBHOOK_URL environment variable.
+func (c *Client) WebhookURL() string {
+	if envURL := os.Getenv("WHK_WEBHOOK_URL"); envURL != "" {
+		return strings.TrimSuffix(envURL, "/")
+	}
+	return defaultWebhookURL
 }
 
 func (c *Client) getToken() (string, error) {

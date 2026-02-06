@@ -224,14 +224,8 @@ func createEndpointCmd() *cobra.Command {
 				return err
 			}
 
-			webhookURL := client.BaseURL()
-			// Use NEXT_PUBLIC_WEBHOOK_URL pattern if available
-			if envURL := os.Getenv("WHK_WEBHOOK_URL"); envURL != "" {
-				webhookURL = envURL
-			}
-
 			fmt.Printf("Endpoint created: %s\n", endpoint.Slug)
-			fmt.Printf("URL: %s/w/%s\n", webhookURL, endpoint.Slug)
+			fmt.Printf("URL: %s/w/%s\n", client.WebhookURL(), endpoint.Slug)
 			return nil
 		},
 	}
@@ -254,10 +248,7 @@ func listEndpointsCmd() *cobra.Command {
 				return nil
 			}
 
-			webhookURL := client.BaseURL()
-			if envURL := os.Getenv("WHK_WEBHOOK_URL"); envURL != "" {
-				webhookURL = envURL
-			}
+			webhookURL := client.WebhookURL()
 
 			fmt.Printf("%-10s %-20s %s\n", "SLUG", "NAME", "URL")
 			fmt.Printf("%-10s %-20s %s\n", "----", "----", "---")
@@ -356,12 +347,7 @@ func tunnelCmd() *cobra.Command {
 				createdEndpoint = true
 			}
 
-			webhookURL := client.BaseURL()
-			if envURL := os.Getenv("WHK_WEBHOOK_URL"); envURL != "" {
-				webhookURL = envURL
-			}
-
-			fmt.Printf("Forwarding %s/w/%s -> %s\n", webhookURL, slug, targetURL)
+			fmt.Printf("Forwarding %s/w/%s -> %s\n", client.WebhookURL(), slug, targetURL)
 			if ephemeral && createdEndpoint {
 				fmt.Println("Endpoint will be deleted on exit")
 			}
@@ -465,12 +451,7 @@ func listenCmd() *cobra.Command {
 				return fmt.Errorf("not logged in: %w", err)
 			}
 
-			webhookURL := client.BaseURL()
-			if envURL := os.Getenv("WHK_WEBHOOK_URL"); envURL != "" {
-				webhookURL = envURL
-			}
-
-			fmt.Printf("Listening on %s/w/%s\n", webhookURL, slug)
+			fmt.Printf("Listening on %s/w/%s\n", client.WebhookURL(), slug)
 			fmt.Println("Press Ctrl+C to stop")
 			fmt.Println()
 

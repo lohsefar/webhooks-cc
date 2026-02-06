@@ -10,6 +10,7 @@ import { getAuthUserId } from "@convex-dev/auth/server";
 import { GenericDatabaseReader } from "convex/server";
 import { v } from "convex/values";
 import { mutation, query, internalQuery, internalMutation } from "./_generated/server";
+import { internal } from "./_generated/api";
 import { DataModel } from "./_generated/dataModel";
 import { nanoid } from "nanoid";
 import { EPHEMERAL_TTL_MS } from "./config";
@@ -232,9 +233,16 @@ export const remove = mutation({
       await ctx.db.delete(request._id);
     }
 
-    // If there might be more requests, the endpoint stays but requests are being cleaned
-    // For simplicity, we delete the endpoint now - orphaned requests will be cleaned by cron
+    // Delete endpoint immediately so it disappears from the UI
     await ctx.db.delete(id);
+
+    // If more requests remain, schedule async drain
+    if (requests.length === DELETE_BATCH_SIZE) {
+      await ctx.scheduler.runAfter(0, internal.requests.drainOrphanedRequests, {
+        endpointId: id,
+      });
+    }
+
     return { success: true };
   },
 });
@@ -313,7 +321,16 @@ export const removeForUser = internalMutation({
       await ctx.db.delete(request._id);
     }
 
+    // Delete endpoint immediately so it disappears from the UI/API
     await ctx.db.delete(endpoint._id);
+
+    // If more requests remain, schedule async drain
+    if (requests.length === DELETE_BATCH_SIZE) {
+      await ctx.scheduler.runAfter(0, internal.requests.drainOrphanedRequests, {
+        endpointId: endpoint._id,
+      });
+    }
+
     return { success: true };
   },
 });
