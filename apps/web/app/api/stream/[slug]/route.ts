@@ -98,9 +98,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ slug
             if (resp.status === 404) {
               try {
                 controller.enqueue(
-                  encoder.encode(
-                    `event: endpoint_deleted\ndata: ${JSON.stringify({ slug })}\n\n`
-                  )
+                  encoder.encode(`event: endpoint_deleted\ndata: ${JSON.stringify({ slug })}\n\n`)
                 );
               } catch {
                 // Stream may already be closed

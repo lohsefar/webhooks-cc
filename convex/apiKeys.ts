@@ -150,11 +150,8 @@ export const validate = internalMutation({
 
     if (!apiKey) return null;
 
-    // Check expiration - lazy cleanup on access
-    if (apiKey.expiresAt && apiKey.expiresAt < Date.now()) {
-      await ctx.db.delete(apiKey._id);
-      return null;
-    }
+    // Reject expired keys (cron handles actual deletion)
+    if (apiKey.expiresAt && apiKey.expiresAt < Date.now()) return null;
 
     // Update last used timestamp
     await ctx.db.patch(apiKey._id, { lastUsedAt: Date.now() });

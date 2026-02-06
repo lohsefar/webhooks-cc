@@ -154,7 +154,12 @@ export class WebhooksCC {
       if (error instanceof Error && error.name === "AbortError") {
         const timeoutError = new TimeoutError(this.timeout);
         try {
-          this.hooks.onError?.({ method, url, error: timeoutError, durationMs: Date.now() - start });
+          this.hooks.onError?.({
+            method,
+            url,
+            error: timeoutError,
+            durationMs: Date.now() - start,
+          });
         } catch {
           // Hooks must not break the request flow
         }

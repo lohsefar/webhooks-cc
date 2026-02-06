@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { WebhooksCC, ApiError } from "../client";
+import { WebhooksCC } from "../client";
 import { WebhooksCCError, UnauthorizedError, NotFoundError } from "../errors";
 
 const API_KEY = "whcc_testkey123";

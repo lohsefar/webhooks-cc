@@ -121,7 +121,10 @@ http.route({
     // Verify webhook signature
     const verification = await verifyWebhookSignature(body, headers, webhookSecret);
     if (!verification.verified) {
-      console.error("[http:error] Polar webhook signature verification failed:", verification.error);
+      console.error(
+        "[http:error] Polar webhook signature verification failed:",
+        verification.error
+      );
       return new Response(JSON.stringify({ error: "invalid_signature" }), {
         status: 401,
         headers: { "Content-Type": "application/json" },

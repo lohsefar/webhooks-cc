@@ -43,9 +43,7 @@ export class RateLimitError extends WebhooksCCError {
   public readonly retryAfter?: number;
 
   constructor(retryAfter?: number) {
-    const message = retryAfter
-      ? `Rate limited, retry after ${retryAfter}s`
-      : "Rate limited";
+    const message = retryAfter ? `Rate limited, retry after ${retryAfter}s` : "Rate limited";
     super(429, message);
     this.name = "RateLimitError";
     this.retryAfter = retryAfter;

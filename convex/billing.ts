@@ -253,9 +253,7 @@ export const handleWebhook = internalMutation({
         // Validate userId is a valid Convex ID before using it
         const normalizedId = ctx.db.normalizeId("users", userId);
         if (!normalizedId) {
-          console.log(
-            `[billing:info] Ignoring ${event} - invalid userId format: ${userId}`
-          );
+          console.log(`[billing:info] Ignoring ${event} - invalid userId format: ${userId}`);
           return;
         }
 
@@ -263,16 +261,12 @@ export const handleWebhook = internalMutation({
         try {
           user = await ctx.db.get(normalizedId);
         } catch {
-          console.log(
-            `[billing:info] Ignoring ${event} - failed to get user`
-          );
+          console.log(`[billing:info] Ignoring ${event} - failed to get user`);
           return;
         }
         if (!user) {
           // User was deleted or this is orphaned sandbox data
-          console.log(
-            `[billing:info] Ignoring ${event} - user not found`
-          );
+          console.log(`[billing:info] Ignoring ${event} - user not found`);
           return;
         }
 

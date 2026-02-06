@@ -18,9 +18,7 @@ export function parseJsonBody(request: Request): unknown | undefined {
  * Matches on the `stripe-signature` header being present.
  */
 export function isStripeWebhook(request: Request): boolean {
-  return Object.keys(request.headers).some(
-    (k) => k.toLowerCase() === "stripe-signature"
-  );
+  return Object.keys(request.headers).some((k) => k.toLowerCase() === "stripe-signature");
 }
 
 /**
@@ -28,9 +26,7 @@ export function isStripeWebhook(request: Request): boolean {
  * Matches on the `x-github-event` header being present.
  */
 export function isGitHubWebhook(request: Request): boolean {
-  return Object.keys(request.headers).some(
-    (k) => k.toLowerCase() === "x-github-event"
-  );
+  return Object.keys(request.headers).some((k) => k.toLowerCase() === "x-github-event");
 }
 
 /**
@@ -44,10 +40,7 @@ export function isGitHubWebhook(request: Request): boolean {
  * });
  * ```
  */
-export function matchJsonField(
-  field: string,
-  value: unknown
-): (request: Request) => boolean {
+export function matchJsonField(field: string, value: unknown): (request: Request) => boolean {
   return (request: Request) => {
     const body = parseJsonBody(request);
     if (typeof body !== "object" || body === null) return false;
