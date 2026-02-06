@@ -1,17 +1,15 @@
 import { getConvexClient } from "@/lib/convex-client";
 import { checkRateLimit } from "@/lib/rate-limit";
+import { parseJsonBody } from "@/lib/request-validation";
 import { api } from "@convex/_generated/api";
 
 export async function POST(request: Request) {
   const rateLimited = checkRateLimit(request, 10);
   if (rateLimited) return rateLimited;
 
-  let body;
-  try {
-    body = await request.json();
-  } catch {
-    return Response.json({ error: "Invalid JSON" }, { status: 400 });
-  }
+  const parsed = await parseJsonBody(request, 1024);
+  if ("error" in parsed) return parsed.error;
+  const body = parsed.data as Record<string, unknown>;
 
   if (typeof body.deviceCode !== "string") {
     return Response.json({ error: "Missing deviceCode" }, { status: 400 });

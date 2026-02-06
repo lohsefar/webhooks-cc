@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { WebhooksCC, ApiError } from "../client";
+import { WebhooksCC } from "../client";
+import { WebhooksCCError, UnauthorizedError, NotFoundError } from "../errors";
 
 const API_KEY = "whcc_testkey123";
 const BASE_URL = "https://test.webhooks.cc";
@@ -253,7 +254,7 @@ describe("WebhooksCC", () => {
       const client = createClient();
       await expect(
         client.requests.waitFor("abc123", { timeout: 50, pollInterval: 10 })
-      ).rejects.toThrow(/Timeout/i);
+      ).rejects.toThrow(/timed out/i);
     });
 
     it("throws on 401 instead of retrying", async () => {
@@ -268,7 +269,7 @@ describe("WebhooksCC", () => {
       const client = createClient();
       await expect(
         client.requests.waitFor("abc123", { timeout: 5000, pollInterval: 10 })
-      ).rejects.toThrow(/Authentication failed/i);
+      ).rejects.toBeInstanceOf(UnauthorizedError);
     });
 
     it("throws on 404 instead of retrying", async () => {
@@ -283,7 +284,7 @@ describe("WebhooksCC", () => {
       const client = createClient();
       await expect(
         client.requests.waitFor("abc123", { timeout: 5000, pollInterval: 10 })
-      ).rejects.toThrow(/not found/i);
+      ).rejects.toBeInstanceOf(NotFoundError);
     });
 
     it("continues polling on 5xx errors", async () => {
@@ -322,7 +323,7 @@ describe("WebhooksCC", () => {
   });
 
   describe("error handling", () => {
-    it("throws ApiError with status code on non-ok response", async () => {
+    it("throws WebhooksCCError with status code on non-ok response", async () => {
       const fetchMock = mockFetch({ status: 400, body: { error: "bad request" } });
       globalThis.fetch = fetchMock;
 
@@ -331,8 +332,8 @@ describe("WebhooksCC", () => {
         await client.endpoints.list();
         expect.fail("Should have thrown");
       } catch (error) {
-        expect(error).toBeInstanceOf(ApiError);
-        expect((error as ApiError).statusCode).toBe(400);
+        expect(error).toBeInstanceOf(WebhooksCCError);
+        expect((error as WebhooksCCError).statusCode).toBe(400);
       }
     });
 
@@ -351,7 +352,7 @@ describe("WebhooksCC", () => {
         await client.endpoints.list();
         expect.fail("Should have thrown");
       } catch (error) {
-        expect((error as ApiError).message.length).toBeLessThan(300);
+        expect((error as WebhooksCCError).message.length).toBeLessThan(300);
       }
     });
   });

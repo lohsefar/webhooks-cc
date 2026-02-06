@@ -1,4 +1,5 @@
 import { authenticateRequest, convexCliRequest, formatEndpoint } from "@/lib/api-auth";
+import { parseJsonBody } from "@/lib/request-validation";
 
 export async function GET(request: Request) {
   const auth = await authenticateRequest(request);
@@ -21,12 +22,9 @@ export async function POST(request: Request) {
   const auth = await authenticateRequest(request);
   if (!auth.success) return auth.response;
 
-  let body;
-  try {
-    body = await request.json();
-  } catch {
-    return Response.json({ error: "Invalid JSON" }, { status: 400 });
-  }
+  const parsed = await parseJsonBody(request);
+  if ("error" in parsed) return parsed.error;
+  const body = parsed.data as Record<string, unknown>;
 
   const name = typeof body.name === "string" ? body.name.trim() : undefined;
   if (name !== undefined && (name.length === 0 || name.length > 100)) {

@@ -74,6 +74,38 @@ export interface WaitForOptions {
   match?: (request: Request) => boolean;
 }
 
+/** Info passed to the onRequest hook before a request is sent. */
+export interface RequestHookInfo {
+  method: string;
+  url: string;
+}
+
+/** Info passed to the onResponse hook after a successful response. */
+export interface ResponseHookInfo {
+  method: string;
+  url: string;
+  status: number;
+  durationMs: number;
+}
+
+/** Info passed to the onError hook when a request fails. */
+export interface ErrorHookInfo {
+  method: string;
+  url: string;
+  error: Error;
+  durationMs: number;
+}
+
+/**
+ * Lifecycle hooks for observability and telemetry integration.
+ * All hooks are optional and are called synchronously (fire-and-forget).
+ */
+export interface ClientHooks {
+  onRequest?: (info: RequestHookInfo) => void;
+  onResponse?: (info: ResponseHookInfo) => void;
+  onError?: (info: ErrorHookInfo) => void;
+}
+
 /**
  * Configuration options for the WebhooksCC client.
  */
@@ -84,4 +116,6 @@ export interface ClientOptions {
   baseUrl?: string;
   /** Request timeout in milliseconds (default: 30000) */
   timeout?: number;
+  /** Lifecycle hooks for observability */
+  hooks?: ClientHooks;
 }

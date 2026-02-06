@@ -21,6 +21,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/getsentry/sentry-go"
 	"github.com/gofiber/fiber/v2"
 	"github.com/gofiber/fiber/v2/middleware/cors"
 	"github.com/gofiber/fiber/v2/middleware/logger"
@@ -801,6 +802,11 @@ func (b *RequestBatcher) flushLocked(slug string) {
 		resp, err := callConvexBatch(ctx, slug, requests)
 		if err != nil {
 			log.Printf("Batch capture failed for %s (%d requests): %v", slug, len(requests), err)
+			hub := sentry.CurrentHub().Clone()
+			hub.ConfigureScope(func(scope *sentry.Scope) {
+				scope.SetTag("slug", slug)
+			})
+			hub.CaptureException(fmt.Errorf("batch capture failed: %w", err))
 			return
 		}
 		if resp.Error != "" {
@@ -830,6 +836,9 @@ func (b *RequestBatcher) Wait() {
 	b.wg.Wait()
 }
 
+// version is set at build time via ldflags for release builds.
+var version = "dev"
+
 var (
 	quotaStore          *FileQuotaStore
 	endpointCache       *EndpointCache
@@ -841,6 +850,21 @@ var (
 )
 
 func main() {
+	// Initialize Sentry if DSN is configured
+	if dsn := os.Getenv("SENTRY_DSN"); dsn != "" {
+		if err := sentry.Init(sentry.ClientOptions{
+			Dsn:              dsn,
+			Release:          "receiver@" + version,
+			TracesSampleRate: 0.1,
+			Environment:      envOrDefault("SENTRY_ENVIRONMENT", "production"),
+		}); err != nil {
+			log.Printf("Warning: Sentry init failed: %v", err)
+		} else {
+			log.Println("Sentry initialized")
+			defer sentry.Flush(2 * time.Second)
+		}
+	}
+
 	convexSiteURL = os.Getenv("CONVEX_SITE_URL")
 	if convexSiteURL == "" {
 		log.Fatal("CONVEX_SITE_URL environment variable is required")
@@ -882,7 +906,14 @@ func main() {
 		BodyLimit:             maxBodySize,
 	})
 
-	app.Use(recover.New())
+	app.Use(recover.New(recover.Config{
+		EnableStackTrace: true,
+		StackTraceHandler: func(c *fiber.Ctx, e any) {
+			hub := sentry.CurrentHub().Clone()
+			hub.Recover(e)
+			hub.Flush(200 * time.Millisecond)
+		},
+	}))
 
 	// CORS: All routes on this service are public webhook capture endpoints,
 	// so allow any origin. The receiver has no authenticated browser-facing routes.
@@ -944,6 +975,8 @@ func main() {
 		case <-time.After(shutdownTimeout):
 			log.Println("Shutdown timeout exceeded, some requests may be lost")
 		}
+
+		sentry.Flush(2 * time.Second)
 
 		// Shutdown the server
 		if err := app.Shutdown(); err != nil {
@@ -1212,6 +1245,13 @@ func fetchQuota(ctx context.Context, slug string) (*QuotaResponse, error) {
 		slug, result.Remaining, result.Limit, result.NeedsPeriodStart, result.Error)
 
 	return &result, nil
+}
+
+func envOrDefault(key, fallback string) string {
+	if v := os.Getenv(key); v != "" {
+		return v
+	}
+	return fallback
 }
 
 func callConvexBatch(ctx context.Context, slug string, requests []BufferedRequest) (*CaptureResponse, error) {

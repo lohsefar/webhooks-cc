@@ -1,8 +1,13 @@
 module webhooks.cc/receiver
 
-go 1.23
+go 1.23.0
 
-require github.com/gofiber/fiber/v2 v2.52.10
+toolchain go1.23.5
+
+require (
+	github.com/getsentry/sentry-go v0.42.0
+	github.com/gofiber/fiber/v2 v2.52.10
+)
 
 require (
 	github.com/andybalholm/brotli v1.1.1 // indirect
@@ -16,6 +21,7 @@ require (
 	github.com/valyala/fasthttp v1.58.0 // indirect
 	github.com/valyala/tcplisten v1.0.0 // indirect
 	golang.org/x/sys v0.29.0 // indirect
+	golang.org/x/text v0.20.0 // indirect
 )
 
 replace webhooks.cc/shared => ../go-shared

@@ -22,6 +22,7 @@ builds:
     ldflags:
       - -s -w
       - -X main.version={{.Version}}
+      - -X main.sentryDSN={{ .Env.WHK_SENTRY_DSN }}
 
 archives:
   - id: whk
