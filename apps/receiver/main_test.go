@@ -395,11 +395,13 @@ func TestGetAndDecrement_InvalidSlug_FailOpen(t *testing.T) {
 func TestGetAndDecrement_StaleRefreshesFromConvex(t *testing.T) {
 	mockServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if strings.Contains(r.URL.Path, "/quota") {
-			json.NewEncoder(w).Encode(QuotaResponse{
+			if err := json.NewEncoder(w).Encode(QuotaResponse{
 				UserID:    "user-fresh",
 				Remaining: 50,
 				Limit:     100,
-			})
+			}); err != nil {
+				t.Errorf("encode QuotaResponse: %v", err)
+			}
 			return
 		}
 		http.NotFound(w, r)
@@ -462,22 +464,26 @@ func TestGetAndDecrement_NeedsPeriodStart_CallsCheckPeriod(t *testing.T) {
 	mockServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if strings.Contains(r.URL.Path, "/check-period") {
 			checkPeriodCalled.Add(1)
-			json.NewEncoder(w).Encode(CheckPeriodResponse{
+			if err := json.NewEncoder(w).Encode(CheckPeriodResponse{
 				Remaining: 200,
 				Limit:     200,
 				PeriodEnd: &periodEnd,
-			})
+			}); err != nil {
+				t.Errorf("encode CheckPeriodResponse: %v", err)
+			}
 			return
 		}
 		if strings.Contains(r.URL.Path, "/quota") {
 			plan := "free"
-			json.NewEncoder(w).Encode(QuotaResponse{
+			if err := json.NewEncoder(w).Encode(QuotaResponse{
 				UserID:           "user-free",
 				Remaining:        200,
 				Limit:            200,
 				NeedsPeriodStart: true,
 				Plan:             &plan,
-			})
+			}); err != nil {
+				t.Errorf("encode QuotaResponse: %v", err)
+			}
 			return
 		}
 		http.NotFound(w, r)
@@ -554,11 +560,15 @@ func TestBatcherAdd_FlushAtMaxSize(t *testing.T) {
 			Slug     string            `json:"slug"`
 			Requests []BufferedRequest `json:"requests"`
 		}
-		json.Unmarshal(body, &payload)
+		if err := json.Unmarshal(body, &payload); err != nil {
+			t.Errorf("unmarshal batch payload: %v", err)
+		}
 		mu.Lock()
 		received = append(received, payload.Requests...)
 		mu.Unlock()
-		json.NewEncoder(w).Encode(CaptureResponse{Success: true, Inserted: len(payload.Requests)})
+		if err := json.NewEncoder(w).Encode(CaptureResponse{Success: true, Inserted: len(payload.Requests)}); err != nil {
+			t.Errorf("encode CaptureResponse: %v", err)
+		}
 	}))
 	defer mockServer.Close()
 	withMockConvex(t, mockServer)
@@ -867,7 +877,7 @@ func TestHandleWebhook_BlockedHeaders(t *testing.T) {
 	if err != nil {
 		t.Fatalf("app.Test: %v", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != 200 {
 		t.Fatalf("expected 200, got %d", resp.StatusCode)
@@ -909,7 +919,7 @@ func TestHandleWebhook_CRLFInjection(t *testing.T) {
 	if err != nil {
 		t.Fatalf("app.Test: %v", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.Header.Get("X-Clean") != "good" {
 		t.Errorf("X-Clean should be present")
@@ -944,7 +954,7 @@ func TestHandleWebhook_OversizedHeaders(t *testing.T) {
 	if err != nil {
 		t.Fatalf("app.Test: %v", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.Header.Get("X-Normal") != "ok" {
 		t.Errorf("normal header should be present")
@@ -973,7 +983,7 @@ func TestHandleWebhook_InvalidSlug(t *testing.T) {
 	if err != nil {
 		t.Fatalf("app.Test: %v", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != 400 {
 		body, _ := io.ReadAll(resp.Body)
@@ -998,7 +1008,7 @@ func TestHandleWebhook_MockResponseStatus(t *testing.T) {
 	if err != nil {
 		t.Fatalf("app.Test: %v", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != 201 {
 		t.Errorf("expected 201, got %d", resp.StatusCode)
@@ -1026,7 +1036,7 @@ func TestHandleWebhook_InvalidMockStatus(t *testing.T) {
 	if err != nil {
 		t.Fatalf("app.Test: %v", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != 200 {
 		t.Errorf("invalid status should fallback to 200, got %d", resp.StatusCode)
@@ -1046,7 +1056,7 @@ func TestHandleWebhook_NoMockResponse(t *testing.T) {
 	if err != nil {
 		t.Fatalf("app.Test: %v", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != 200 {
 		t.Errorf("expected 200 for no mock response, got %d", resp.StatusCode)
@@ -1079,7 +1089,7 @@ func TestHandleWebhook_BodySizeLimit(t *testing.T) {
 		}
 		t.Fatalf("app.Test: %v", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != 413 {
 		t.Errorf("expected 413 for oversized body, got %d", resp.StatusCode)
@@ -1101,7 +1111,7 @@ func TestHandleWebhook_ExpiredEndpoint(t *testing.T) {
 	if err != nil {
 		t.Fatalf("app.Test: %v", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != 410 {
 		t.Errorf("expected 410 for expired endpoint, got %d", resp.StatusCode)
@@ -1201,7 +1211,7 @@ func TestRealIP(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			resp.Body.Close()
+			_ = resp.Body.Close()
 
 			if gotIP != tt.expected {
 				t.Errorf("realIP() = %q, want %q", gotIP, tt.expected)
