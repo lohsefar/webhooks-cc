@@ -25,7 +25,7 @@ export function AppHeader({
     <header className="border-b-2 border-foreground shrink-0 bg-background sticky top-0 z-50">
       <div className="container mx-auto px-4 h-14 flex items-center justify-between">
         <div className="flex items-center gap-3">
-          <Link href="/dashboard" className="font-bold text-lg">
+          <Link href="/" className="font-bold text-lg">
             webhooks.cc
           </Link>
 

@@ -3,8 +3,27 @@ import { FloatingNavbar } from "@/components/nav/floating-navbar";
 import { AuthAwareDemo } from "@/components/landing/auth-aware-demo";
 import { HeroCTA } from "@/components/landing/hero-cta";
 import { Zap, Eye, Terminal, ArrowRight, Check } from "lucide-react";
+import { GitHubCard } from "@/components/landing/github-card";
 
-export default function Home() {
+interface GitHubRepoResponse {
+  stargazers_count: number;
+}
+
+async function getStarCount(): Promise<number | null> {
+  try {
+    const res = await fetch("https://api.github.com/repos/lohsefar/webhooks-cc", {
+      next: { revalidate: 3600 },
+    });
+    if (!res.ok) return null;
+    const data = (await res.json()) as GitHubRepoResponse;
+    return typeof data?.stargazers_count === "number" ? data.stargazers_count : null;
+  } catch {
+    return null;
+  }
+}
+
+export default async function Home() {
+  const stars = await getStarCount();
   return (
     <main className="min-h-screen">
       {/* Navigation */}
@@ -13,24 +32,65 @@ export default function Home() {
       {/* Hero */}
       <section className="pt-32 pb-20 px-4">
         <div className="max-w-6xl mx-auto">
-          <div className="max-w-3xl">
-            <div className="inline-block neo-btn-secondary text-sm py-1 px-3 mb-6">
-              Developer Tools
+          <div className="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-8">
+            <div className="max-w-3xl">
+              <div className="inline-block neo-btn-secondary text-sm py-1 px-3 mb-6">
+                Developer Tools
+              </div>
+              <h1 className="text-5xl md:text-7xl font-bold tracking-tight mb-6 leading-[1.1]">
+                Inspect webhooks{" "}
+                <span className="bg-primary text-primary-foreground px-2">instantly</span>
+              </h1>
+              <p className="text-xl md:text-2xl text-muted-foreground mb-8 max-w-2xl leading-relaxed">
+                Get a unique URL in one click. See incoming requests in real-time. Forward to
+                localhost for development.{" "}
+                <span className="text-foreground font-semibold">No signup required.</span>
+              </p>
+              <HeroCTA />
             </div>
-            <h1 className="text-5xl md:text-7xl font-bold tracking-tight mb-6 leading-[1.1]">
-              Inspect webhooks{" "}
-              <span className="bg-primary text-primary-foreground px-2">instantly</span>
-            </h1>
-            <p className="text-xl md:text-2xl text-muted-foreground mb-8 max-w-2xl leading-relaxed">
-              Get a unique URL in one click. See incoming requests in real-time. Forward to
-              localhost for development.{" "}
-              <span className="text-foreground font-semibold">No signup required.</span>
-            </p>
-            <HeroCTA />
+
+            {/* GitHub */}
+            <GitHubCard stars={stars} />
+          </div>
+
+          {/* Install */}
+          <div className="mt-16 grid md:grid-cols-2 gap-6">
+            <div className="neo-card">
+              <p className="text-xs font-bold uppercase tracking-wide text-muted-foreground mb-3">
+                SDK
+              </p>
+              <div className="neo-code !p-3 !shadow-none">
+                <code className="text-sm">
+                  <span className="text-primary">$</span> npm install @webhooks-cc/sdk
+                </code>
+              </div>
+              <p className="text-xs text-muted-foreground mt-2">
+                Also works with{" "}
+                <Link href="/installation" className="text-primary hover:underline font-bold">
+                  pnpm, yarn, and bun
+                </Link>
+              </p>
+            </div>
+            <div className="neo-card">
+              <p className="text-xs font-bold uppercase tracking-wide text-muted-foreground mb-3">
+                CLI
+              </p>
+              <div className="neo-code !p-3 !shadow-none">
+                <code className="text-sm">
+                  <span className="text-primary">$</span> curl -fsSL https://webhooks.cc/install.sh | sh
+                </code>
+              </div>
+              <p className="text-xs text-muted-foreground mt-2">
+                Also available via{" "}
+                <Link href="/installation" className="text-primary hover:underline font-bold">
+                  Homebrew
+                </Link>
+              </p>
+            </div>
           </div>
 
           {/* Code preview */}
-          <div className="mt-16 neo-code overflow-x-auto">
+          <div className="mt-6 neo-code overflow-x-auto">
             <pre className="text-sm md:text-base">
               <code>
                 <span className="text-muted-foreground">
@@ -152,8 +212,8 @@ export default function Home() {
                 {[
                   "500,000 requests/month",
                   "30-day data retention",
-                  "Custom subdomains",
-                  "Priority support",
+                  "Unlimited endpoints",
+                  "CLI & SDK access",
                 ].map((feature) => (
                   <li key={feature} className="flex items-center gap-3">
                     <Check className="h-5 w-5 text-primary flex-shrink-0" />
@@ -244,6 +304,11 @@ export default function Home() {
                 <li>
                   <Link href="/terms" className="text-muted-foreground hover:text-foreground">
                     Terms of Service
+                  </Link>
+                </li>
+                <li>
+                  <Link href="/support" className="text-muted-foreground hover:text-foreground">
+                    Support
                   </Link>
                 </li>
               </ul>

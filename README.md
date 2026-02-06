@@ -10,7 +10,7 @@ Get a unique URL, point your webhook there, and see every request in real-time. 
 
 1. Visit [webhooks.cc](https://webhooks.cc)
 2. Copy your unique webhook URL
-3. Send a test request: `curl -X POST https://hooks.webhooks.cc/w/your-slug -d '{"test": true}'`
+3. Send a test request: `curl -X POST https://go.webhooks.cc/w/<slug> -d '{"test": true}'`
 4. Watch it appear in the dashboard
 
 ## Features
@@ -38,7 +38,7 @@ Get a unique URL, point your webhook there, and see every request in real-time. 
 
 **Pro ($8/month)** — 500,000 requests/month, 30-day retention. For production monitoring and high-volume testing.
 
-See [webhooks.cc/pricing](https://webhooks.cc/pricing) for details.
+See [webhooks.cc](https://webhooks.cc) for details.
 
 ## Install
 
@@ -60,7 +60,7 @@ whk auth login
 npm install @webhooks-cc/sdk
 ```
 
-See [webhooks.cc/docs/installation](https://webhooks.cc/docs/installation) for Homebrew, manual downloads, and other methods.
+See [webhooks.cc/installation](https://webhooks.cc/installation) for Homebrew, manual downloads, and other methods.
 
 ## CLI
 
