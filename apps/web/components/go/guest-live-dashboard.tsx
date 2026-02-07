@@ -17,6 +17,8 @@ import type { Request } from "@/types/request";
 import { Check, Circle, Copy, Plus, Send } from "lucide-react";
 
 const REQUEST_LIMIT = 50;
+// Local fallback so refreshes immediately after create still restore the slug.
+// This is overwritten with the authoritative `endpoint.expiresAt` once Convex returns it.
 const EXPIRY_MS = 10 * 60 * 60 * 1000;
 const COPY_FEEDBACK_MS = 2000;
 const SEND_FEEDBACK_MS = 3000;
@@ -66,6 +68,21 @@ export function GuestLiveDashboard() {
     api.endpoints.getBySlug,
     endpointSlug ? { slug: endpointSlug } : "skip"
   );
+
+  // Sync local expiry to the authoritative server expiry as soon as we have it.
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    if (!endpointSlug || !endpoint?.isEphemeral || !endpoint.expiresAt) return;
+
+    // Avoid unnecessary re-renders/LS writes.
+    if (expiresAt === endpoint.expiresAt) return;
+
+    setExpiresAt(endpoint.expiresAt);
+    localStorage.setItem(
+      DEMO_ENDPOINT_STORAGE_KEY,
+      JSON.stringify({ slug: endpointSlug, expiresAt: endpoint.expiresAt })
+    );
+  }, [endpoint?.expiresAt, endpoint?.isEphemeral, endpointSlug, expiresAt]);
 
   const requests = useQuery(
     api.requests.list,
@@ -453,7 +470,7 @@ function DemoUrlBar({
       <div className="border-b-2 border-foreground bg-card px-4 py-2.5 flex items-center gap-3">
         <span className="font-bold text-sm uppercase tracking-wide shrink-0">Test Endpoint</span>
 
-        <div className="flex items-center gap-1.5 min-w-0 flex-1">
+        <div className="flex items-center gap-1.5 min-w-0">
           <code
             className="font-mono text-sm text-muted-foreground truncate cursor-pointer hover:text-foreground transition-colors"
             onClick={handleCopy}
@@ -471,15 +488,12 @@ function DemoUrlBar({
           </button>
         </div>
 
-        {/* Status indicators as compact pills */}
-        <div className="hidden sm:flex items-center gap-2 shrink-0 text-xs">
-          <span className="flex items-center gap-1.5 border-2 border-foreground px-2.5 py-1 bg-background">
+        <div className="hidden sm:flex items-center gap-4 shrink-0 text-xs text-muted-foreground">
+          <span className="flex items-center gap-1.5">
             <Circle className="h-2 w-2 fill-primary text-primary" />
-            <span className="font-mono font-bold">
-              {timeRemaining ?? "10:00:00"}
-            </span>
+            Expires in <span className="font-mono font-bold text-foreground">{timeRemaining ?? "..."}</span>
           </span>
-          <span className="flex items-center gap-1.5 border-2 border-foreground px-2.5 py-1 bg-background">
+          <span>
             <span
               className={cn(
                 "font-mono font-bold",
@@ -487,44 +501,40 @@ function DemoUrlBar({
               )}
             >
               {remainingRequests}
-            </span>
-            <span className="text-muted-foreground">req left</span>
+            </span>{" "}
+            requests left
           </span>
         </div>
       </div>
 
-      {/* Sign-up banner */}
-      <div className="border-b-2 border-foreground bg-amber-500/25 px-4 py-1.5 flex items-center justify-between gap-4">
-        <span className="text-xs text-muted-foreground">
-          <span className="hidden md:inline">
-            Guest: <strong className="text-foreground">50 requests</strong>, 10h expiry.
-            Free account: <strong className="text-foreground">200 requests/day</strong>, permanent endpoints, CLI + SDK.
-          </span>
-          <span className="md:hidden">
-            Free: <strong className="text-foreground">200 requests/day</strong>, permanent endpoints
-          </span>
-        </span>
-        <div className="flex items-center gap-3 shrink-0">
-          <span className="hidden lg:inline text-xs text-muted-foreground">Register free, <strong className="text-foreground">no credit card</strong></span>
-          <div className="hidden lg:flex items-center gap-2">
-            <OAuthSignInButtons redirectTo="/dashboard" buttonClassName="h-7 text-xs px-3 w-auto" layout="horizontal" />
-          </div>
-          <Link
-            href="/login"
-            className="lg:hidden text-xs font-bold uppercase tracking-wide text-primary hover:underline shrink-0"
-          >
-            Sign up free
-          </Link>
-        </div>
-      </div>
+	      {/* Sign-up banner */}
+	      <div className="border-b-2 border-foreground bg-amber-500/25 px-4 py-1.5 flex items-center justify-between gap-4">
+	        <span className="text-xs text-muted-foreground">
+	          <span className="hidden md:inline">
+	            Guest: <strong className="text-foreground">50 requests</strong>, temporary endpoint.
+	            Free account: <strong className="text-foreground">200 requests/day</strong>, permanent endpoints, CLI + SDK.
+	          </span>
+	          <span className="md:hidden">
+	            Free: <strong className="text-foreground">200 requests/day</strong>, permanent endpoints
+	          </span>
+	        </span>
+	        <div className="flex items-center gap-3 shrink-0">
+	          <span className="hidden md:inline text-xs text-muted-foreground">
+	            Register free, <strong className="text-foreground">no credit card</strong>
+	          </span>
+	          <OAuthSignInButtons
+	            redirectTo="/dashboard"
+	            buttonClassName="h-7 text-xs px-3 w-auto"
+	            layout="horizontal"
+	          />
+	        </div>
+	      </div>
 
       {/* Mobile-only status row (visible below sm) */}
       <div className="sm:hidden border-b-2 border-foreground bg-card px-4 py-1.5 flex items-center gap-4 text-xs text-muted-foreground">
         <span className="flex items-center gap-1.5">
           <Circle className="h-2 w-2 fill-primary text-primary" />
-          <span className="font-mono font-bold text-foreground">
-            {timeRemaining ?? "10:00:00"}
-          </span>
+          Expires in <span className="font-mono font-bold text-foreground">{timeRemaining ?? "..."}</span>
         </span>
         <span>
           <span
@@ -535,7 +545,7 @@ function DemoUrlBar({
           >
             {remainingRequests}
           </span>{" "}
-          req left
+          requests left
         </span>
       </div>
     </div>

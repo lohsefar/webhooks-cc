@@ -34,7 +34,7 @@ export function OAuthSignInButtons({
     setSigningIn(provider);
     setError(null);
     try {
-      await signIn(provider);
+      await signIn(provider, { redirectTo });
     } catch {
       setError("Sign in failed. Please try again.");
       setSigningIn(null);
@@ -57,7 +57,11 @@ export function OAuthSignInButtons({
         </div>
       )}
 
-      <div className={layout === "horizontal" ? "flex items-center gap-2" : "space-y-3"}>
+      <div
+        className={
+          layout === "horizontal" ? "flex flex-wrap items-center gap-2" : "space-y-3"
+        }
+      >
         <Button
           variant="outline"
           className={buttonClassName}
