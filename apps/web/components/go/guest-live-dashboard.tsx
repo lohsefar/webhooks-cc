@@ -356,7 +356,11 @@ export function GuestLiveDashboard() {
 
               <div className="flex-1 overflow-hidden">
                 <ErrorBoundary resetKey={selectedId ?? undefined}>
-                  {selectedRequest ? <RequestDetail request={selectedRequest} /> : <RequestDetailEmpty />}
+                  {selectedRequest ? (
+                    <RequestDetail request={selectedRequest} />
+                  ) : (
+                    <RequestDetailEmpty />
+                  )}
                 </ErrorBoundary>
               </div>
             </div>
@@ -421,7 +425,9 @@ function GoHeader({
         <div className="flex items-center gap-3">
           <ThemeToggle />
           {isLoading ? (
-            <span className="neo-btn-outline text-sm py-2 px-4 w-28 text-center opacity-50">...</span>
+            <span className="neo-btn-outline text-sm py-2 px-4 w-28 text-center opacity-50">
+              ...
+            </span>
           ) : isAuthenticated ? (
             <Link href="/dashboard" className="neo-btn-primary text-sm py-2 px-4 w-28 text-center">
               Dashboard
@@ -491,7 +497,8 @@ function DemoUrlBar({
         <div className="hidden sm:flex items-center gap-4 shrink-0 text-xs text-muted-foreground">
           <span className="flex items-center gap-1.5">
             <Circle className="h-2 w-2 fill-primary text-primary" />
-            Expires in <span className="font-mono font-bold text-foreground">{timeRemaining ?? "..."}</span>
+            Expires in{" "}
+            <span className="font-mono font-bold text-foreground">{timeRemaining ?? "..."}</span>
           </span>
           <span>
             <span
@@ -507,34 +514,36 @@ function DemoUrlBar({
         </div>
       </div>
 
-	      {/* Sign-up banner */}
-	      <div className="border-b-2 border-foreground bg-amber-500/25 px-4 py-1.5 flex items-center justify-between gap-4">
-	        <span className="text-xs text-muted-foreground">
-	          <span className="hidden md:inline">
-	            Guest: <strong className="text-foreground">50 requests</strong>, temporary endpoint.
-	            Free account: <strong className="text-foreground">200 requests/day</strong>, permanent endpoints, CLI + SDK.
-	          </span>
-	          <span className="md:hidden">
-	            Free: <strong className="text-foreground">200 requests/day</strong>, permanent endpoints
-	          </span>
-	        </span>
-	        <div className="flex items-center gap-3 shrink-0">
-	          <span className="hidden md:inline text-xs text-muted-foreground">
-	            Register free, <strong className="text-foreground">no credit card</strong>
-	          </span>
-	          <OAuthSignInButtons
-	            redirectTo="/dashboard"
-	            buttonClassName="h-7 text-xs px-3 w-auto"
-	            layout="horizontal"
-	          />
-	        </div>
-	      </div>
+      {/* Sign-up banner */}
+      <div className="border-b-2 border-foreground bg-amber-500/25 px-4 py-1.5 flex items-center justify-between gap-4">
+        <span className="text-xs text-muted-foreground">
+          <span className="hidden md:inline">
+            Guest: <strong className="text-foreground">50 requests</strong>, temporary endpoint.
+            Free account: <strong className="text-foreground">200 requests/day</strong>, permanent
+            endpoints, CLI + SDK.
+          </span>
+          <span className="md:hidden">
+            Free: <strong className="text-foreground">200 requests/day</strong>, permanent endpoints
+          </span>
+        </span>
+        <div className="flex items-center gap-3 shrink-0">
+          <span className="hidden md:inline text-xs text-muted-foreground">
+            Register free, <strong className="text-foreground">no credit card</strong>
+          </span>
+          <OAuthSignInButtons
+            redirectTo="/dashboard"
+            buttonClassName="h-7 text-xs px-3 w-auto"
+            layout="horizontal"
+          />
+        </div>
+      </div>
 
       {/* Mobile-only status row (visible below sm) */}
       <div className="sm:hidden border-b-2 border-foreground bg-card px-4 py-1.5 flex items-center gap-4 text-xs text-muted-foreground">
         <span className="flex items-center gap-1.5">
           <Circle className="h-2 w-2 fill-primary text-primary" />
-          Expires in <span className="font-mono font-bold text-foreground">{timeRemaining ?? "..."}</span>
+          Expires in{" "}
+          <span className="font-mono font-bold text-foreground">{timeRemaining ?? "..."}</span>
         </span>
         <span>
           <span

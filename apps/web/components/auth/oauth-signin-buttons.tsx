@@ -57,11 +57,7 @@ export function OAuthSignInButtons({
         </div>
       )}
 
-      <div
-        className={
-          layout === "horizontal" ? "flex flex-wrap items-center gap-2" : "space-y-3"
-        }
-      >
+      <div className={layout === "horizontal" ? "flex flex-wrap items-center gap-2" : "space-y-3"}>
         <Button
           variant="outline"
           className={buttonClassName}
