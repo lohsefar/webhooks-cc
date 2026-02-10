@@ -120,40 +120,54 @@ type UpdateApplyMsg struct {
 type SSESession struct {
 	cancel context.CancelFunc
 	Ch     chan *types.CapturedRequest
+	ErrCh  chan error
 }
 
 func StartSSE(s *stream.Stream) (*SSESession, tea.Cmd) {
 	ctx, cancel := context.WithCancel(context.Background())
 	ch := make(chan *types.CapturedRequest, 32)
+	errCh := make(chan error, 1)
 
 	go func() {
 		defer close(ch)
-		_ = s.Listen(ctx, func(req *types.CapturedRequest) {
+		if err := s.Listen(ctx, func(req *types.CapturedRequest) {
 			select {
 			case ch <- req:
 			case <-ctx.Done():
 			}
-		})
+		}); err != nil && ctx.Err() == nil {
+			errCh <- err
+		}
 	}()
 
-	session := &SSESession{cancel: cancel, Ch: ch}
-	return session, waitForSSE(ch)
+	session := &SSESession{cancel: cancel, Ch: ch, ErrCh: errCh}
+	return session, waitForSSE(session)
 }
 
 func (s *SSESession) Stop() {
 	s.cancel()
 }
 
-func waitForSSE(ch <-chan *types.CapturedRequest) tea.Cmd {
+func waitForSSE(session *SSESession) tea.Cmd {
 	return func() tea.Msg {
-		req, ok := <-ch
-		if !ok {
-			return SSEDoneMsg{}
+		select {
+		case req, ok := <-session.Ch:
+			if !ok {
+				// Channel closed — check if there's a pending error
+				select {
+				case err := <-session.ErrCh:
+					return SSEErrorMsg{Err: err}
+				default:
+					return SSEDoneMsg{}
+				}
+			}
+			return RequestReceivedMsg{Request: req}
+		case err := <-session.ErrCh:
+			return SSEErrorMsg{Err: err}
 		}
-		return RequestReceivedMsg{Request: req}
 	}
 }
 
-func WaitForSSE(ch <-chan *types.CapturedRequest) tea.Cmd {
-	return waitForSSE(ch)
+func WaitForSSE(session *SSESession) tea.Cmd {
+	return waitForSSE(session)
 }

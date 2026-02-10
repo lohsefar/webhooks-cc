@@ -93,7 +93,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ slug
       }, KEEPALIVE_INTERVAL_MS);
 
       // Enforce max connection duration
-      const remainingMs = MAX_CONNECTION_DURATION_MS - (Date.now() - connectionStart);
+      const remainingMs = Math.max(0, MAX_CONNECTION_DURATION_MS - (Date.now() - connectionStart));
       durationTimer = setTimeout(() => {
         if (abortSignal.aborted) return;
         try {
@@ -117,7 +117,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ slug
         return;
       }
 
-      let afterTimestamp = Date.now();
+      let afterTimestamp = connectionStart;
       const sentIds = new Set<string>();
 
       const subscribe = () => {

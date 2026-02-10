@@ -160,7 +160,7 @@ func (m TunnelModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 		var cmds []tea.Cmd
 		if m.sseSession != nil {
-			cmds = append(cmds, tui.WaitForSSE(m.sseSession.Ch))
+			cmds = append(cmds, tui.WaitForSSE(m.sseSession))
 		}
 		cmds = append(cmds, m.forwardRequest(msg.Request, idx))
 		return m, tea.Batch(cmds...)

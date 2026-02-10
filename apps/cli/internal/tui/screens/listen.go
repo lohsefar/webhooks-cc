@@ -131,7 +131,7 @@ func (m ListenModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		// Auto-scroll to bottom
 		m.scrollPos = len(m.requests) - 1
 		if m.sseSession != nil {
-			return m, tui.WaitForSSE(m.sseSession.Ch)
+			return m, tui.WaitForSSE(m.sseSession)
 		}
 
 	case tui.SSEErrorMsg:
