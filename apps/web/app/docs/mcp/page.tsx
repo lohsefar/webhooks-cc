@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { createPageMetadata } from "@/lib/seo";
+import { McpInstallButtons, SetupCommandsTable, CopyableCode } from "./mcp-setup";
 
 export const metadata = createPageMetadata({
   title: "MCP Server Docs",
@@ -66,94 +67,44 @@ const TOOLS = [
   },
 ];
 
-const SETUP_METHODS = [
-  {
-    tool: "Claude Code",
-    command: "npx @webhooks-cc/mcp setup claude-code --api-key whcc_...",
-    note: "Adds to user scope — available in all sessions",
-  },
-  {
-    tool: "Cursor",
-    command: "npx @webhooks-cc/mcp setup cursor --api-key whcc_...",
-    note: "Writes .cursor/mcp.json in current directory",
-  },
-  {
-    tool: "VS Code",
-    command: "npx @webhooks-cc/mcp setup vscode --api-key whcc_...",
-    note: "Writes .vscode/mcp.json in current directory",
-  },
-  {
-    tool: "OpenAI Codex",
-    command: "npx @webhooks-cc/mcp setup codex --api-key whcc_...",
-    note: "Runs codex mcp add",
-  },
-  {
-    tool: "Windsurf",
-    command: "npx @webhooks-cc/mcp setup windsurf --api-key whcc_...",
-    note: "Writes ~/.codeium/windsurf/mcp_config.json",
-  },
-  {
-    tool: "Claude Desktop",
-    command: "npx @webhooks-cc/mcp setup claude-desktop --api-key whcc_...",
-    note: "Writes claude_desktop_config.json",
-  },
-];
-
 export default function McpPage() {
   return (
     <article>
       <h1 className="text-3xl md:text-4xl font-bold mb-4">MCP Server</h1>
-      <p className="text-lg text-muted-foreground mb-10">
+      <p className="text-lg text-muted-foreground mb-6">
         The <code className="font-mono font-bold">@webhooks-cc/mcp</code> package lets AI coding
         agents create endpoints, inspect webhooks, send test payloads, and replay captured requests
         — all through natural language.
       </p>
 
       <section className="mb-10">
-        <h2 className="text-xl font-bold mb-3">Quick setup</h2>
+        <h2 className="text-xl font-bold mb-4">One-click install</h2>
+        <McpInstallButtons />
+        <p className="text-sm text-muted-foreground mt-3">
+          Cursor uses a placeholder API key you&apos;ll need to replace. VS Code prompts you for
+          your key during install.
+        </p>
+      </section>
+
+      <section className="mb-10">
+        <h2 className="text-xl font-bold mb-3">Setup via CLI</h2>
         <p className="text-muted-foreground mb-4">
-          One command configures your AI tool. Get your API key from your{" "}
+          Or use the setup command. Get your API key from your{" "}
           <Link href="/account" className="text-primary hover:underline font-bold">
             account page
           </Link>
           , then run:
         </p>
-        <pre className="neo-code text-sm">{`npx @webhooks-cc/mcp setup <tool> --api-key whcc_...`}</pre>
-      </section>
-
-      <section className="mb-10">
-        <h2 className="text-xl font-bold mb-3">Supported tools</h2>
-        <div className="neo-code text-sm overflow-x-auto">
-          <table className="w-full">
-            <thead>
-              <tr className="border-b border-foreground/20">
-                <th className="text-left py-1.5 pr-3 font-bold">Tool</th>
-                <th className="text-left py-1.5 pr-3 font-bold">Command</th>
-                <th className="text-left py-1.5 font-bold">Note</th>
-              </tr>
-            </thead>
-            <tbody>
-              {SETUP_METHODS.map((m) => (
-                <tr key={m.tool} className="border-b border-foreground/20 last:border-0">
-                  <td className="py-1.5 pr-3 font-bold whitespace-nowrap">{m.tool}</td>
-                  <td className="py-1.5 pr-3">
-                    <code className="text-xs">{m.command}</code>
-                  </td>
-                  <td className="py-1.5 text-muted-foreground">{m.note}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+        <SetupCommandsTable />
       </section>
 
       <section className="mb-10">
         <h2 className="text-xl font-bold mb-3">Manual configuration</h2>
         <p className="text-muted-foreground mb-4">
-          If you prefer to configure manually, or the setup command doesn&apos;t support your tool,
-          use this stdio server config:
+          If you prefer to configure manually, use this stdio server config:
         </p>
-        <pre className="neo-code text-sm">{`{
+        <CopyableCode
+          text={`{
   "mcpServers": {
     "webhooks-cc": {
       "command": "npx",
@@ -163,7 +114,18 @@ export default function McpPage() {
       }
     }
   }
-}`}</pre>
+}`}
+        >{`{
+  "mcpServers": {
+    "webhooks-cc": {
+      "command": "npx",
+      "args": ["-y", "@webhooks-cc/mcp"],
+      "env": {
+        "WHK_API_KEY": "whcc_..."
+      }
+    }
+  }
+}`}</CopyableCode>
       </section>
 
       <section className="mb-10">
