@@ -782,7 +782,11 @@ http.route({
       });
     }
 
-    if (typeof body.userId !== "string" || typeof body.slug !== "string") {
+    if (
+      typeof body.userId !== "string" ||
+      body.userId.length === 0 ||
+      typeof body.slug !== "string"
+    ) {
       return new Response(JSON.stringify({ error: "missing_fields" }), {
         status: 400,
         headers: { "Content-Type": "application/json" },
@@ -791,6 +795,58 @@ http.route({
 
     if (!SLUG_REGEX.test(body.slug)) {
       return new Response(JSON.stringify({ error: "invalid_slug" }), {
+        status: 400,
+        headers: { "Content-Type": "application/json" },
+      });
+    }
+
+    // Validate name type if provided
+    if (body.name !== undefined && typeof body.name !== "string") {
+      return new Response(JSON.stringify({ error: "invalid_name" }), {
+        status: 400,
+        headers: { "Content-Type": "application/json" },
+      });
+    }
+
+    // Validate mockResponse structure if provided
+    if (body.mockResponse !== undefined && body.mockResponse !== null) {
+      if (
+        typeof body.mockResponse !== "object" ||
+        typeof body.mockResponse.status !== "number" ||
+        typeof body.mockResponse.body !== "string" ||
+        !isStringRecord(body.mockResponse.headers)
+      ) {
+        return new Response(JSON.stringify({ error: "invalid_mock_response" }), {
+          status: 400,
+          headers: { "Content-Type": "application/json" },
+        });
+      }
+      if (body.mockResponse.body.length > MAX_BODY_SIZE) {
+        return new Response(JSON.stringify({ error: "mock_body_too_large" }), {
+          status: 413,
+          headers: { "Content-Type": "application/json" },
+        });
+      }
+      const headerEntries = Object.entries(body.mockResponse.headers) as [string, string][];
+      if (headerEntries.length > MAX_HEADERS) {
+        return new Response(JSON.stringify({ error: "too_many_mock_headers" }), {
+          status: 400,
+          headers: { "Content-Type": "application/json" },
+        });
+      }
+      for (const [hKey, hVal] of headerEntries) {
+        if (hKey.length > 1024 || hVal.length > 8192) {
+          return new Response(JSON.stringify({ error: "mock_header_too_large" }), {
+            status: 400,
+            headers: { "Content-Type": "application/json" },
+          });
+        }
+      }
+    }
+
+    // Require at least one update field
+    if (body.name === undefined && body.mockResponse === undefined) {
+      return new Response(JSON.stringify({ error: "no_update_fields" }), {
         status: 400,
         headers: { "Content-Type": "application/json" },
       });
@@ -817,6 +873,21 @@ http.route({
       if (message === "not_authorized") {
         return new Response(JSON.stringify({ error: "not_authorized" }), {
           status: 403,
+          headers: { "Content-Type": "application/json" },
+        });
+      }
+      if (message === "endpoint_disappeared") {
+        return new Response(JSON.stringify({ error: "not_found" }), {
+          status: 404,
+          headers: { "Content-Type": "application/json" },
+        });
+      }
+      if (
+        message.startsWith("Endpoint name must be") ||
+        message.startsWith("Mock response status must be")
+      ) {
+        return new Response(JSON.stringify({ error: "invalid_input" }), {
+          status: 400,
           headers: { "Content-Type": "application/json" },
         });
       }

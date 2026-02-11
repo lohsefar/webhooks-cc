@@ -5,6 +5,7 @@ import Link from "next/link";
 import { CopyButton } from "@/components/ui/copy-button";
 
 const KEY_PLACEHOLDER = "whcc_...";
+const KEY_REGEX = /^whcc_[A-Za-z0-9_-]+$/;
 
 const VSCODE_URL =
   "https://insiders.vscode.dev/redirect/mcp/install?name=webhooks-cc&config=%7B%22command%22%3A%22npx%22%2C%22args%22%3A%5B%22-y%22%2C%22%40webhooks-cc%2Fmcp%22%5D%2C%22env%22%3A%7B%22WHK_API_KEY%22%3A%22%24%7Binput%3Awhk_api_key%7D%22%7D%7D&inputs=%5B%7B%22id%22%3A%22whk_api_key%22%2C%22type%22%3A%22promptString%22%2C%22description%22%3A%22webhooks.cc%20API%20key%20%28get%20yours%20at%20webhooks.cc%2Faccount%29%22%2C%22password%22%3Atrue%7D%5D";
@@ -15,7 +16,9 @@ function buildCursorUrl(apiKey: string) {
     args: ["-y", "@webhooks-cc/mcp"],
     env: { WHK_API_KEY: apiKey },
   });
-  return `https://cursor.com/en/install-mcp?name=webhooks-cc&config=${btoa(config)}`;
+  // Use TextEncoder for Unicode safety (btoa only handles Latin-1)
+  const encoded = btoa(String.fromCharCode(...new TextEncoder().encode(config)));
+  return `https://cursor.com/en/install-mcp?name=webhooks-cc&config=${encoded}`;
 }
 
 const BTN =
@@ -34,7 +37,8 @@ function CodeBlock({ children, copyText }: { children: string; copyText?: string
 
 export function McpInstallGuide() {
   const [apiKey, setApiKey] = useState("");
-  const key = apiKey.trim() || KEY_PLACEHOLDER;
+  const trimmed = apiKey.trim();
+  const key = trimmed && KEY_REGEX.test(trimmed) ? trimmed : KEY_PLACEHOLDER;
   const cursorUrl = useMemo(() => buildCursorUrl(key), [key]);
 
   return (
@@ -46,13 +50,14 @@ export function McpInstallGuide() {
           nothing is sent or stored.
         </p>
         <input
-          type="text"
+          type="password"
           value={apiKey}
           onChange={(e) => setApiKey(e.target.value)}
           placeholder="whcc_..."
           className="w-full px-3 py-2 border-2 border-foreground bg-background text-sm font-mono focus:outline-none focus:ring-2 focus:ring-primary"
           autoComplete="off"
           spellCheck={false}
+          aria-label="webhooks.cc API key"
         />
         <p className="text-sm text-muted-foreground mt-2">
           Get your key from your{" "}
@@ -71,8 +76,8 @@ export function McpInstallGuide() {
               Add to Cursor
             </a>
             <p className="text-sm text-muted-foreground mt-1.5">
-              {apiKey.trim()
-                ? "Your key is included in the link."
+              {key !== KEY_PLACEHOLDER
+                ? "Your key is included in the link — do not share this URL."
                 : "Paste your key above first — it gets baked into the install link."}
             </p>
           </div>

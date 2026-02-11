@@ -3,11 +3,13 @@
  *
  * @example
  * ```typescript
+ * import { WebhooksCC, matchMethod } from '@webhooks-cc/sdk';
+ *
  * const client = new WebhooksCC({ apiKey: 'whcc_...' });
  * const endpoint = await client.endpoints.create({ name: 'My Webhook' });
  * const request = await client.requests.waitFor(endpoint.slug, {
- *   timeout: 10000,
- *   match: (r) => r.method === 'POST'
+ *   timeout: '30s',
+ *   match: matchMethod('POST'),
  * });
  * ```
  */
@@ -43,7 +45,9 @@ const SDK_VERSION = "0.3.0";
 const MIN_POLL_INTERVAL = 10;
 const MAX_POLL_INTERVAL = 60000;
 
-// Headers stripped when replaying requests (hop-by-hop headers)
+const ALLOWED_METHODS = new Set(["GET", "HEAD", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"]);
+
+// Headers stripped when replaying requests (hop-by-hop + sensitive)
 const HOP_BY_HOP_HEADERS = new Set([
   "host",
   "connection",
@@ -54,6 +58,8 @@ const HOP_BY_HOP_HEADERS = new Set([
   "trailer",
   "upgrade",
 ]);
+
+const SENSITIVE_HEADERS = new Set(["authorization", "cookie", "proxy-authorization", "set-cookie"]);
 
 /**
  * @deprecated Use {@link WebhooksCCError} instead. Kept for backward compatibility.
@@ -122,9 +128,12 @@ export class WebhooksCC {
   private readonly hooks: ClientHooks;
 
   constructor(options: ClientOptions) {
+    if (!options.apiKey || typeof options.apiKey !== "string") {
+      throw new Error("Missing or invalid apiKey. Get one at https://webhooks.cc/account");
+    }
     this.apiKey = options.apiKey;
-    this.baseUrl = options.baseUrl ?? DEFAULT_BASE_URL;
-    this.webhookUrl = options.webhookUrl ?? DEFAULT_WEBHOOK_URL;
+    this.baseUrl = stripTrailingSlashes(options.baseUrl ?? DEFAULT_BASE_URL);
+    this.webhookUrl = stripTrailingSlashes(options.webhookUrl ?? DEFAULT_WEBHOOK_URL);
     this.timeout = options.timeout ?? DEFAULT_TIMEOUT;
     this.hooks = options.hooks ?? {};
   }
@@ -279,6 +288,12 @@ export class WebhooksCC {
 
     update: async (slug: string, options: UpdateEndpointOptions): Promise<Endpoint> => {
       validatePathSegment(slug, "slug");
+      if (options.mockResponse && options.mockResponse !== null) {
+        const { status } = options.mockResponse;
+        if (!Number.isInteger(status) || status < 100 || status > 599) {
+          throw new Error(`Invalid mock response status: ${status}. Must be an integer 100-599.`);
+        }
+      }
       return this.request<Endpoint>("PATCH", `/endpoints/${slug}`, options);
     },
 
@@ -289,11 +304,21 @@ export class WebhooksCC {
 
     send: async (slug: string, options: SendOptions = {}): Promise<Response> => {
       validatePathSegment(slug, "slug");
-      const { method = "POST", headers = {}, body } = options;
+      const rawMethod = (options.method ?? "POST").toUpperCase();
+      if (!ALLOWED_METHODS.has(rawMethod)) {
+        throw new Error(
+          `Invalid HTTP method: "${options.method}". Must be one of: ${[...ALLOWED_METHODS].join(", ")}`
+        );
+      }
+      const { headers = {}, body } = options;
+      const method = rawMethod;
       const url = `${this.webhookUrl}/w/${slug}`;
 
       const fetchHeaders: Record<string, string> = { ...headers };
-      if (body !== undefined && !fetchHeaders["content-type"] && !fetchHeaders["Content-Type"]) {
+      const hasContentType = Object.keys(fetchHeaders).some(
+        (k) => k.toLowerCase() === "content-type"
+      );
+      if (body !== undefined && !hasContentType) {
         fetchHeaders["Content-Type"] = "application/json";
       }
 
@@ -302,6 +327,7 @@ export class WebhooksCC {
         headers: fetchHeaders,
         body:
           body !== undefined ? (typeof body === "string" ? body : JSON.stringify(body)) : undefined,
+        signal: AbortSignal.timeout(this.timeout),
       });
     },
   };
@@ -348,7 +374,9 @@ export class WebhooksCC {
         Math.min(MAX_POLL_INTERVAL, rawPollInterval)
       );
       const start = Date.now();
-      let lastChecked = 0;
+      // Start from 5 minutes before to catch requests that were sent just before
+      // waitFor was called but haven't been flushed to the database yet
+      let lastChecked = start - 5 * 60 * 1000;
       const MAX_ITERATIONS = 10000;
       let iterations = 0;
 
@@ -401,20 +429,38 @@ export class WebhooksCC {
     replay: async (requestId: string, targetUrl: string): Promise<Response> => {
       validatePathSegment(requestId, "requestId");
 
+      // Validate target URL
+      let parsed: URL;
+      try {
+        parsed = new URL(targetUrl);
+      } catch {
+        throw new Error(`Invalid targetUrl: "${targetUrl}" is not a valid URL`);
+      }
+      if (parsed.protocol !== "http:" && parsed.protocol !== "https:") {
+        throw new Error(`Invalid targetUrl: only http and https protocols are supported`);
+      }
+
       const captured = await this.requests.get(requestId);
 
-      // Strip hop-by-hop headers
+      // Strip hop-by-hop and sensitive headers
       const headers: Record<string, string> = {};
       for (const [key, val] of Object.entries(captured.headers)) {
-        if (!HOP_BY_HOP_HEADERS.has(key.toLowerCase())) {
+        const lower = key.toLowerCase();
+        if (!HOP_BY_HOP_HEADERS.has(lower) && !SENSITIVE_HEADERS.has(lower)) {
           headers[key] = val;
         }
       }
 
+      // Don't send body on GET/HEAD requests
+      const upperMethod = captured.method.toUpperCase();
+      const body =
+        upperMethod === "GET" || upperMethod === "HEAD" ? undefined : (captured.body ?? undefined);
+
       return fetch(targetUrl, {
         method: captured.method,
         headers,
-        body: captured.body ?? undefined,
+        body,
+        signal: AbortSignal.timeout(this.timeout),
       });
     },
 
@@ -442,11 +488,12 @@ export class WebhooksCC {
           let started = false;
 
           // Link external signal to our controller
+          const onAbort = () => controller.abort();
           if (signal) {
             if (signal.aborted) {
               controller.abort();
             } else {
-              signal.addEventListener("abort", () => controller.abort(), { once: true });
+              signal.addEventListener("abort", onAbort, { once: true });
             }
           }
 
@@ -456,14 +503,27 @@ export class WebhooksCC {
 
           const cleanup = () => {
             if (timeoutId !== undefined) clearTimeout(timeoutId);
+            if (signal) signal.removeEventListener("abort", onAbort);
           };
 
           const start = async () => {
             const url = `${baseUrl}/api/stream/${slug}`;
-            const response = await fetch(url, {
-              headers: { Authorization: `Bearer ${apiKey}` },
-              signal: controller.signal,
+            // Use a separate signal for connection timeout so it doesn't conflict with stream duration
+            const connectController = new AbortController();
+            const connectTimeout = setTimeout(() => connectController.abort(), 30000);
+            // Abort connection timeout if the main controller aborts
+            controller.signal.addEventListener("abort", () => connectController.abort(), {
+              once: true,
             });
+            let response: globalThis.Response;
+            try {
+              response = await fetch(url, {
+                headers: { Authorization: `Bearer ${apiKey}` },
+                signal: connectController.signal,
+              });
+            } finally {
+              clearTimeout(connectTimeout);
+            }
 
             if (!response.ok) {
               cleanup();
@@ -475,6 +535,15 @@ export class WebhooksCC {
               cleanup();
               throw new Error("SSE response has no body");
             }
+
+            // Link main controller to response body so abort cancels the stream
+            controller.signal.addEventListener(
+              "abort",
+              () => {
+                response.body?.cancel();
+              },
+              { once: true }
+            );
 
             return parseSSE(response.body);
           };
@@ -501,18 +570,22 @@ export class WebhooksCC {
                   if (value.event === "request") {
                     try {
                       const data = JSON.parse(value.data);
+                      // Validate required fields exist
+                      if (!data.endpointId || !data.method || !data.headers || !data.receivedAt) {
+                        continue; // Skip malformed frames
+                      }
                       // Transform SSE data to Request shape
                       const req: Request = {
                         id: data._id ?? data.id,
                         endpointId: data.endpointId,
                         method: data.method,
-                        path: data.path,
+                        path: data.path ?? "/",
                         headers: data.headers,
-                        body: data.body,
-                        queryParams: data.queryParams,
-                        contentType: data.contentType,
-                        ip: data.ip,
-                        size: data.size,
+                        body: data.body ?? undefined,
+                        queryParams: data.queryParams ?? {},
+                        contentType: data.contentType ?? undefined,
+                        ip: data.ip ?? "unknown",
+                        size: data.size ?? 0,
                         receivedAt: data.receivedAt,
                       };
                       return { done: false, value: req };
@@ -535,6 +608,7 @@ export class WebhooksCC {
                 return { done: true, value: undefined };
               } catch (error) {
                 cleanup();
+                controller.abort();
                 // AbortError means the consumer broke out or signal was aborted — that's normal
                 if (error instanceof Error && error.name === "AbortError") {
                   return { done: true, value: undefined };
@@ -560,4 +634,8 @@ export class WebhooksCC {
 /** Returns a promise that resolves after the specified milliseconds. */
 function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function stripTrailingSlashes(url: string): string {
+  return url.replace(/\/+$/, "");
 }

@@ -47,8 +47,12 @@ export async function* parseSSE(
         const trimmedLine = line.endsWith("\r") ? line.slice(0, -1) : line;
 
         if (trimmedLine.startsWith(":")) {
-          // Comment line
-          yield { event: "comment", data: trimmedLine.slice(1).trimStart() };
+          // Comment line — strip single leading space per SSE spec
+          const rawComment = trimmedLine.slice(1);
+          yield {
+            event: "comment",
+            data: rawComment.startsWith(" ") ? rawComment.slice(1) : rawComment,
+          };
           continue;
         }
 
@@ -56,7 +60,9 @@ export async function* parseSSE(
         if (colonIdx === -1) continue;
 
         const field = trimmedLine.slice(0, colonIdx);
-        const val = trimmedLine.slice(colonIdx + 1).trimStart();
+        // Per SSE spec: strip exactly one leading space after the colon, not all whitespace
+        const rawVal = trimmedLine.slice(colonIdx + 1);
+        const val = rawVal.startsWith(" ") ? rawVal.slice(1) : rawVal;
 
         switch (field) {
           case "event":
@@ -74,12 +80,17 @@ export async function* parseSSE(
     if (buffer.length > 0) {
       const trimmedLine = buffer.endsWith("\r") ? buffer.slice(0, -1) : buffer;
       if (trimmedLine.startsWith(":")) {
-        yield { event: "comment", data: trimmedLine.slice(1).trimStart() };
+        const rawComment = trimmedLine.slice(1);
+        yield {
+          event: "comment",
+          data: rawComment.startsWith(" ") ? rawComment.slice(1) : rawComment,
+        };
       } else {
         const colonIdx = trimmedLine.indexOf(":");
         if (colonIdx !== -1) {
           const field = trimmedLine.slice(0, colonIdx);
-          const val = trimmedLine.slice(colonIdx + 1).trimStart();
+          const rawVal = trimmedLine.slice(colonIdx + 1);
+          const val = rawVal.startsWith(" ") ? rawVal.slice(1) : rawVal;
           if (field === "event") currentEvent = val;
           else if (field === "data") dataLines.push(val);
         }
@@ -91,6 +102,7 @@ export async function* parseSSE(
       yield { event: currentEvent, data: dataLines.join("\n") };
     }
   } finally {
+    await reader.cancel();
     reader.releaseLock();
   }
 }

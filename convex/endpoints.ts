@@ -453,17 +453,20 @@ export const updateForUser = internalMutation({
       }),
     });
 
+    // Only invalidate when mockResponse changes — name is not cached by the receiver
     if (mockResponse !== undefined) {
       await ctx.scheduler.runAfter(2000, internal.endpoints.invalidateReceiverCache, {
         slug: endpoint.slug,
       });
     }
 
+    const updated = await ctx.db.get(endpoint._id);
+    if (!updated) throw new Error("endpoint_disappeared");
     return {
-      _id: endpoint._id,
-      slug: endpoint.slug,
-      name: name !== undefined ? name.trim() : endpoint.name,
-      createdAt: endpoint.createdAt ?? endpoint._creationTime,
+      _id: updated._id,
+      slug: updated.slug,
+      name: updated.name,
+      createdAt: updated.createdAt ?? updated._creationTime,
     };
   },
 });

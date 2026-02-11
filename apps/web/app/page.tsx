@@ -129,7 +129,7 @@ export default async function Home() {
           </p>
 
           <div className="grid md:grid-cols-2 gap-6">
-            <div className="neo-card transition-neo cursor-pointer">
+            <div className="neo-card">
               <div className="w-12 h-12 border-2 border-foreground bg-primary flex items-center justify-center mb-4 shadow-neo-sm">
                 <Eye className="h-6 w-6 text-primary-foreground" />
               </div>
@@ -140,7 +140,7 @@ export default async function Home() {
               </p>
             </div>
 
-            <div className="neo-card transition-neo cursor-pointer">
+            <div className="neo-card">
               <div className="w-12 h-12 border-2 border-foreground bg-secondary flex items-center justify-center mb-4 shadow-neo-sm">
                 <Zap className="h-6 w-6 text-secondary-foreground" />
               </div>
@@ -151,7 +151,7 @@ export default async function Home() {
               </p>
             </div>
 
-            <div className="neo-card transition-neo cursor-pointer">
+            <div className="neo-card">
               <div className="w-12 h-12 border-2 border-foreground bg-accent flex items-center justify-center mb-4 shadow-neo-sm">
                 <Terminal className="h-6 w-6 text-accent-foreground" />
               </div>
@@ -163,7 +163,7 @@ export default async function Home() {
               </p>
             </div>
 
-            <div className="neo-card transition-neo cursor-pointer">
+            <div className="neo-card">
               <div className="w-12 h-12 border-2 border-foreground bg-foreground flex items-center justify-center mb-4 shadow-neo-sm">
                 <Bot className="h-6 w-6 text-background" />
               </div>

@@ -12,7 +12,7 @@ npm install @webhooks-cc/sdk
 ## Quick start
 
 ```typescript
-import { WebhooksCC, matchMethod, matchHeader } from "@webhooks-cc/sdk";
+import { WebhooksCC, matchAll, matchMethod, matchHeader } from "@webhooks-cc/sdk";
 
 const client = new WebhooksCC({ apiKey: "whcc_..." });
 
@@ -167,19 +167,19 @@ const desc = client.describe();
 All API errors extend `WebhooksCCError` and include actionable recovery hints:
 
 ```typescript
-import { WebhooksCC, ApiError, NotFoundError } from "@webhooks-cc/sdk";
+import { WebhooksCC, WebhooksCCError, NotFoundError } from "@webhooks-cc/sdk";
 
 try {
   await client.endpoints.get("nonexistent");
 } catch (error) {
-  if (error instanceof ApiError) {
+  if (error instanceof WebhooksCCError) {
     console.log(error.statusCode); // 404
     console.log(error.message); // includes what went wrong and how to fix it
   }
 }
 ```
 
-Error classes: `ApiError`, `UnauthorizedError`, `NotFoundError`, `TimeoutError`, `RateLimitError`.
+Error classes: `WebhooksCCError`, `UnauthorizedError`, `NotFoundError`, `TimeoutError`, `RateLimitError`. The legacy `ApiError` alias is still exported for backward compatibility.
 
 ## GitHub Actions
 

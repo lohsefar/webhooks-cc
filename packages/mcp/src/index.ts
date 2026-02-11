@@ -2,6 +2,10 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { WebhooksCC } from "@webhooks-cc/sdk";
 import { registerTools } from "./tools";
 
+declare const PKG_VERSION: string | undefined;
+
+const VERSION = typeof PKG_VERSION !== "undefined" ? PKG_VERSION : "0.0.0-dev";
+
 export interface CreateServerOptions {
   /** API key for webhooks.cc (default: reads WHK_API_KEY env var) */
   apiKey?: string;
@@ -37,7 +41,7 @@ export function createServer(options: CreateServerOptions = {}): McpServer {
 
   const server = new McpServer({
     name: "webhooks-cc",
-    version: "0.1.0",
+    version: VERSION,
   });
 
   registerTools(server, client);

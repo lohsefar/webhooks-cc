@@ -3,15 +3,16 @@
 import { useState, useMemo } from "react";
 import Link from "next/link";
 import { cn } from "@/lib/utils";
-import { Copy, Check } from "lucide-react";
-import { copyToClipboard } from "@/lib/clipboard";
+import { CopyButton } from "@/components/ui/copy-button";
 import { FloatingNavbar } from "@/components/nav/floating-navbar";
 import { BackButton } from "@/components/nav/back-button";
 import { DocsSidebar } from "@/components/docs/sidebar";
 
 type Tab = "cli" | "sdk" | "mcp";
+const TABS: Tab[] = ["cli", "sdk", "mcp"];
 
 const KEY_PLACEHOLDER = "whcc_...";
+const KEY_REGEX = /^whcc_[A-Za-z0-9_-]+$/;
 
 function buildCursorUrl(apiKey: string) {
   const config = JSON.stringify({
@@ -19,33 +20,13 @@ function buildCursorUrl(apiKey: string) {
     args: ["-y", "@webhooks-cc/mcp"],
     env: { WHK_API_KEY: apiKey },
   });
-  return `https://cursor.com/en/install-mcp?name=webhooks-cc&config=${btoa(config)}`;
+  // Use TextEncoder for Unicode safety (btoa only handles Latin-1)
+  const encoded = btoa(String.fromCharCode(...new TextEncoder().encode(config)));
+  return `https://cursor.com/en/install-mcp?name=webhooks-cc&config=${encoded}`;
 }
 
 const VSCODE_URL =
   "https://insiders.vscode.dev/redirect/mcp/install?name=webhooks-cc&config=%7B%22command%22%3A%22npx%22%2C%22args%22%3A%5B%22-y%22%2C%22%40webhooks-cc%2Fmcp%22%5D%2C%22env%22%3A%7B%22WHK_API_KEY%22%3A%22%24%7Binput%3Awhk_api_key%7D%22%7D%7D&inputs=%5B%7B%22id%22%3A%22whk_api_key%22%2C%22type%22%3A%22promptString%22%2C%22description%22%3A%22webhooks.cc%20API%20key%20%28get%20yours%20at%20webhooks.cc%2Faccount%29%22%2C%22password%22%3Atrue%7D%5D";
-
-function CopyButton({ text }: { text: string }) {
-  const [copied, setCopied] = useState(false);
-
-  const handleCopy = async () => {
-    const success = await copyToClipboard(text);
-    if (success) {
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
-    }
-  };
-
-  return (
-    <button
-      onClick={handleCopy}
-      className="absolute top-2 right-2 p-1.5 text-muted-foreground hover:text-foreground cursor-pointer transition-colors"
-      aria-label="Copy to clipboard"
-    >
-      {copied ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
-    </button>
-  );
-}
 
 function CodeBlock({ children, copyText }: { children: string; copyText?: string }) {
   return (
@@ -61,7 +42,8 @@ function CodeBlock({ children, copyText }: { children: string; copyText?: string
 export default function InstallationPage() {
   const [tab, setTab] = useState<Tab>("cli");
   const [apiKey, setApiKey] = useState("");
-  const key = apiKey.trim() || KEY_PLACEHOLDER;
+  const trimmed = apiKey.trim();
+  const key = trimmed && KEY_REGEX.test(trimmed) ? trimmed : KEY_PLACEHOLDER;
   const cursorUrl = useMemo(() => buildCursorUrl(key), [key]);
 
   return (
@@ -81,11 +63,29 @@ export default function InstallationPage() {
             </p>
 
             {/* Tab switcher */}
-            <div className="border-2 border-foreground flex mb-8">
-              {(["cli", "sdk", "mcp"] as const).map((t) => (
+            <div role="tablist" className="border-2 border-foreground flex mb-8">
+              {TABS.map((t) => (
                 <button
                   key={t}
+                  role="tab"
+                  aria-selected={tab === t}
+                  aria-controls={`tabpanel-${t}`}
+                  id={`tab-${t}`}
+                  tabIndex={tab === t ? 0 : -1}
                   onClick={() => setTab(t)}
+                  onKeyDown={(e) => {
+                    const idx = TABS.indexOf(t);
+                    let next: number | null = null;
+                    if (e.key === "ArrowRight") next = (idx + 1) % TABS.length;
+                    else if (e.key === "ArrowLeft") next = (idx - 1 + TABS.length) % TABS.length;
+                    else if (e.key === "Home") next = 0;
+                    else if (e.key === "End") next = TABS.length - 1;
+                    if (next !== null) {
+                      e.preventDefault();
+                      setTab(TABS[next]);
+                      document.getElementById(`tab-${TABS[next]}`)?.focus();
+                    }
+                  }}
                   className={cn(
                     "flex-1 px-4 py-2.5 text-sm font-bold uppercase tracking-wide cursor-pointer transition-colors border-r-2 border-foreground last:border-r-0",
                     tab === t ? "bg-foreground text-background" : "bg-background hover:bg-muted"
@@ -97,7 +97,12 @@ export default function InstallationPage() {
             </div>
 
             {tab === "cli" && (
-              <div className="space-y-6">
+              <div
+                role="tabpanel"
+                id="tabpanel-cli"
+                aria-labelledby="tab-cli"
+                className="space-y-6"
+              >
                 <section>
                   <h2 className="text-lg font-bold mb-3">Homebrew (macOS / Linux)</h2>
                   <CodeBlock>{`brew install lohsefar/tap/whk`}</CodeBlock>
@@ -157,7 +162,12 @@ whk tunnel 3000     # forward webhooks to localhost:3000`}</CodeBlock>
             )}
 
             {tab === "sdk" && (
-              <div className="space-y-6">
+              <div
+                role="tabpanel"
+                id="tabpanel-sdk"
+                aria-labelledby="tab-sdk"
+                className="space-y-6"
+              >
                 <section>
                   <h2 className="text-lg font-bold mb-3">npm</h2>
                   <CodeBlock>{`npm install @webhooks-cc/sdk`}</CodeBlock>
@@ -210,7 +220,12 @@ console.log(endpoint.url);`}
             )}
 
             {tab === "mcp" && (
-              <div className="space-y-6">
+              <div
+                role="tabpanel"
+                id="tabpanel-mcp"
+                aria-labelledby="tab-mcp"
+                className="space-y-6"
+              >
                 <section>
                   <h2 className="text-lg font-bold mb-3">Your API key</h2>
                   <p className="text-sm text-muted-foreground mb-3">
@@ -218,13 +233,14 @@ console.log(endpoint.url);`}
                     only — nothing is sent or stored.
                   </p>
                   <input
-                    type="text"
+                    type="password"
                     value={apiKey}
                     onChange={(e) => setApiKey(e.target.value)}
                     placeholder="whcc_..."
                     className="w-full px-3 py-2 border-2 border-foreground bg-background text-sm font-mono focus:outline-none focus:ring-2 focus:ring-primary"
                     autoComplete="off"
                     spellCheck={false}
+                    aria-label="webhooks.cc API key"
                   />
                   <p className="text-sm text-muted-foreground mt-2">
                     Get your key from your{" "}
@@ -248,8 +264,8 @@ console.log(endpoint.url);`}
                         Add to Cursor
                       </a>
                       <p className="text-sm text-muted-foreground mt-1.5">
-                        {apiKey.trim()
-                          ? "Your key is included in the link."
+                        {key !== KEY_PLACEHOLDER
+                          ? "Your key is included in the link — do not share this URL."
                           : "Paste your key above first — it gets baked into the install link."}
                       </p>
                     </div>

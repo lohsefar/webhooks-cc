@@ -15,7 +15,7 @@ Works with Claude Code, Cursor, VS Code, Codex, Windsurf, and Claude Desktop.
 
 ```bash
 # Claude Code
-claude mcp add -s user webhooks-cc -e WHK_API_KEY=whcc_... -- npx -y @webhooks-cc/mcp
+claude mcp add -s user --transport stdio webhooks-cc -e WHK_API_KEY=whcc_... -- npx -y @webhooks-cc/mcp
 
 # Cursor
 npx @webhooks-cc/mcp setup cursor --api-key whcc_...
@@ -57,19 +57,19 @@ Get your API key at [webhooks.cc/account](https://webhooks.cc/account).
 
 The MCP server exposes 11 tools:
 
-| Tool                | Description                               |
-| ------------------- | ----------------------------------------- |
-| `create_endpoint`   | Create a new webhook endpoint             |
-| `list_endpoints`    | List all your endpoints                   |
-| `get_endpoint`      | Get details for an endpoint by slug       |
-| `update_endpoint`   | Update an endpoint name or mock response  |
-| `delete_endpoint`   | Delete an endpoint and its requests       |
-| `list_requests`     | List captured requests for an endpoint    |
-| `get_request`       | Get full details of a captured request    |
-| `send_test_webhook` | Send a test webhook to an endpoint        |
-| `wait_for_request`  | Wait for an incoming request (polling)    |
-| `replay_request`    | Replay a captured request to a target URL |
-| `describe_sdk`      | Describe all available SDK operations     |
+| Tool               | Description                               |
+| ------------------ | ----------------------------------------- |
+| `create_endpoint`  | Create a new webhook endpoint             |
+| `list_endpoints`   | List all your endpoints                   |
+| `get_endpoint`     | Get details for an endpoint by slug       |
+| `update_endpoint`  | Update an endpoint name or mock response  |
+| `delete_endpoint`  | Delete an endpoint and its requests       |
+| `list_requests`    | List captured requests for an endpoint    |
+| `get_request`      | Get full details of a captured request    |
+| `send_webhook`     | Send a test webhook to an endpoint        |
+| `wait_for_request` | Wait for an incoming request (polling)    |
+| `replay_request`   | Replay a captured request to a target URL |
+| `describe`         | Describe all available SDK operations     |
 
 ## Example conversation
 

@@ -1,10 +1,20 @@
-import { existsSync, readFileSync, writeFileSync, mkdirSync } from "fs";
+import { existsSync, readFileSync, writeFileSync, mkdirSync, copyFileSync } from "fs";
 import { join, dirname } from "path";
-import { execSync } from "child_process";
+import { execFileSync } from "child_process";
 import { homedir, platform } from "os";
 
 const TOOLS = ["claude-code", "claude-desktop", "cursor", "vscode", "codex", "windsurf"] as const;
 type Tool = (typeof TOOLS)[number];
+
+const API_KEY_REGEX = /^whcc_[a-zA-Z0-9_-]+$/;
+
+function validateApiKeyFormat(key: string): void {
+  if (!API_KEY_REGEX.test(key)) {
+    console.error("Error: Invalid API key format. Keys must start with 'whcc_' and contain only");
+    console.error("alphanumeric characters, hyphens, and underscores.");
+    process.exit(1);
+  }
+}
 
 function mcpServerConfig(apiKey: string) {
   return {
@@ -24,7 +34,9 @@ function mergeJsonConfig(filePath: string, serverName: string, serverConfig: obj
     try {
       existing = JSON.parse(readFileSync(filePath, "utf-8"));
     } catch {
-      // File exists but isn't valid JSON — we'll overwrite
+      console.warn(`Warning: ${filePath} contains invalid JSON and will be overwritten.`);
+      console.warn(`A backup has been saved to ${filePath}.bak`);
+      copyFileSync(filePath, `${filePath}.bak`);
     }
   }
 
@@ -61,8 +73,23 @@ function getClaudeDesktopConfigPath(): string {
 
 function setupClaudeCode(apiKey: string): void {
   try {
-    execSync(
-      `claude mcp add -s user --transport stdio webhooks-cc -e WHK_API_KEY=${apiKey} -- npx -y @webhooks-cc/mcp`,
+    execFileSync(
+      "claude",
+      [
+        "mcp",
+        "add",
+        "-s",
+        "user",
+        "--transport",
+        "stdio",
+        "webhooks-cc",
+        "-e",
+        `WHK_API_KEY=${apiKey}`,
+        "--",
+        "npx",
+        "-y",
+        "@webhooks-cc/mcp",
+      ],
       { stdio: "inherit" }
     );
     console.log("\nDone! webhooks-cc MCP server added to Claude Code (user scope).");
@@ -72,7 +99,7 @@ function setupClaudeCode(apiKey: string): void {
     console.error("Install it: npm install -g @anthropic-ai/claude-code");
     console.error("\nManual alternative — run this command:");
     console.error(
-      `  claude mcp add -s user --transport stdio webhooks-cc -e WHK_API_KEY=${apiKey} -- npx -y @webhooks-cc/mcp`
+      `  claude mcp add -s user --transport stdio webhooks-cc -e WHK_API_KEY=<your-key> -- npx -y @webhooks-cc/mcp`
     );
     process.exit(1);
   }
@@ -101,9 +128,21 @@ function setupVSCode(apiKey: string): void {
 
 function setupCodex(apiKey: string): void {
   try {
-    execSync(`codex mcp add webhooks-cc -e WHK_API_KEY=${apiKey} -- npx -y @webhooks-cc/mcp`, {
-      stdio: "inherit",
-    });
+    execFileSync(
+      "codex",
+      [
+        "mcp",
+        "add",
+        "webhooks-cc",
+        "-e",
+        `WHK_API_KEY=${apiKey}`,
+        "--",
+        "npx",
+        "-y",
+        "@webhooks-cc/mcp",
+      ],
+      { stdio: "inherit" }
+    );
     console.log("\nDone! webhooks-cc MCP server added to Codex.");
   } catch {
     console.error("\nFailed to run 'codex mcp add'. Is OpenAI Codex CLI installed?");
@@ -114,7 +153,7 @@ command = "npx"
 args = ["-y", "@webhooks-cc/mcp"]
 
 [mcp.webhooks-cc.env]
-WHK_API_KEY = "${apiKey}"
+WHK_API_KEY = "<your-key>"
 `);
     process.exit(1);
   }
@@ -182,6 +221,8 @@ export function runSetup(args: string[]): void {
     console.error("Get your API key at https://webhooks.cc/account\n");
     process.exit(1);
   }
+
+  validateApiKeyFormat(apiKey);
 
   console.log(`Setting up webhooks-cc MCP server for ${tool}...\n`);
 

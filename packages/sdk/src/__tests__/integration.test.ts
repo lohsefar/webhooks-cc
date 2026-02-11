@@ -254,7 +254,7 @@ describe.skipIf(!API_KEY)("SDK integration tests", () => {
     // Verify structure
     const createOp = description.endpoints.create;
     expect(createOp.description).toBeTruthy();
-    expect(createOp.parameters).toBeDefined();
+    expect(createOp.params).toBeDefined();
   });
 
   it("provider detection helpers work on requests", async () => {

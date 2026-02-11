@@ -242,7 +242,7 @@ Config stored at `~/.config/whk/token.json`. Override API URL with `WHK_API_URL`
 
 Next.js 16 App Router with neobrutalism design (Space Grotesk + JetBrains Mono fonts).
 
-**Public routes:** `/` (landing), `/docs/*` (8 doc pages incl. MCP), `/installation` (CLI/SDK/MCP tabs), `/login`, `/privacy`, `/terms`, `/support`
+**Public routes:** `/` (landing), `/docs/*` (10 doc pages incl. MCP), `/installation` (CLI/SDK/MCP tabs), `/login`, `/privacy`, `/terms`, `/support`
 
 **Authenticated routes:** `/dashboard` (split-pane request viewer), `/account` (profile, billing, API keys), `/endpoints/new`, `/endpoints/[slug]/settings`, `/cli/verify` (device auth)
 
@@ -285,7 +285,7 @@ const req = await client.requests.waitFor(endpoint.slug, {
 
 `@webhooks-cc/mcp` v0.1.0 - MCP server for AI coding agents, MIT licensed.
 
-- 11 tools: `create_endpoint`, `list_endpoints`, `get_endpoint`, `update_endpoint`, `delete_endpoint`, `list_requests`, `get_request`, `send_test_webhook`, `wait_for_request`, `replay_request`, `describe_sdk`
+- 11 tools: `create_endpoint`, `list_endpoints`, `get_endpoint`, `update_endpoint`, `delete_endpoint`, `list_requests`, `get_request`, `send_webhook`, `wait_for_request`, `replay_request`, `describe`
 - Setup CLI: `npx @webhooks-cc/mcp setup <tool>` for Cursor, VS Code, Windsurf, Claude Desktop
 - Native install: `claude mcp add` (Claude Code), `codex mcp add` (Codex)
 - Transport: stdio via `@modelcontextprotocol/sdk`

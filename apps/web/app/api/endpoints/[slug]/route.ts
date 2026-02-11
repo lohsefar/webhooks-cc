@@ -29,6 +29,38 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ sl
     return Response.json({ error: "Invalid JSON body" }, { status: 400 });
   }
 
+  // Validate name type and length if provided
+  if (body.name !== undefined && (typeof body.name !== "string" || body.name.length > 100)) {
+    return Response.json({ error: "Invalid name" }, { status: 400 });
+  }
+
+  // Validate mockResponse structure if provided
+  if (body.mockResponse !== undefined && body.mockResponse !== null) {
+    if (typeof body.mockResponse !== "object" || Array.isArray(body.mockResponse)) {
+      return Response.json({ error: "Invalid mockResponse" }, { status: 400 });
+    }
+    const mr = body.mockResponse as Record<string, unknown>;
+    if (
+      mr.status !== undefined &&
+      (typeof mr.status !== "number" || mr.status < 100 || mr.status > 599)
+    ) {
+      return Response.json({ error: "Invalid status code" }, { status: 400 });
+    }
+    if (mr.body !== undefined && typeof mr.body !== "string") {
+      return Response.json({ error: "Invalid mockResponse body" }, { status: 400 });
+    }
+    if (mr.headers !== undefined) {
+      if (typeof mr.headers !== "object" || Array.isArray(mr.headers)) {
+        return Response.json({ error: "Invalid mockResponse headers" }, { status: 400 });
+      }
+      for (const val of Object.values(mr.headers as Record<string, unknown>)) {
+        if (typeof val !== "string") {
+          return Response.json({ error: "Invalid mockResponse headers" }, { status: 400 });
+        }
+      }
+    }
+  }
+
   const resp = await convexCliRequest("/cli/endpoints", {
     method: "PATCH",
     body: { userId: auth.userId, slug, name: body.name, mockResponse: body.mockResponse },

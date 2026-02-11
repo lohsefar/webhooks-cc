@@ -10,7 +10,7 @@ export function matchMethod(method: string): (request: Request) => boolean {
   return (request: Request) => request.method.toUpperCase() === upper;
 }
 
-/** Match requests that have a specific header, optionally with a specific value. */
+/** Match requests that have a specific header, optionally with a specific value. Header names are matched case-insensitively; values are matched with exact (case-sensitive) equality. */
 export function matchHeader(name: string, value?: string): (request: Request) => boolean {
   const lowerName = name.toLowerCase();
   return (request: Request) => {
@@ -23,11 +23,13 @@ export function matchHeader(name: string, value?: string): (request: Request) =>
 
 /**
  * Match requests by a dot-notation path into the JSON body.
+ * Supports array indexing with numeric path segments (e.g., `"items.0.id"`).
  *
  * @example
  * ```ts
  * matchBodyPath("data.object.id", "obj_123")
  * matchBodyPath("type", "checkout.session.completed")
+ * matchBodyPath("items.0.name", "Widget")
  * ```
  */
 export function matchBodyPath(path: string, value: unknown): (request: Request) => boolean {
@@ -38,25 +40,37 @@ export function matchBodyPath(path: string, value: unknown): (request: Request) 
 
     let current: unknown = body;
     for (const key of keys) {
-      if (typeof current !== "object" || current === null) return false;
-      if (!Object.prototype.hasOwnProperty.call(current, key)) return false;
-      current = (current as Record<string, unknown>)[key];
+      if (current === null || current === undefined) return false;
+      if (Array.isArray(current)) {
+        const idx = Number(key);
+        if (!Number.isInteger(idx) || idx < 0 || idx >= current.length) return false;
+        current = current[idx];
+      } else if (typeof current === "object") {
+        if (!Object.prototype.hasOwnProperty.call(current, key)) return false;
+        current = (current as Record<string, unknown>)[key];
+      } else {
+        return false;
+      }
     }
 
     return current === value;
   };
 }
 
-/** Match when ALL matchers return true. */
+/** Match when ALL matchers return true. Requires at least one matcher. */
 export function matchAll(
-  ...matchers: Array<(request: Request) => boolean>
+  first: (request: Request) => boolean,
+  ...rest: Array<(request: Request) => boolean>
 ): (request: Request) => boolean {
+  const matchers = [first, ...rest];
   return (request: Request) => matchers.every((m) => m(request));
 }
 
-/** Match when ANY matcher returns true. */
+/** Match when ANY matcher returns true. Requires at least one matcher. */
 export function matchAny(
-  ...matchers: Array<(request: Request) => boolean>
+  first: (request: Request) => boolean,
+  ...rest: Array<(request: Request) => boolean>
 ): (request: Request) => boolean {
+  const matchers = [first, ...rest];
   return (request: Request) => matchers.some((m) => m(request));
 }

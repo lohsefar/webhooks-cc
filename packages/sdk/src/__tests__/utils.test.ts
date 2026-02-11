@@ -11,8 +11,16 @@ describe("parseDuration", () => {
       expect(parseDuration(0)).toBe(0);
     });
 
-    it("handles negative numbers", () => {
-      expect(parseDuration(-100)).toBe(-100);
+    it("throws on negative numbers", () => {
+      expect(() => parseDuration(-100)).toThrow("must be a finite non-negative number");
+    });
+
+    it("throws on NaN", () => {
+      expect(() => parseDuration(NaN)).toThrow("must be a finite non-negative number");
+    });
+
+    it("throws on Infinity", () => {
+      expect(() => parseDuration(Infinity)).toThrow("must be a finite non-negative number");
     });
   });
 
@@ -53,6 +61,16 @@ describe("parseDuration", () => {
 
     it("parses '2h'", () => {
       expect(parseDuration("2h")).toBe(7200000);
+    });
+  });
+
+  describe("fractional durations", () => {
+    it("parses '1.5s'", () => {
+      expect(parseDuration("1.5s")).toBe(1500);
+    });
+
+    it("parses '0.5m'", () => {
+      expect(parseDuration("0.5m")).toBe(30000);
     });
   });
 

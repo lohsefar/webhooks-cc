@@ -46,7 +46,7 @@ const TOOLS = [
     example: '"Show me the body of request abc123"',
   },
   {
-    name: "send_test_webhook",
+    name: "send_webhook",
     description: "Send a test webhook to an endpoint",
     example: '"Send a POST with {"event":"test"} to stripe-test"',
   },
@@ -61,7 +61,7 @@ const TOOLS = [
     example: '"Replay request abc123 to http://localhost:3000/webhooks"',
   },
   {
-    name: "describe_sdk",
+    name: "describe",
     description: "Describe all available SDK operations",
     example: '"What can you do with webhooks.cc?"',
   },

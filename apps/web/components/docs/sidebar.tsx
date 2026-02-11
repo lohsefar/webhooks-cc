@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
@@ -95,6 +95,15 @@ function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
 export function DocsSidebar() {
   const [mobileOpen, setMobileOpen] = useState(false);
 
+  useEffect(() => {
+    if (!mobileOpen) return;
+    const handler = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setMobileOpen(false);
+    };
+    document.addEventListener("keydown", handler);
+    return () => document.removeEventListener("keydown", handler);
+  }, [mobileOpen]);
+
   return (
     <>
       {/* Mobile toggle - below navbar (h-16 + top-4 + gap) */}
@@ -116,6 +125,10 @@ export function DocsSidebar() {
 
       {/* Mobile sidebar */}
       <aside
+        role={mobileOpen ? "dialog" : undefined}
+        aria-modal={mobileOpen ? "true" : undefined}
+        aria-label="Documentation navigation"
+        aria-hidden={!mobileOpen}
         className={cn(
           "md:hidden fixed top-24 left-4 bottom-4 z-[35] w-64 border-2 border-foreground bg-background shadow-neo overflow-y-auto py-6 transition-transform",
           mobileOpen ? "translate-x-0" : "-translate-x-full"

@@ -340,6 +340,15 @@ interface WaitForOptions {
   match?: (request: Request) => boolean;
 }
 
+interface CreateEndpointOptions {
+  name?: string;
+}
+
+interface ListRequestsOptions {
+  limit?: number;
+  since?: number;
+}
+
 interface SubscribeOptions {
   signal?: AbortSignal;
   timeout?: number | string;
