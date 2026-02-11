@@ -48,6 +48,10 @@ const NAV_SECTIONS: NavSection[] = [
       { title: "Testing", href: "/docs/sdk/testing" },
     ],
   },
+  {
+    title: "MCP",
+    items: [{ title: "MCP Server", href: "/docs/mcp" }],
+  },
 ];
 
 function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
