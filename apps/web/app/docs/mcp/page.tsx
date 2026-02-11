@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { createPageMetadata } from "@/lib/seo";
-import { McpInstallButtons, SetupCommandsTable, CopyableCode } from "./mcp-setup";
+import { McpInstallGuide } from "./mcp-setup";
 
 export const metadata = createPageMetadata({
   title: "MCP Server Docs",
@@ -28,7 +28,7 @@ const TOOLS = [
   {
     name: "update_endpoint",
     description: "Update an endpoint name or mock response",
-    example: '"Set stripe-test to return a 201 with {\"ok\":true}"',
+    example: '"Set stripe-test to return a 201 with {"ok":true}"',
   },
   {
     name: "delete_endpoint",
@@ -48,7 +48,7 @@ const TOOLS = [
   {
     name: "send_test_webhook",
     description: "Send a test webhook to an endpoint",
-    example: '"Send a POST with {\"event\":\"test\"} to stripe-test"',
+    example: '"Send a POST with {"event":"test"} to stripe-test"',
   },
   {
     name: "wait_for_request",
@@ -77,98 +77,7 @@ export default function McpPage() {
         — all through natural language.
       </p>
 
-      <section className="mb-10">
-        <h2 className="text-xl font-bold mb-4">One-click install</h2>
-        <McpInstallButtons />
-        <p className="text-sm text-muted-foreground mt-3">
-          Cursor uses a placeholder API key you&apos;ll need to replace. VS Code prompts you for
-          your key during install.
-        </p>
-      </section>
-
-      <section className="mb-10">
-        <h2 className="text-xl font-bold mb-3">Setup via CLI</h2>
-        <p className="text-muted-foreground mb-4">
-          Or use the setup command. Get your API key from your{" "}
-          <Link href="/account" className="text-primary hover:underline font-bold">
-            account page
-          </Link>
-          , then run:
-        </p>
-        <SetupCommandsTable />
-      </section>
-
-      <section className="mb-10">
-        <h2 className="text-xl font-bold mb-3">Manual configuration</h2>
-        <p className="text-muted-foreground mb-4">
-          If you prefer to configure manually, use this stdio server config:
-        </p>
-        <CopyableCode
-          text={`{
-  "mcpServers": {
-    "webhooks-cc": {
-      "command": "npx",
-      "args": ["-y", "@webhooks-cc/mcp"],
-      "env": {
-        "WHK_API_KEY": "whcc_..."
-      }
-    }
-  }
-}`}
-        >{`{
-  "mcpServers": {
-    "webhooks-cc": {
-      "command": "npx",
-      "args": ["-y", "@webhooks-cc/mcp"],
-      "env": {
-        "WHK_API_KEY": "whcc_..."
-      }
-    }
-  }
-}`}</CopyableCode>
-      </section>
-
-      <section className="mb-10">
-        <h2 className="text-xl font-bold mb-3">Environment variables</h2>
-        <div className="neo-code text-sm overflow-x-auto">
-          <table className="w-full">
-            <thead>
-              <tr className="border-b border-foreground/20">
-                <th className="text-left py-1.5 pr-3 font-bold">Variable</th>
-                <th className="text-left py-1.5 pr-3 font-bold">Required</th>
-                <th className="text-left py-1.5 font-bold">Description</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr className="border-b border-foreground/20">
-                <td className="py-1.5 pr-3">
-                  <code>WHK_API_KEY</code>
-                </td>
-                <td className="py-1.5 pr-3">Yes</td>
-                <td className="py-1.5 text-muted-foreground">Your webhooks.cc API key</td>
-              </tr>
-              <tr className="border-b border-foreground/20">
-                <td className="py-1.5 pr-3">
-                  <code>WHK_WEBHOOK_URL</code>
-                </td>
-                <td className="py-1.5 pr-3">No</td>
-                <td className="py-1.5 text-muted-foreground">
-                  Override webhook receiver URL (default: production)
-                </td>
-              </tr>
-              <tr className="border-b border-foreground/20 last:border-0">
-                <td className="py-1.5 pr-3">
-                  <code>WHK_BASE_URL</code>
-                </td>
-                <td className="py-1.5 pr-3">No</td>
-                <td className="py-1.5 text-muted-foreground">
-                  Override API base URL (default: production)
-                </td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
-      </section>
+      <McpInstallGuide />
 
       <section className="mb-10">
         <h2 className="text-xl font-bold mb-3">Available tools</h2>

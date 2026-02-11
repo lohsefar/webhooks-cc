@@ -17,13 +17,7 @@ export {
   isLinearWebhook,
   matchJsonField,
 } from "./helpers";
-export {
-  matchMethod,
-  matchHeader,
-  matchBodyPath,
-  matchAll,
-  matchAny,
-} from "./matchers";
+export { matchMethod, matchHeader, matchBodyPath, matchAll, matchAny } from "./matchers";
 export { parseDuration } from "./utils";
 export { parseSSE } from "./sse";
 export type { SSEFrame } from "./sse";

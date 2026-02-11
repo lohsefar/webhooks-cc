@@ -79,8 +79,7 @@ const METHODS: { section: string; methods: MethodDef[] }[] = [
       {
         name: "client.requests.list",
         description: "List captured requests for an endpoint.",
-        signature:
-          "list(endpointSlug: string, options?: ListRequestsOptions): Promise<Request[]>",
+        signature: "list(endpointSlug: string, options?: ListRequestsOptions): Promise<Request[]>",
         params: [
           { name: "endpointSlug", type: "string", description: "Endpoint slug" },
           { name: "limit", type: "number?", description: "Max results (default: 50)" },
@@ -102,8 +101,7 @@ const METHODS: { section: string; methods: MethodDef[] }[] = [
         name: "client.requests.waitFor",
         description:
           "Poll for incoming requests until one matches or timeout expires. Accepts human-readable duration strings.",
-        signature:
-          "waitFor(endpointSlug: string, options?: WaitForOptions): Promise<Request>",
+        signature: "waitFor(endpointSlug: string, options?: WaitForOptions): Promise<Request>",
         params: [
           { name: "endpointSlug", type: "string", description: "Endpoint slug to monitor" },
           {
@@ -128,8 +126,7 @@ const METHODS: { section: string; methods: MethodDef[] }[] = [
         name: "client.requests.subscribe",
         description:
           "Stream incoming requests via SSE as an async iterator. No automatic reconnection.",
-        signature:
-          "subscribe(slug: string, options?: SubscribeOptions): AsyncIterable<Request>",
+        signature: "subscribe(slug: string, options?: SubscribeOptions): AsyncIterable<Request>",
         params: [
           { name: "slug", type: "string", description: "Endpoint slug" },
           {
@@ -149,8 +146,7 @@ const METHODS: { section: string; methods: MethodDef[] }[] = [
         name: "client.requests.replay",
         description:
           "Replay a captured request to a target URL. Sends the original method, headers, and body. Hop-by-hop headers are stripped.",
-        signature:
-          "replay(requestId: string, targetUrl: string): Promise<Response>",
+        signature: "replay(requestId: string, targetUrl: string): Promise<Response>",
         params: [
           { name: "requestId", type: "string", description: "ID of the captured request" },
           {
@@ -171,8 +167,7 @@ const METHODS: { section: string; methods: MethodDef[] }[] = [
         description:
           "Returns a static description of all SDK operations and their parameters. No API call is made. Useful for AI agents and tool discovery.",
         signature: "describe(): SDKDescription",
-        returns:
-          "Object with version, endpoints (6 operations), and requests (5 operations)",
+        returns: "Object with version, endpoints (6 operations), and requests (5 operations)",
       },
     ],
   },
@@ -248,8 +243,9 @@ const client = new WebhooksCC({
       <section className="mb-10">
         <h2 className="text-xl font-bold mb-3">Matchers</h2>
         <p className="text-muted-foreground mb-4">
-          Composable functions that return <code className="font-mono font-bold">(request) =&gt; boolean</code>.
-          Use with <code className="font-mono font-bold">waitFor</code> or filter logic.
+          Composable functions that return{" "}
+          <code className="font-mono font-bold">(request) =&gt; boolean</code>. Use with{" "}
+          <code className="font-mono font-bold">waitFor</code> or filter logic.
         </p>
         <pre className="neo-code text-sm">{`import {
   matchMethod,
@@ -289,8 +285,8 @@ matchAny(matchMethod("GET"), matchMethod("POST"))`}</pre>
         <h2 className="text-xl font-bold mb-3">Duration Strings</h2>
         <p className="text-muted-foreground mb-4">
           <code className="font-mono font-bold">timeout</code> and{" "}
-          <code className="font-mono font-bold">pollInterval</code> accept
-          human-readable strings alongside milliseconds.
+          <code className="font-mono font-bold">pollInterval</code> accept human-readable strings
+          alongside milliseconds.
         </p>
         <pre className="neo-code text-sm">{`"500ms"  →    500
 "30s"    →  30000

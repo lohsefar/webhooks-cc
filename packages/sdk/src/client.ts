@@ -67,7 +67,9 @@ function mapStatusToError(status: number, message: string, response: Response): 
 
   switch (status) {
     case 401: {
-      const hint = isGeneric ? `${message} — Get an API key at https://webhooks.cc/account` : message;
+      const hint = isGeneric
+        ? `${message} — Get an API key at https://webhooks.cc/account`
+        : message;
       return new UnauthorizedError(hint);
     }
     case 404: {
@@ -298,7 +300,8 @@ export class WebhooksCC {
       return fetch(url, {
         method,
         headers: fetchHeaders,
-        body: body !== undefined ? (typeof body === "string" ? body : JSON.stringify(body)) : undefined,
+        body:
+          body !== undefined ? (typeof body === "string" ? body : JSON.stringify(body)) : undefined,
       });
     },
   };

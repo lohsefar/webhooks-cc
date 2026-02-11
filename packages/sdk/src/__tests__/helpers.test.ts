@@ -66,11 +66,15 @@ describe("isGitHubWebhook", () => {
 
 describe("isShopifyWebhook", () => {
   it("detects x-shopify-hmac-sha256 header", () => {
-    expect(isShopifyWebhook(makeRequest({ headers: { "x-shopify-hmac-sha256": "abc" } }))).toBe(true);
+    expect(isShopifyWebhook(makeRequest({ headers: { "x-shopify-hmac-sha256": "abc" } }))).toBe(
+      true
+    );
   });
 
   it("is case-insensitive", () => {
-    expect(isShopifyWebhook(makeRequest({ headers: { "X-Shopify-Hmac-Sha256": "abc" } }))).toBe(true);
+    expect(isShopifyWebhook(makeRequest({ headers: { "X-Shopify-Hmac-Sha256": "abc" } }))).toBe(
+      true
+    );
   });
 
   it("returns false without header", () => {
@@ -110,7 +114,9 @@ describe("isPaddleWebhook", () => {
 
 describe("isLinearWebhook", () => {
   it("detects linear-signature header", () => {
-    expect(isLinearWebhook(makeRequest({ headers: { "linear-signature": "sha256=abc" } }))).toBe(true);
+    expect(isLinearWebhook(makeRequest({ headers: { "linear-signature": "sha256=abc" } }))).toBe(
+      true
+    );
   });
 
   it("returns false without header", () => {

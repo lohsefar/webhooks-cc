@@ -1,14 +1,7 @@
 import { describe, it, expect, beforeAll } from "vitest";
 import { WebhooksCC, ApiError } from "../client";
 import { WebhooksCCError } from "../errors";
-import {
-  matchMethod,
-  matchHeader,
-  matchBodyPath,
-  matchJsonField,
-  matchAll,
-  matchAny,
-} from "../matchers";
+import { matchMethod, matchHeader, matchBodyPath, matchAll, matchAny } from "../matchers";
 import {
   isStripeWebhook,
   isGitHubWebhook,
@@ -238,10 +231,7 @@ describe.skipIf(!API_KEY)("SDK integration tests", () => {
       // Use composed matchers
       const request = await client.requests.waitFor(endpoint.slug, {
         timeout: "10s",
-        match: matchAll(
-          matchMethod("POST"),
-          matchHeader("x-event-type", "payment.success"),
-        ),
+        match: matchAll(matchMethod("POST"), matchHeader("x-event-type", "payment.success")),
       });
 
       expect(request.method).toBe("POST");

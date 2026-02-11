@@ -26,9 +26,7 @@ export interface CreateServerOptions {
 export function createServer(options: CreateServerOptions = {}): McpServer {
   const apiKey = options.apiKey ?? process.env.WHK_API_KEY;
   if (!apiKey) {
-    throw new Error(
-      "Missing API key. Set WHK_API_KEY environment variable or pass apiKey option."
-    );
+    throw new Error("Missing API key. Set WHK_API_KEY environment variable or pass apiKey option.");
   }
 
   const client = new WebhooksCC({

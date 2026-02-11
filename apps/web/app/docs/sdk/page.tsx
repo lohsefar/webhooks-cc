@@ -132,7 +132,9 @@ if (isStripeWebhook(request)) {
             <Link href="/docs/mcp" className="text-primary hover:underline font-bold">
               MCP Server
             </Link>{" "}
-            <span className="text-muted-foreground">- AI agent integration for Claude, Cursor, VS Code</span>
+            <span className="text-muted-foreground">
+              - AI agent integration for Claude, Cursor, VS Code
+            </span>
           </li>
         </ul>
       </section>

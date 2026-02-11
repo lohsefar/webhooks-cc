@@ -1,5 +1,12 @@
 import { describe, it, expect } from "vitest";
-import { matchMethod, matchHeader, matchBodyPath, matchAll, matchAny, matchJsonField } from "../matchers";
+import {
+  matchMethod,
+  matchHeader,
+  matchBodyPath,
+  matchAll,
+  matchAny,
+  matchJsonField,
+} from "../matchers";
 import type { Request } from "../types";
 
 function makeRequest(overrides: Partial<Request> = {}): Request {
@@ -64,17 +71,23 @@ describe("matchHeader", () => {
 describe("matchBodyPath", () => {
   it("matches top-level field", () => {
     const matcher = matchBodyPath("type", "checkout.session.completed");
-    expect(matcher(makeRequest({ body: JSON.stringify({ type: "checkout.session.completed" }) }))).toBe(true);
+    expect(
+      matcher(makeRequest({ body: JSON.stringify({ type: "checkout.session.completed" }) }))
+    ).toBe(true);
   });
 
   it("matches nested field", () => {
     const matcher = matchBodyPath("data.object.id", "obj_123");
-    expect(matcher(makeRequest({ body: JSON.stringify({ data: { object: { id: "obj_123" } } }) }))).toBe(true);
+    expect(
+      matcher(makeRequest({ body: JSON.stringify({ data: { object: { id: "obj_123" } } }) }))
+    ).toBe(true);
   });
 
   it("rejects wrong value", () => {
     const matcher = matchBodyPath("type", "payment_intent.succeeded");
-    expect(matcher(makeRequest({ body: JSON.stringify({ type: "checkout.session.completed" }) }))).toBe(false);
+    expect(
+      matcher(makeRequest({ body: JSON.stringify({ type: "checkout.session.completed" }) }))
+    ).toBe(false);
   });
 
   it("rejects missing path", () => {
@@ -95,39 +108,31 @@ describe("matchBodyPath", () => {
 
 describe("matchAll", () => {
   it("requires all matchers to pass", () => {
-    const matcher = matchAll(
-      matchMethod("POST"),
-      matchHeader("content-type", "application/json")
-    );
-    expect(matcher(makeRequest({
-      method: "POST",
-      headers: { "content-type": "application/json" },
-    }))).toBe(true);
+    const matcher = matchAll(matchMethod("POST"), matchHeader("content-type", "application/json"));
+    expect(
+      matcher(
+        makeRequest({
+          method: "POST",
+          headers: { "content-type": "application/json" },
+        })
+      )
+    ).toBe(true);
   });
 
   it("fails if any matcher fails", () => {
-    const matcher = matchAll(
-      matchMethod("POST"),
-      matchHeader("x-custom")
-    );
+    const matcher = matchAll(matchMethod("POST"), matchHeader("x-custom"));
     expect(matcher(makeRequest({ method: "POST", headers: {} }))).toBe(false);
   });
 });
 
 describe("matchAny", () => {
   it("passes if any matcher passes", () => {
-    const matcher = matchAny(
-      matchMethod("GET"),
-      matchMethod("POST")
-    );
+    const matcher = matchAny(matchMethod("GET"), matchMethod("POST"));
     expect(matcher(makeRequest({ method: "POST" }))).toBe(true);
   });
 
   it("fails if no matchers pass", () => {
-    const matcher = matchAny(
-      matchMethod("GET"),
-      matchMethod("PUT")
-    );
+    const matcher = matchAny(matchMethod("GET"), matchMethod("PUT"));
     expect(matcher(makeRequest({ method: "POST" }))).toBe(false);
   });
 });

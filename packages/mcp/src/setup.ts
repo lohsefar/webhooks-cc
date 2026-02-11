@@ -40,10 +40,20 @@ function mergeJsonConfig(filePath: string, serverName: string, serverConfig: obj
 function getClaudeDesktopConfigPath(): string {
   const os = platform();
   if (os === "darwin") {
-    return join(homedir(), "Library", "Application Support", "Claude", "claude_desktop_config.json");
+    return join(
+      homedir(),
+      "Library",
+      "Application Support",
+      "Claude",
+      "claude_desktop_config.json"
+    );
   }
   if (os === "win32") {
-    return join(process.env.APPDATA ?? join(homedir(), "AppData", "Roaming"), "Claude", "claude_desktop_config.json");
+    return join(
+      process.env.APPDATA ?? join(homedir(), "AppData", "Roaming"),
+      "Claude",
+      "claude_desktop_config.json"
+    );
   }
   // Linux
   return join(homedir(), ".config", "Claude", "claude_desktop_config.json");
@@ -61,7 +71,9 @@ function setupClaudeCode(apiKey: string): void {
     console.error("\nFailed to run 'claude mcp add'. Is Claude Code CLI installed?");
     console.error("Install it: npm install -g @anthropic-ai/claude-code");
     console.error("\nManual alternative — run this command:");
-    console.error(`  claude mcp add -s user --transport stdio webhooks-cc -e WHK_API_KEY=${apiKey} -- npx -y @webhooks-cc/mcp`);
+    console.error(
+      `  claude mcp add -s user --transport stdio webhooks-cc -e WHK_API_KEY=${apiKey} -- npx -y @webhooks-cc/mcp`
+    );
     process.exit(1);
   }
 }
@@ -89,10 +101,9 @@ function setupVSCode(apiKey: string): void {
 
 function setupCodex(apiKey: string): void {
   try {
-    execSync(
-      `codex mcp add webhooks-cc -e WHK_API_KEY=${apiKey} -- npx -y @webhooks-cc/mcp`,
-      { stdio: "inherit" }
-    );
+    execSync(`codex mcp add webhooks-cc -e WHK_API_KEY=${apiKey} -- npx -y @webhooks-cc/mcp`, {
+      stdio: "inherit",
+    });
     console.log("\nDone! webhooks-cc MCP server added to Codex.");
   } catch {
     console.error("\nFailed to run 'codex mcp add'. Is OpenAI Codex CLI installed?");
