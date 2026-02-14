@@ -540,7 +540,9 @@ export class WebhooksCC {
             controller.signal.addEventListener(
               "abort",
               () => {
-                response.body?.cancel();
+                response.body?.cancel().catch(() => {
+                  // Stream may already be locked/consumed by parseSSE — safe to ignore
+                });
               },
               { once: true }
             );
