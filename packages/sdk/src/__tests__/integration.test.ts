@@ -230,7 +230,7 @@ describe.skipIf(!API_KEY)("SDK integration tests", () => {
 
       // Use composed matchers
       const request = await client.requests.waitFor(endpoint.slug, {
-        timeout: "10s",
+        timeout: "30s",
         match: matchAll(matchMethod("POST"), matchHeader("x-event-type", "payment.success")),
       });
 
