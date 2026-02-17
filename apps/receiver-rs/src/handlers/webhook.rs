@@ -32,7 +32,9 @@ pub fn is_valid_slug(slug: &str) -> bool {
 /// Sanitizes the value to contain only valid IP characters (digits, dots, colons, hex)
 /// to prevent XSS via spoofed headers stored in the database.
 fn real_ip(headers: &HeaderMap) -> String {
-    let raw = if let Some(ip) = headers.get("x-real-ip").and_then(|v| v.to_str().ok()) {
+    let raw = if let Some(ip) = headers.get("cf-connecting-ip").and_then(|v| v.to_str().ok()) {
+        ip.to_string()
+    } else if let Some(ip) = headers.get("x-real-ip").and_then(|v| v.to_str().ok()) {
         ip.to_string()
     } else if let Some(xff) = headers.get("x-forwarded-for").and_then(|v| v.to_str().ok())
         && let Some(first) = xff.split(',').next() {
@@ -50,6 +52,16 @@ fn real_ip(headers: &HeaderMap) -> String {
     } else {
         String::new()
     }
+}
+
+/// Extract the original client IP from Cloudflare's cf-connecting-ip header.
+/// Falls back to real_ip() if cf-connecting-ip is absent.
+fn cf_connecting_ip(headers: &HeaderMap) -> String {
+    headers
+        .get("cf-connecting-ip")
+        .and_then(|v| v.to_str().ok())
+        .map(|s| s.to_string())
+        .unwrap_or_else(|| real_ip(headers))
 }
 
 /// The main webhook handler: GET/POST/PUT/PATCH/DELETE /w/{slug}/*
@@ -160,10 +172,21 @@ pub async fn handle_webhook(
         }
     }
 
-    // 4. Buffer the request
+    // 4. Dedup: skip buffering if an identical request arrived within 2s
+    //    (catches Cloudflare multi-path duplicate delivery under burst traffic).
+    let client_ip = cf_connecting_ip(&headers);
+    if !state.redis.check_dedup(&slug, method.as_str(), &req_path, &body, &client_ip).await {
+        tracing::debug!(slug, "duplicate request detected, skipping buffer");
+        if let Some(mock) = &endpoint.mock_response {
+            return build_mock_response(mock);
+        }
+        return (StatusCode::OK, "OK").into_response();
+    }
+
+    // 5. Buffer the request
     buffer_request(&state, &slug, &method, &req_path, &headers, &query, &body).await;
 
-    // 5. Return mock response or "OK"
+    // 6. Return mock response or "OK"
     if let Some(mock) = &endpoint.mock_response {
         return build_mock_response(mock);
     }
