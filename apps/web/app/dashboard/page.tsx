@@ -121,10 +121,20 @@ export default function DashboardPage() {
     [authToken]
   );
 
-  // Store ClickHouse results in the detail map
+  // Store ClickHouse results in the detail map (capped at 500 entries)
   const storeClickHouseResults = useCallback((results: ClickHouseRequest[]) => {
+    const map = clickHouseDetailMap.current;
     for (const r of results) {
-      clickHouseDetailMap.current.set(r.id, r);
+      map.set(r.id, r);
+    }
+    // Evict oldest entries if map exceeds cap
+    if (map.size > 500) {
+      const excess = map.size - 500;
+      const iter = map.keys();
+      for (let i = 0; i < excess; i++) {
+        const key = iter.next().value;
+        if (key) map.delete(key);
+      }
     }
   }, []);
 
@@ -136,11 +146,14 @@ export default function DashboardPage() {
     if (prefetchedSlug.current === currentEndpoint.slug) return;
     prefetchedSlug.current = currentEndpoint.slug;
 
+    let cancelled = false;
+
     fetchFromClickHouse({
       slug: currentEndpoint.slug,
       limit: "50",
       order: "desc",
     }).then((results) => {
+      if (cancelled) return;
       storeClickHouseResults(results);
       // Map Convex _ids to ClickHouse details by matching receivedAt
       for (const summary of summaries) {
@@ -149,19 +162,12 @@ export default function DashboardPage() {
           clickHouseDetailMap.current.set(summary._id, match);
         }
       }
-      // If current selection now has a cached detail, show it
-      if (selectedId && clickHouseDetailMap.current.has(selectedId)) {
-        setSelectedDetail(clickHouseDetailMap.current.get(selectedId)!);
-      }
     });
-  }, [
-    currentEndpoint,
-    summaries,
-    authToken,
-    fetchFromClickHouse,
-    storeClickHouseResults,
-    selectedId,
-  ]);
+
+    return () => {
+      cancelled = true;
+    };
+  }, [currentEndpoint, summaries, authToken, fetchFromClickHouse, storeClickHouseResults]);
 
   // Fetch detail from ClickHouse when selection changes
   useEffect(() => {

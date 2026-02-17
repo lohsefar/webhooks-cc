@@ -80,7 +80,7 @@ async fn main() {
         }
         Some(ch)
     } else {
-        tracing::info!("ClickHouse dual-write disabled (CLICKHOUSE_URL not set)");
+        tracing::info!("ClickHouse dual-write disabled (CLICKHOUSE_HOST not set)");
         None
     };
 

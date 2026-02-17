@@ -1,6 +1,6 @@
 use std::sync::Arc;
 use std::time::Duration;
-use tokio::sync::watch;
+use tokio::sync::{Semaphore, watch};
 
 use crate::clickhouse::client::ClickHouseClient;
 use crate::clickhouse::types::ClickHouseRequest;
@@ -10,6 +10,9 @@ use crate::redis::RedisState;
 
 /// How long to sleep when the circuit breaker is open.
 const CIRCUIT_OPEN_BACKOFF: Duration = Duration::from_secs(5);
+
+/// Max concurrent fire-and-forget ClickHouse insert tasks.
+const CH_MAX_CONCURRENT_WRITES: usize = 16;
 
 /// Spawn N flush workers that drain Redis request buffers and POST to Convex.
 pub fn spawn_flush_workers(
@@ -22,11 +25,13 @@ pub fn spawn_flush_workers(
     shutdown: watch::Receiver<bool>,
 ) {
     let clickhouse = clickhouse.map(Arc::new);
+    let ch_semaphore = Arc::new(Semaphore::new(CH_MAX_CONCURRENT_WRITES));
 
     for worker_id in 0..worker_count {
         let redis = redis.clone();
         let convex = convex.clone();
         let clickhouse = clickhouse.clone();
+        let ch_semaphore = ch_semaphore.clone();
         let mut shutdown = shutdown.clone();
 
         tokio::spawn(async move {
@@ -38,7 +43,7 @@ pub fn spawn_flush_workers(
                     // Final drain — skip if circuit is open (Convex unreachable,
                     // batches stay in Redis for next startup)
                     if !convex.circuit().is_degraded().await {
-                        drain_pass(&redis, &convex, clickhouse.as_deref(), batch_max_size, worker_id, worker_count).await;
+                        drain_pass(&redis, &convex, clickhouse.as_deref(), &ch_semaphore, batch_max_size, worker_id, worker_count).await;
                     }
                     tracing::info!(worker_id, "flush worker shutting down");
                     return;
@@ -55,7 +60,7 @@ pub fn spawn_flush_workers(
                 }
 
                 let did_work =
-                    drain_pass(&redis, &convex, clickhouse.as_deref(), batch_max_size, worker_id, worker_count).await;
+                    drain_pass(&redis, &convex, clickhouse.as_deref(), &ch_semaphore, batch_max_size, worker_id, worker_count).await;
 
                 if !did_work {
                     tokio::select! {
@@ -77,6 +82,7 @@ async fn drain_pass(
     redis: &RedisState,
     convex: &ConvexClient,
     clickhouse: Option<&ClickHouseClient>,
+    ch_semaphore: &Arc<Semaphore>,
     batch_max_size: usize,
     worker_id: usize,
     worker_count: usize,
@@ -125,7 +131,11 @@ async fn drain_pass(
         did_work = true;
         let batch_len = batch.len();
 
-        match convex.capture_batch(slug, batch.clone()).await {
+        // Clone batch for Convex (capture_batch takes ownership).
+        // On success, move the original batch into the ClickHouse task
+        // to avoid a second clone.
+        let convex_batch = batch.clone();
+        match convex.capture_batch(slug, convex_batch).await {
             Ok(resp) => {
                 if !resp.error.is_empty() {
                     tracing::warn!(
@@ -140,13 +150,15 @@ async fn drain_pass(
                         "flushed batch to Convex"
                     );
 
-                    // Fire-and-forget ClickHouse dual-write after successful Convex flush
+                    // Fire-and-forget ClickHouse dual-write after successful Convex flush.
+                    // Semaphore limits concurrent writes to prevent unbounded task spawning.
                     if let Some(ch) = clickhouse {
                         fire_and_forget_clickhouse(
                             ch.clone(),
                             redis.clone(),
                             slug.clone(),
-                            batch.clone(),
+                            batch, // move, not clone
+                            ch_semaphore.clone(),
                         );
                     }
                 }
@@ -182,18 +194,33 @@ async fn drain_pass(
 
 /// Spawn a background task to write a batch to ClickHouse (fire-and-forget).
 /// Looks up endpoint info from Redis cache for metadata enrichment.
+/// Bounded by semaphore to prevent unbounded task accumulation.
 fn fire_and_forget_clickhouse(
     ch: ClickHouseClient,
     redis: RedisState,
     slug: String,
     batch: Vec<BufferedRequest>,
+    semaphore: Arc<Semaphore>,
 ) {
     tokio::spawn(async move {
+        // Acquire semaphore permit — drops batch if ClickHouse is backed up
+        let _permit = match semaphore.try_acquire() {
+            Ok(permit) => permit,
+            Err(_) => {
+                tracing::warn!(
+                    slug,
+                    count = batch.len(),
+                    "ClickHouse write backpressure: dropping batch (semaphore full)"
+                );
+                return;
+            }
+        };
+
         // Get endpoint info from Redis cache for metadata
         let info = match redis.get_endpoint(&slug).await {
             Some(info) => info,
             None => {
-                tracing::debug!(slug, "skipping ClickHouse write: endpoint info not in cache");
+                tracing::warn!(slug, count = batch.len(), "skipping ClickHouse write: endpoint info not in cache");
                 return;
             }
         };

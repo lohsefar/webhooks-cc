@@ -61,9 +61,10 @@ export async function GET(request: Request) {
 
     if (!resp.ok) {
       const text = await resp.text();
+      console.error("Search proxy error:", resp.status, text);
       return Response.json(
-        { error: "Search request failed", detail: text },
-        { status: resp.status }
+        { error: "Search request failed" },
+        { status: resp.status >= 500 ? 502 : resp.status }
       );
     }
 

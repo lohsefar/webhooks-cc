@@ -1,20 +1,11 @@
 use axum::extract::{Query, State};
 use axum::http::{HeaderMap, StatusCode};
 use axum::response::IntoResponse;
-use std::collections::hash_map::DefaultHasher;
-use std::hash::{Hash, Hasher};
-use subtle::ConstantTimeEq;
 
 use serde::Deserialize;
 
+use crate::handlers::auth::verify_bearer_token;
 use crate::AppState;
-
-/// Hash a byte slice to a fixed-length digest for length-independent comparison.
-fn hash_to_fixed(data: &[u8]) -> [u8; 8] {
-    let mut h = DefaultHasher::new();
-    data.hash(&mut h);
-    h.finish().to_le_bytes()
-}
 
 #[derive(Debug, Deserialize)]
 pub struct SearchParams {
@@ -30,12 +21,10 @@ pub struct SearchParams {
 }
 
 /// Escape a string for safe inclusion in ClickHouse SQL string literals.
-/// Prevents SQL injection by escaping special characters.
+/// Only escapes backslash and single-quote (the two characters that can
+/// break out of a ClickHouse string literal).
 fn escape_clickhouse_string(s: &str) -> String {
-    s.replace('\\', "\\\\")
-        .replace('\'', "\\'")
-        .replace('%', "\\%")
-        .replace('_', "\\_")
+    s.replace('\\', "\\\\").replace('\'', "\\'")
 }
 
 pub async fn search(
@@ -48,12 +37,8 @@ pub async fn search(
         .get("authorization")
         .and_then(|v| v.to_str().ok())
         .unwrap_or("");
-    let expected = format!("Bearer {}", state.config.capture_shared_secret);
 
-    let auth_hash = hash_to_fixed(auth.as_bytes());
-    let expected_hash = hash_to_fixed(expected.as_bytes());
-
-    if auth_hash.ct_eq(&expected_hash).unwrap_u8() != 1 {
+    if !verify_bearer_token(auth, &state.config.capture_shared_secret) {
         return (
             StatusCode::UNAUTHORIZED,
             axum::Json(serde_json::json!({"error": "unauthorized"})),
@@ -101,23 +86,34 @@ pub async fn search(
         ));
     }
 
+    // Use multiSearchAny() for substring search — it does exact substring
+    // matching (no wildcard/regex escaping needed) and is supported by
+    // ngrambf_v1 skip indexes for efficient filtering.
     if let Some(q) = &params.q
         && !q.is_empty()
     {
         let escaped = escape_clickhouse_string(q);
         conditions.push(format!(
-            "(path LIKE '%{escaped}%' OR body LIKE '%{escaped}%' OR headers LIKE '%{escaped}%')"
+            "(multiSearchAny(path, ['{escaped}']) OR multiSearchAny(body, ['{escaped}']) OR multiSearchAny(headers, ['{escaped}']))"
         ));
     }
 
+    // Use integer arithmetic for timestamps to avoid f64 precision loss
+    // and potential scientific notation formatting.
     if let Some(from) = params.from {
-        let secs = from as f64 / 1000.0;
-        conditions.push(format!("received_at >= toDateTime64({secs}, 3, 'UTC')"));
+        let secs = from.div_euclid(1000);
+        let ms = from.rem_euclid(1000) as u64;
+        conditions.push(format!(
+            "received_at >= toDateTime64('{secs}.{ms:03}', 3, 'UTC')"
+        ));
     }
 
     if let Some(to) = params.to {
-        let secs = to as f64 / 1000.0;
-        conditions.push(format!("received_at <= toDateTime64({secs}, 3, 'UTC')"));
+        let secs = to.div_euclid(1000);
+        let ms = to.rem_euclid(1000) as u64;
+        conditions.push(format!(
+            "received_at <= toDateTime64('{secs}.{ms:03}', 3, 'UTC')"
+        ));
     }
 
     let where_clause = conditions.join(" AND ");

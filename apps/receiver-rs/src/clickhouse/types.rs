@@ -1,6 +1,6 @@
 use std::collections::HashMap;
-use std::collections::hash_map::DefaultHasher;
-use std::hash::{Hash, Hasher};
+
+use sha2::{Digest, Sha256};
 
 use serde::{Deserialize, Serialize};
 
@@ -35,7 +35,7 @@ impl ClickHouseRequest {
             .unwrap_or_default()
             .to_string();
 
-        let body_size = req.body.len() as u32;
+        let body_size = u32::try_from(req.body.len()).unwrap_or(u32::MAX);
         let headers_json = serde_json::to_string(&req.headers).unwrap_or_default();
         let query_json = serde_json::to_string(&req.query_params).unwrap_or_default();
 
@@ -62,9 +62,10 @@ impl ClickHouseRequest {
 
 /// Convert epoch milliseconds to a ClickHouse DateTime64(3) compatible string.
 /// ClickHouse accepts epoch seconds as a float (e.g. "1739800496.789").
+/// Uses div_euclid/rem_euclid for correct handling of negative timestamps.
 fn epoch_ms_to_iso(ms: i64) -> String {
-    let secs = ms / 1000;
-    let subsec_ms = (ms % 1000).unsigned_abs();
+    let secs = ms.div_euclid(1000);
+    let subsec_ms = ms.rem_euclid(1000) as u64;
     format!("{secs}.{subsec_ms:03}")
 }
 
@@ -125,13 +126,22 @@ impl SearchResultRequest {
             Some(row.content_type.clone())
         };
 
-        // Synthetic ID: slug:received_at_ms:hash — hash disambiguates same-ms rows
-        let mut hasher = DefaultHasher::new();
-        row.body.hash(&mut hasher);
-        row.path.hash(&mut hasher);
-        row.ip.hash(&mut hasher);
-        let hash_suffix = hasher.finish() & 0xFFFF;
-        let id = format!("{}:{}:{:04x}", row.slug, received_at as i64, hash_suffix);
+        // Synthetic ID: slug:received_at_ms:hash
+        // Uses SHA-256 (stable across Rust versions) with all distinguishing fields.
+        // Null byte separators prevent field-boundary collisions.
+        let mut hasher = Sha256::new();
+        hasher.update(row.method.as_bytes());
+        hasher.update(b"\x00");
+        hasher.update(row.path.as_bytes());
+        hasher.update(b"\x00");
+        hasher.update(row.headers.as_bytes());
+        hasher.update(b"\x00");
+        hasher.update(row.body.as_bytes());
+        hasher.update(b"\x00");
+        hasher.update(row.ip.as_bytes());
+        let digest = hasher.finalize();
+        let hash_suffix = u64::from_le_bytes(digest[..8].try_into().unwrap());
+        let id = format!("{}:{}:{:016x}", row.slug, received_at as i64, hash_suffix);
 
         Self {
             id,
@@ -160,7 +170,6 @@ fn parse_received_at(s: &str) -> f64 {
     // Simple manual parse for the common ClickHouse format
     if s.len() >= 19 {
         // We have at least "YYYY-MM-DD HH:MM:SS"
-        // For simplicity, try to extract via the format
         let parts: Vec<&str> = s.split('.').collect();
         let datetime_part = parts[0];
         let millis: u64 = if parts.len() > 1 {
@@ -175,6 +184,7 @@ fn parse_received_at(s: &str) -> f64 {
             return (epoch_secs * 1000 + millis as i64) as f64;
         }
     }
+    tracing::warn!(value = s, "failed to parse ClickHouse received_at timestamp");
     0.0
 }
 
@@ -192,12 +202,35 @@ fn parse_datetime_to_epoch(s: &str) -> Option<i64> {
     let min: i64 = s[14..16].parse().ok()?;
     let sec: i64 = s[17..19].parse().ok()?;
 
+    // Validate ranges to prevent panics on malformed data
+    if !(1..=12).contains(&month)
+        || !(1..=31).contains(&day)
+        || !(0..=23).contains(&hour)
+        || !(0..=59).contains(&min)
+        || !(0..=59).contains(&sec)
+    {
+        return None;
+    }
+
     // Simplified days-from-epoch calculation (no leap second handling)
     let mut days: i64 = 0;
     for y in 1970..year {
         days += if is_leap_year(y) { 366 } else { 365 };
     }
-    let month_days = [31, 28 + i64::from(is_leap_year(year)), 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
+    let month_days = [
+        31,
+        28 + i64::from(is_leap_year(year)),
+        31,
+        30,
+        31,
+        30,
+        31,
+        31,
+        30,
+        31,
+        30,
+        31,
+    ];
     for &d in &month_days[..(month - 1) as usize] {
         days += d;
     }

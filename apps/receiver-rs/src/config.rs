@@ -97,6 +97,14 @@ impl Config {
         let clickhouse_database =
             env::var("CLICKHOUSE_DATABASE").unwrap_or_else(|_| "webhooks".into());
 
+        // Validate database name to prevent SQL injection via env var
+        assert!(
+            clickhouse_database
+                .chars()
+                .all(|c| c.is_ascii_alphanumeric() || c == '_'),
+            "CLICKHOUSE_DATABASE must contain only alphanumeric characters and underscores"
+        );
+
         assert!(flush_workers > 0, "FLUSH_WORKERS must be > 0");
         assert!(batch_max_size > 0, "BATCH_MAX_SIZE must be > 0");
 

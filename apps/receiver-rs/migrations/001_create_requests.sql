@@ -18,11 +18,12 @@ CREATE TABLE IF NOT EXISTS webhooks.requests (
 ENGINE = MergeTree()
 PARTITION BY toYYYYMM(received_at)
 ORDER BY (user_id, slug, received_at)
-TTL toDateTime(received_at) + INTERVAL 31 DAY
+TTL received_at + INTERVAL 31 DAY
 SETTINGS index_granularity = 8192;
 
 ALTER TABLE webhooks.requests ADD INDEX idx_method method TYPE set(10) GRANULARITY 4;
-ALTER TABLE webhooks.requests ADD INDEX idx_path path TYPE tokenbf_v1(10240, 3, 0) GRANULARITY 4;
-ALTER TABLE webhooks.requests ADD INDEX idx_body body TYPE tokenbf_v1(10240, 3, 0) GRANULARITY 4;
-ALTER TABLE webhooks.requests ADD INDEX idx_headers headers TYPE tokenbf_v1(10240, 3, 0) GRANULARITY 4;
+-- ngrambf_v1 indexes support arbitrary substring search via position()
+ALTER TABLE webhooks.requests ADD INDEX idx_path path TYPE ngrambf_v1(3, 10240, 3, 0) GRANULARITY 4;
+ALTER TABLE webhooks.requests ADD INDEX idx_body body TYPE ngrambf_v1(3, 10240, 3, 0) GRANULARITY 4;
+ALTER TABLE webhooks.requests ADD INDEX idx_headers headers TYPE ngrambf_v1(3, 10240, 3, 0) GRANULARITY 4;
 ALTER TABLE webhooks.requests ADD INDEX idx_ip ip TYPE bloom_filter(0.01) GRANULARITY 4;
