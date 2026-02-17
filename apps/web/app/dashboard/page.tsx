@@ -384,10 +384,12 @@ export default function DashboardPage() {
         : summaries.filter((r) => r.method === methodFilter)
       : [];
 
-    // Deduplicate: exclude ClickHouse items whose receivedAt overlaps with Convex summaries
+    // Deduplicate: exclude ClickHouse items whose receivedAt overlaps with Convex window.
+    // Use unfiltered summaries for the boundary so a method filter that excludes all
+    // Convex items doesn't collapse oldestConvex to -Infinity and drop everything.
     const oldestConvex =
-      convexSummaries.length > 0
-        ? convexSummaries[convexSummaries.length - 1].receivedAt
+      summaries && summaries.length > 0
+        ? summaries[summaries.length - 1].receivedAt
         : -Infinity;
     const olderSummaries: ClickHouseSummary[] = olderRequests
       .filter((r) => r.receivedAt < oldestConvex)

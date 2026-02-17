@@ -179,8 +179,13 @@ fn parse_received_at(s: &str) -> f64 {
         let parts: Vec<&str> = s.split('.').collect();
         let datetime_part = parts[0];
         let millis: u64 = if parts.len() > 1 {
-            let ms_str = &parts[1][..parts[1].len().min(3)];
-            ms_str.parse().unwrap_or(0)
+            let frac = &parts[1][..parts[1].len().min(3)];
+            // Right-pad with zeros: "7" → 700, "78" → 780, "789" → 789
+            match frac.len() {
+                1 => frac.parse::<u64>().unwrap_or(0) * 100,
+                2 => frac.parse::<u64>().unwrap_or(0) * 10,
+                _ => frac.parse::<u64>().unwrap_or(0),
+            }
         } else {
             0
         };
