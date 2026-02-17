@@ -11,6 +11,23 @@ use crate::AppState;
 const MAX_HEADER_KEY_LEN: usize = 256;
 const MAX_HEADER_VALUE_LEN: usize = 8192;
 
+/// Proxy/CDN/transport headers added by our infrastructure (Cloudflare + Caddy)
+/// that should not be stored — they are not part of the original sender's request.
+const PROXY_HEADERS: &[&str] = &[
+    "accept-encoding",
+    "cdn-loop",
+    "cf-connecting-ip",
+    "cf-ipcountry",
+    "cf-ray",
+    "cf-visitor",
+    "via",
+    "x-forwarded-for",
+    "x-forwarded-host",
+    "x-forwarded-proto",
+    "x-real-ip",
+    "true-client-ip",
+];
+
 /// Blocked response headers that must not be forwarded from mock responses.
 const BLOCKED_HEADERS: &[&str] = &[
     "set-cookie",
@@ -217,8 +234,13 @@ async fn buffer_request(
 ) {
     let mut header_map = HashMap::new();
     for (key, value) in headers.iter() {
+        let name = key.as_str();
+        // Skip proxy/CDN headers added by our infrastructure
+        if PROXY_HEADERS.contains(&name) {
+            continue;
+        }
         if let Ok(v) = value.to_str() {
-            header_map.insert(key.as_str().to_string(), v.to_string());
+            header_map.insert(name.to_string(), v.to_string());
         }
     }
 
