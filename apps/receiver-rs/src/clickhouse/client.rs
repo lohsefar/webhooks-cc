@@ -101,6 +101,15 @@ impl ClickHouseClient {
             return Err(format!("ClickHouse query failed ({status}): {text}"));
         }
 
+        // Reject oversized responses early via Content-Length before buffering
+        if let Some(cl) = resp.content_length()
+            && cl > MAX_RESPONSE_SIZE as u64
+        {
+            return Err(format!(
+                "ClickHouse response too large: Content-Length {cl} bytes (max {MAX_RESPONSE_SIZE})"
+            ));
+        }
+
         let body_bytes = resp
             .bytes()
             .await

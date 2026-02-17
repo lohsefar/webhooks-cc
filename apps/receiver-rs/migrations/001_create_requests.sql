@@ -1,3 +1,5 @@
+-- NOTE: The database name here must match the CLICKHOUSE_DATABASE env var
+-- (default: "webhooks"). See apps/receiver-rs/src/config.rs.
 CREATE DATABASE IF NOT EXISTS webhooks;
 
 CREATE TABLE IF NOT EXISTS webhooks.requests (

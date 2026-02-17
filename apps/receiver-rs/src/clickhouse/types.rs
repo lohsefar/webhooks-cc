@@ -138,6 +138,8 @@ impl SearchResultRequest {
         hasher.update(b"\x00");
         hasher.update(row.body.as_bytes());
         hasher.update(b"\x00");
+        hasher.update(row.query_params.as_bytes());
+        hasher.update(b"\x00");
         hasher.update(row.ip.as_bytes());
         let digest = hasher.finalize();
         let hash_suffix = u64::from_le_bytes(digest[..8].try_into().unwrap());

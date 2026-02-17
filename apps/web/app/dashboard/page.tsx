@@ -115,6 +115,14 @@ export default function DashboardPage() {
         if (!resp.ok) return { data: [], ok: false };
         const results: unknown = await resp.json();
         if (!Array.isArray(results)) return { data: [], ok: false };
+        // Minimal shape validation: first element must have expected fields
+        if (results.length > 0) {
+          const first = results[0] as Record<string, unknown>;
+          if (typeof first.id !== "string" || typeof first.method !== "string" || typeof first.receivedAt !== "number") {
+            console.error("ClickHouse response shape mismatch:", first);
+            return { data: [], ok: false };
+          }
+        }
         return { data: results as ClickHouseRequest[], ok: true };
       } catch (err) {
         console.error("ClickHouse search failed:", err);
@@ -160,12 +168,16 @@ export default function DashboardPage() {
       // Mark as prefetched only after success
       prefetchedSlug.current = slugToFetch;
       storeClickHouseResults(results);
-      // Map Convex _ids to ClickHouse details by matching receivedAt + method
+      // Map Convex _ids to ClickHouse details by matching receivedAt + method.
+      // Track consumed matches to prevent the same ClickHouse result
+      // being mapped to multiple Convex IDs.
+      const consumed = new Set<string>();
       for (const summary of summaries) {
         const match = results.find(
-          (r) => r.method === summary.method && Math.abs(r.receivedAt - summary.receivedAt) < 2
+          (r) => !consumed.has(r.id) && r.method === summary.method && Math.abs(r.receivedAt - summary.receivedAt) < 2
         );
         if (match) {
+          consumed.add(match.id);
           clickHouseDetailMap.current.set(summary._id, match);
         }
       }
@@ -465,7 +477,10 @@ export default function DashboardPage() {
       return;
     }
     downloadFile(exportToJson(results), "webhooks-export.json", "application/json");
-  }, [currentEndpoint, methodFilter, debouncedSearch, fetchFromClickHouse]);
+    if (results.length >= 200) {
+      alert(`Exported 200 of ${requestCount} requests. Use search filters to narrow the export.`);
+    }
+  }, [currentEndpoint, methodFilter, debouncedSearch, fetchFromClickHouse, requestCount]);
 
   const handleExportCsv = useCallback(async () => {
     if (!currentEndpoint) return;
@@ -483,7 +498,10 @@ export default function DashboardPage() {
       return;
     }
     downloadFile(exportToCsv(results), "webhooks-export.csv", "text/csv");
-  }, [currentEndpoint, methodFilter, debouncedSearch, fetchFromClickHouse]);
+    if (results.length >= 200) {
+      alert(`Exported 200 of ${requestCount} requests. Use search filters to narrow the export.`);
+    }
+  }, [currentEndpoint, methodFilter, debouncedSearch, fetchFromClickHouse, requestCount]);
 
   if (endpoints === undefined) {
     return <DashboardSkeleton />;
