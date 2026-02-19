@@ -15,6 +15,22 @@ function createClient(opts?: { timeout?: number; webhookUrl?: string }) {
   });
 }
 
+async function hmacSha1Base64(secret: string, payload: string): Promise<string> {
+  const subtle = globalThis.crypto?.subtle;
+  if (!subtle) {
+    throw new Error("crypto.subtle is required for this test");
+  }
+  const key = await subtle.importKey(
+    "raw",
+    new TextEncoder().encode(secret),
+    { name: "HMAC", hash: "SHA-1" },
+    false,
+    ["sign"]
+  );
+  const signature = await subtle.sign("HMAC", key, new TextEncoder().encode(payload));
+  return Buffer.from(new Uint8Array(signature)).toString("base64");
+}
+
 function mockFetch(response: {
   status?: number;
   body?: unknown;
@@ -210,6 +226,37 @@ describe("WebhooksCC", () => {
       expect(opts.headers["x-twilio-signature"]).toMatch(/^[A-Za-z0-9+/=]+$/);
       expect(opts.body).toContain("MessageSid=");
       expect(opts.body).toContain("MessageStatus=delivered");
+    });
+
+    it("signs Twilio string body override using URL + sorted params", async () => {
+      const fetchMock = vi.fn().mockResolvedValue({
+        ok: true,
+        status: 200,
+        statusText: "OK",
+        headers: new Headers(),
+        text: () => Promise.resolve("ok"),
+      });
+      globalThis.fetch = fetchMock;
+
+      const bodyOverride =
+        "MessageStatus=delivered&To=%2B14155559876&From=%2B14155550123&MessageSid=SM123";
+      const client = createClient();
+      await client.endpoints.sendTemplate("abc123", {
+        provider: "twilio",
+        secret: "twilio_auth_token",
+        body: bodyOverride,
+      });
+
+      const [, opts] = fetchMock.mock.calls[0];
+      const endpointUrl = `${WEBHOOK_URL}/w/abc123`;
+      const sorted = Array.from(new URLSearchParams(bodyOverride).entries()).sort(([a], [b]) =>
+        a.localeCompare(b)
+      );
+      const signaturePayload = `${endpointUrl}${sorted.map(([k, v]) => `${k}${v}`).join("")}`;
+      const expectedSignature = await hmacSha1Base64("twilio_auth_token", signaturePayload);
+
+      expect(opts.body).toBe(bodyOverride);
+      expect(opts.headers["x-twilio-signature"]).toBe(expectedSignature);
     });
 
     it("throws on unsupported provider template", async () => {

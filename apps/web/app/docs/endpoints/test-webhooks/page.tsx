@@ -115,6 +115,10 @@ Body:
           Leave <strong className="text-foreground">Event/topic override</strong> empty to use the
           preset default. Use override only when you need to test a specific event name.
         </p>
+        <p className="text-muted-foreground mt-3">
+          Twilio signatures are computed from URL + sorted form params. If you override a Twilio
+          body as a string, provide URL-encoded key/value pairs (not raw JSON).
+        </p>
       </section>
 
       <section className="mb-10">

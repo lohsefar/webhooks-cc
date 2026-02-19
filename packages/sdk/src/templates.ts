@@ -1,5 +1,7 @@
 import type { SendOptions, SendTemplateOptions, TemplateProvider } from "./types";
 
+type TwilioParamEntry = [string, string];
+
 const DEFAULT_TEMPLATE_BY_PROVIDER = {
   stripe: "payment_intent.succeeded",
   github: "push",
@@ -69,7 +71,7 @@ function ensureTemplate(provider: TemplateProvider, template?: string): string {
   const supported = PROVIDER_TEMPLATES[provider];
   if (!supported.some((item) => item === resolved)) {
     throw new Error(
-      `Unsupported template \"${resolved}\" for provider \"${provider}\". Supported templates: ${supported.join(", ")}`
+      `Unsupported template "${resolved}" for provider "${provider}". Supported templates: ${supported.join(", ")}`
     );
   }
   return resolved;
@@ -116,7 +118,7 @@ function buildTemplatePayload(
   body: string;
   contentType: string;
   headers: Record<string, string>;
-  twilioParams?: Record<string, string>;
+  twilioParams?: TwilioParamEntry[];
 } {
   const nowSec = Math.floor(now.getTime() / 1000);
   const nowIso = now.toISOString();
@@ -507,12 +509,14 @@ function buildTemplatePayload(
   let twilioParams: Record<string, string>;
   if (bodyOverride !== undefined) {
     if (typeof bodyOverride === "string") {
+      const entries = Array.from(new URLSearchParams(bodyOverride).entries());
       return {
         body: bodyOverride,
         contentType: "application/x-www-form-urlencoded",
         headers: {
           "user-agent": "TwilioProxy/1.1",
         },
+        twilioParams: entries,
       };
     }
     const overrideParams = asStringRecord(bodyOverride);
@@ -530,7 +534,7 @@ function buildTemplatePayload(
     headers: {
       "user-agent": "TwilioProxy/1.1",
     },
-    twilioParams,
+    twilioParams: Object.entries(twilioParams),
   };
 }
 
@@ -572,11 +576,13 @@ function toBase64(bytes: Uint8Array): string {
   return btoa(binary);
 }
 
-function buildTwilioSignaturePayload(endpointUrl: string, params: Record<string, string>): string {
-  const sortedKeys = Object.keys(params).sort((a, b) => a.localeCompare(b));
+function buildTwilioSignaturePayload(endpointUrl: string, params: TwilioParamEntry[]): string {
+  const sortedParams = params
+    .map(([key, value], index) => ({ key, value, index }))
+    .sort((a, b) => a.key.localeCompare(b.key) || a.index - b.index);
   let payload = endpointUrl;
-  for (const key of sortedKeys) {
-    payload += `${key}${params[key]}`;
+  for (const { key, value } of sortedParams) {
+    payload += `${key}${value}`;
   }
   return payload;
 }

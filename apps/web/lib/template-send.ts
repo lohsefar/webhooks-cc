@@ -1,5 +1,7 @@
 export type TemplateProvider = "stripe" | "github" | "shopify" | "twilio";
 
+type TwilioParamEntry = [string, string];
+
 export interface TemplatePreset {
   id: string;
   label: string;
@@ -150,8 +152,8 @@ function randomSid(prefix: "SM" | "AC" | "CA"): string {
 }
 
 function randomUuid(): string {
-  if (typeof crypto.randomUUID === "function") {
-    return crypto.randomUUID();
+  if (typeof globalThis.crypto?.randomUUID === "function") {
+    return globalThis.crypto.randomUUID();
   }
   return `${randomHex(8)}-${randomHex(4)}-${randomHex(4)}-${randomHex(4)}-${randomHex(12)}`;
 }
@@ -177,9 +179,14 @@ function githubSender() {
 
 function findPreset(provider: TemplateProvider, template?: string): TemplatePreset {
   const presets = TEMPLATE_PRESETS[provider];
-  const first = presets[0];
-  if (!template) return first;
-  return presets.find((preset) => preset.id === template) ?? first;
+  if (!template) return presets[0];
+  const selected = presets.find((preset) => preset.id === template);
+  if (selected) return selected;
+  throw new Error(
+    `Unsupported template "${template}" for provider "${provider}". Supported templates: ${presets
+      .map((preset) => preset.id)
+      .join(", ")}`
+  );
 }
 
 function formEncode(params: Record<string, string>): string {
@@ -216,7 +223,7 @@ function buildPayload(
   body: string;
   contentType: string;
   headers: Record<string, string>;
-  twilioParams?: Record<string, string>;
+  twilioParams?: TwilioParamEntry[];
 } {
   const nowSec = Math.floor(now.getTime() / 1000);
   const nowIso = now.toISOString();
@@ -606,12 +613,14 @@ function buildPayload(
   let twilioParams: Record<string, string>;
   if (bodyOverride !== undefined) {
     if (typeof bodyOverride === "string") {
+      const entries = Array.from(new URLSearchParams(bodyOverride).entries());
       return {
         body: bodyOverride,
         contentType: "application/x-www-form-urlencoded",
         headers: {
           "user-agent": "TwilioProxy/1.1",
         },
+        twilioParams: entries,
       };
     }
     const overrideParams = asStringRecord(bodyOverride);
@@ -629,7 +638,7 @@ function buildPayload(
     headers: {
       "user-agent": "TwilioProxy/1.1",
     },
-    twilioParams,
+    twilioParams: Object.entries(twilioParams),
   };
 }
 
@@ -638,14 +647,21 @@ async function hmacSign(
   secret: string,
   payload: string
 ): Promise<Uint8Array> {
-  const key = await crypto.subtle.importKey(
+  if (!globalThis.crypto?.subtle) {
+    throw new Error("crypto.subtle is required for template signature generation");
+  }
+  const key = await globalThis.crypto.subtle.importKey(
     "raw",
     new TextEncoder().encode(secret),
     { name: "HMAC", hash: algorithm },
     false,
     ["sign"]
   );
-  const signature = await crypto.subtle.sign("HMAC", key, new TextEncoder().encode(payload));
+  const signature = await globalThis.crypto.subtle.sign(
+    "HMAC",
+    key,
+    new TextEncoder().encode(payload)
+  );
   return new Uint8Array(signature);
 }
 
@@ -656,16 +672,21 @@ function toHex(bytes: Uint8Array): string {
 }
 
 function toBase64(bytes: Uint8Array): string {
+  if (typeof btoa !== "function") {
+    return Buffer.from(bytes).toString("base64");
+  }
   let binary = "";
   for (const byte of bytes) binary += String.fromCharCode(byte);
   return btoa(binary);
 }
 
-function buildTwilioSignaturePayload(endpointUrl: string, params: Record<string, string>): string {
-  const sortedKeys = Object.keys(params).sort((a, b) => a.localeCompare(b));
+function buildTwilioSignaturePayload(endpointUrl: string, params: TwilioParamEntry[]): string {
+  const sortedParams = params
+    .map(([key, value], index) => ({ key, value, index }))
+    .sort((a, b) => a.key.localeCompare(b.key) || a.index - b.index);
   let payload = endpointUrl;
-  for (const key of sortedKeys) {
-    payload += `${key}${params[key]}`;
+  for (const { key, value } of sortedParams) {
+    payload += `${key}${value}`;
   }
   return payload;
 }

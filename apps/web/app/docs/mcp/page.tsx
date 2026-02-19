@@ -100,6 +100,11 @@ export default function McpPage() {
         <p className="text-muted-foreground mb-4">
           The MCP server exposes 11 tools your AI agent can call:
         </p>
+        <p className="text-muted-foreground mb-4">
+          For provider templates in <code className="font-mono">send_webhook</code>,{" "}
+          <strong className="text-foreground">secret is required</strong>. The MCP server does not
+          inject a default secret.
+        </p>
         <div className="space-y-4">
           {TOOLS.map((tool) => (
             <div key={tool.name} className="neo-code text-sm p-3">

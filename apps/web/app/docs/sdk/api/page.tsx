@@ -95,7 +95,12 @@ const METHODS: { section: string; methods: MethodDef[] }[] = [
           },
           { name: "event", type: "string?", description: "Provider event/topic override" },
           { name: "headers", type: "Record?", description: "Additional headers" },
-          { name: "body", type: "unknown?", description: "Template body override" },
+          {
+            name: "body",
+            type: "unknown?",
+            description:
+              "Template body override. For Twilio string overrides, provide URL-encoded key/value pairs.",
+          },
         ],
         returns: "Raw fetch Response from the receiver",
       },

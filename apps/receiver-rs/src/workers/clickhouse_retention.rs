@@ -123,7 +123,7 @@ async fn run_free_retention_sweep(
 
         cursor = page.next_cursor;
         if cursor.is_none() {
-            break;
+            return Err("convex users-by-plan returned done=false without nextCursor".to_string());
         }
     }
 
@@ -139,7 +139,10 @@ async fn run_free_retention_sweep(
 
 #[cfg(test)]
 mod tests {
-    use super::{DELETE_CHUNK_SIZE, PlanUserSource, USER_PAGE_SIZE, run_free_retention_sweep};
+    use super::{
+        DELETE_CHUNK_SIZE, PlanUserSource, RequestRetentionDeleter, USER_PAGE_SIZE,
+        run_free_retention_sweep,
+    };
     use crate::clickhouse::client::ClickHouseClient;
     use crate::convex::types::UsersByPlanResponse;
     use axum::extract::{Query, State};
@@ -151,9 +154,11 @@ mod tests {
     use std::sync::{Arc, Mutex};
     use tokio::net::TcpListener;
 
+    type UsersByPlanCall = (String, Option<String>, u32);
+
     #[derive(Default, Clone)]
     struct ConvexRequestLog {
-        calls: Arc<Mutex<Vec<(String, Option<String>, u32)>>>,
+        calls: Arc<Mutex<Vec<UsersByPlanCall>>>,
     }
 
     #[derive(Default, Clone)]
@@ -358,5 +363,47 @@ mod tests {
         assert_eq!(count_users_in_delete_sql(&sql[0]), DELETE_CHUNK_SIZE);
         assert_eq!(count_users_in_delete_sql(&sql[1]), 5);
         assert_eq!(count_users_in_delete_sql(&sql[2]), 3);
+    }
+
+    struct BrokenPaginationSource;
+
+    impl PlanUserSource for BrokenPaginationSource {
+        async fn list_users_by_plan_page(
+            &self,
+            _plan: &str,
+            _cursor: Option<&str>,
+            _limit: u32,
+        ) -> Result<UsersByPlanResponse, String> {
+            Ok(UsersByPlanResponse {
+                error: String::new(),
+                user_ids: vec!["user_1".to_string()],
+                next_cursor: None,
+                done: false,
+            })
+        }
+    }
+
+    struct NoopDeleter;
+
+    impl RequestRetentionDeleter for NoopDeleter {
+        async fn delete_old_requests(
+            &self,
+            _user_ids: &[String],
+            _retention_days: u32,
+        ) -> Result<(), String> {
+            Ok(())
+        }
+    }
+
+    #[tokio::test]
+    async fn sweep_fails_on_broken_pagination_response() {
+        let source = BrokenPaginationSource;
+        let deleter = NoopDeleter;
+
+        let result = run_free_retention_sweep(&source, &deleter).await;
+        assert!(result.is_err());
+        let err = result.err().unwrap_or_default();
+        assert!(err.contains("done=false"));
+        assert!(err.contains("nextCursor"));
     }
 }

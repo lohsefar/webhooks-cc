@@ -115,13 +115,21 @@ export function SendWebhookDialog({ slug }: SendWebhookDialogProps) {
       : "/";
     const url = `${endpointUrl}${normalizedPath === "/" ? "" : normalizedPath}`;
 
+    let customHeaders: Record<string, string>;
     try {
-      const customHeaders = parseHeaders(headersInput);
-      let requestMethod: string = method;
-      let requestHeaders: Record<string, string> = customHeaders;
-      let requestBody: string | undefined = method === "GET" ? undefined : body || undefined;
+      customHeaders = parseHeaders(headersInput);
+    } catch (error) {
+      setStatus("error");
+      setStatusText(error instanceof Error ? error.message : "Headers must be a valid JSON object");
+      return;
+    }
 
-      if (isTemplateMode) {
+    let requestMethod: string = method;
+    let requestHeaders: Record<string, string> = customHeaders;
+    let requestBody: string | undefined = method === "GET" ? undefined : body || undefined;
+
+    if (isTemplateMode) {
+      try {
         const template = await buildTemplateRequest({
           provider: mode,
           template: templates[mode],
@@ -132,8 +140,14 @@ export function SendWebhookDialog({ slug }: SendWebhookDialogProps) {
         requestMethod = template.method;
         requestHeaders = { ...template.headers, ...customHeaders };
         requestBody = template.body;
+      } catch (error) {
+        setStatus("error");
+        setStatusText(error instanceof Error ? error.message : "Failed to build template request");
+        return;
       }
+    }
 
+    try {
       const response = await fetch(url, {
         method: requestMethod,
         headers: requestHeaders,

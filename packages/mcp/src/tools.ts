@@ -120,21 +120,28 @@ export function registerTools(server: McpServer, client: WebhooksCC): void {
       secret: z
         .string()
         .optional()
-        .describe("Shared secret for provider signature generation when provider is set"),
+        .describe("Shared secret for provider signature generation (required when provider is set)"),
     },
     withErrorHandling(
       async ({ slug, method, headers, body, provider, template, event, secret }) => {
-        const response = provider
-          ? await client.endpoints.sendTemplate(slug, {
-              provider,
-              template,
-              event,
-              secret: secret ?? "mock_webhook_secret",
-              method,
-              headers,
-              body,
-            })
-          : await client.endpoints.send(slug, { method, headers, body });
+        let response: Response;
+        if (provider) {
+          const templateSecret = secret?.trim();
+          if (!templateSecret) {
+            throw new Error("send_webhook with provider templates requires a non-empty secret");
+          }
+          response = await client.endpoints.sendTemplate(slug, {
+            provider,
+            template,
+            event,
+            secret: templateSecret,
+            method,
+            headers,
+            body,
+          });
+        } else {
+          response = await client.endpoints.send(slug, { method, headers, body });
+        }
         const responseBody = await readBodyTruncated(response);
         return textContent(
           JSON.stringify(
