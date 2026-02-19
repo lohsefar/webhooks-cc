@@ -1,5 +1,6 @@
 import { createPageMetadata } from "@/lib/seo";
 import { JsonLd, howToSchema } from "@/lib/schemas";
+import Link from "next/link";
 
 export const metadata = createPageMetadata({
   title: "SDK Testing Docs",
@@ -133,6 +134,39 @@ const req = await client.requests.waitFor(endpoint.slug, {
             <code className="font-mono font-bold">afterEach</code>
           </li>
           <li>The free plan supports 200 requests/day — enough for most test suites</li>
+        </ul>
+      </section>
+
+      <section className="border-t-2 border-foreground pt-8">
+        <h2 className="text-xl font-bold mb-4">Framework examples</h2>
+        <ul className="space-y-2">
+          <li>
+            <Link
+              href="/docs/sdk/testing/stripe-vitest"
+              className="text-primary hover:underline font-bold"
+            >
+              Stripe + Vitest
+            </Link>{" "}
+            <span className="text-muted-foreground">- payment webhook assertions</span>
+          </li>
+          <li>
+            <Link
+              href="/docs/sdk/testing/github-jest"
+              className="text-primary hover:underline font-bold"
+            >
+              GitHub + Jest
+            </Link>{" "}
+            <span className="text-muted-foreground">- push event verification</span>
+          </li>
+          <li>
+            <Link
+              href="/docs/sdk/testing/playwright-e2e"
+              className="text-primary hover:underline font-bold"
+            >
+              Playwright E2E
+            </Link>{" "}
+            <span className="text-muted-foreground">- browser flow + webhook assertions</span>
+          </li>
         </ul>
       </section>
     </article>

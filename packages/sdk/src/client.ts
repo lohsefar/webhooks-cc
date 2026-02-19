@@ -21,6 +21,7 @@ import type {
   CreateEndpointOptions,
   UpdateEndpointOptions,
   SendOptions,
+  SendTemplateOptions,
   ListRequestsOptions,
   WaitForOptions,
   SubscribeOptions,
@@ -35,6 +36,7 @@ import {
 } from "./errors";
 import { parseDuration } from "./utils";
 import { parseSSE } from "./sse";
+import { buildTemplateSendOptions } from "./templates";
 
 const DEFAULT_BASE_URL = "https://webhooks.cc";
 const DEFAULT_WEBHOOK_URL = "https://go.webhooks.cc";
@@ -242,6 +244,16 @@ export class WebhooksCC {
           description: "Send a test webhook to endpoint",
           params: { slug: "string", method: "string?", headers: "object?", body: "unknown?" },
         },
+        sendTemplate: {
+          description: "Send a provider template webhook with signed headers",
+          params: {
+            slug: "string",
+            provider: '"stripe"|"github"|"shopify"|"twilio"',
+            template: "string?",
+            secret: "string",
+            event: "string?",
+          },
+        },
       },
       requests: {
         list: {
@@ -329,6 +341,17 @@ export class WebhooksCC {
           body !== undefined ? (typeof body === "string" ? body : JSON.stringify(body)) : undefined,
         signal: AbortSignal.timeout(this.timeout),
       });
+    },
+
+    sendTemplate: async (slug: string, options: SendTemplateOptions): Promise<Response> => {
+      validatePathSegment(slug, "slug");
+      if (!options.secret || typeof options.secret !== "string") {
+        throw new Error("sendTemplate requires a non-empty secret");
+      }
+
+      const endpointUrl = `${this.webhookUrl}/w/${slug}`;
+      const sendOptions = await buildTemplateSendOptions(endpointUrl, options);
+      return this.endpoints.send(slug, sendOptions);
     },
   };
 

@@ -270,7 +270,6 @@ export const processAccountDeletion = internalMutation({
  * Called via scheduler when a free user's 24-hour period expires.
  * Clears periodEnd and requestsUsed to mark as "ready for new period" -
  * next request will trigger a new period (lazy activation).
- * Also schedules cleanup of all requests from the expired period.
  */
 export const resetFreeUserPeriod = internalMutation({
   args: { userId: v.id("users") },
@@ -283,11 +282,6 @@ export const resetFreeUserPeriod = internalMutation({
     await ctx.db.patch(userId, {
       periodEnd: undefined,
       requestsUsed: 0,
-    });
-
-    // Schedule request cleanup for this user
-    await ctx.scheduler.runAfter(0, internal.requests.cleanupUserRequests, {
-      userId,
     });
   },
 });

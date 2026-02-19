@@ -105,18 +105,46 @@ export function registerTools(server: McpServer, client: WebhooksCC): void {
         .describe("HTTP method (default: POST)"),
       headers: z.record(z.string()).optional().describe("HTTP headers to include"),
       body: z.unknown().optional().describe("Request body (will be JSON-serialized)"),
+      provider: z
+        .enum(["stripe", "github", "shopify", "twilio"])
+        .optional()
+        .describe("Optional provider template to send with signed headers"),
+      template: z
+        .string()
+        .optional()
+        .describe("Optional provider-specific template preset (for example: pull_request.opened)"),
+      event: z
+        .string()
+        .optional()
+        .describe("Optional provider event/topic name when provider template is used"),
+      secret: z
+        .string()
+        .optional()
+        .describe("Shared secret for provider signature generation when provider is set"),
     },
-    withErrorHandling(async ({ slug, method, headers, body }) => {
-      const response = await client.endpoints.send(slug, { method, headers, body });
-      const responseBody = await readBodyTruncated(response);
-      return textContent(
-        JSON.stringify(
-          { status: response.status, statusText: response.statusText, body: responseBody },
-          null,
-          2
-        )
-      );
-    })
+    withErrorHandling(
+      async ({ slug, method, headers, body, provider, template, event, secret }) => {
+        const response = provider
+          ? await client.endpoints.sendTemplate(slug, {
+              provider,
+              template,
+              event,
+              secret: secret ?? "mock_webhook_secret",
+              method,
+              headers,
+              body,
+            })
+          : await client.endpoints.send(slug, { method, headers, body });
+        const responseBody = await readBodyTruncated(response);
+        return textContent(
+          JSON.stringify(
+            { status: response.status, statusText: response.statusText, body: responseBody },
+            null,
+            2
+          )
+        );
+      }
+    )
   );
 
   server.tool(

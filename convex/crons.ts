@@ -23,6 +23,14 @@ crons.daily(
   internal.apiKeys.cleanupExpired
 );
 
+// Clean up old requests for free users (7-day retention)
+crons.daily(
+  "cleanup old free requests",
+  { hourUTC: 1, minuteUTC: 30 },
+  internal.requests.cleanupOldFreeRequests,
+  { cursor: undefined }
+);
+
 // Clean up old requests for pro users (30-day retention)
 crons.daily(
   "cleanup old requests",

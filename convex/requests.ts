@@ -3,7 +3,7 @@ import { v } from "convex/values";
 import { query, internalMutation, internalQuery } from "./_generated/server";
 import { internal } from "./_generated/api";
 import { EPHEMERAL_RATE_LIMIT } from "./rateLimiter";
-import { FREE_PERIOD_MS, PRO_REQUEST_RETENTION_MS } from "./config";
+import { FREE_PERIOD_MS, FREE_REQUEST_RETENTION_MS, PRO_REQUEST_RETENTION_MS } from "./config";
 
 // Internal mutation - only called from the HTTP action in http.ts
 export const capture = internalMutation({
@@ -749,6 +749,73 @@ export const cleanupUserRequests = internalMutation({
   },
 });
 
+// Delete requests older than 7 days for free users.
+// Runs daily to enforce free-tier retention.
+// Uses pagination to process all free users across multiple cron invocations.
+// For users with >20 endpoints, schedules cleanupOldRequestsForUser for remaining.
+export const cleanupOldFreeRequests = internalMutation({
+  args: {
+    cursor: v.optional(v.string()),
+  },
+  handler: async (ctx, { cursor }) => {
+    const cutoff = Date.now() - FREE_REQUEST_RETENTION_MS;
+
+    // Use index for efficient lookup and paginate through users
+    const result = await ctx.db
+      .query("users")
+      .withIndex("by_plan", (q) => q.eq("plan", "free"))
+      .paginate({ cursor: cursor ?? null, numItems: 5 });
+
+    let totalDeleted = 0;
+    for (const user of result.page) {
+      // Paginate endpoints to detect overflow beyond first page
+      const endpointResult = await ctx.db
+        .query("endpoints")
+        .withIndex("by_user", (q) => q.eq("userId", user._id))
+        .paginate({ cursor: null, numItems: 20 });
+
+      for (const endpoint of endpointResult.page) {
+        const oldRequests = await ctx.db
+          .query("requests")
+          .withIndex("by_endpoint_time", (q) =>
+            q.eq("endpointId", endpoint._id).lt("receivedAt", cutoff)
+          )
+          .take(CLEANUP_BATCH_SIZE);
+
+        for (const req of oldRequests) {
+          await ctx.db.delete(req._id);
+          totalDeleted++;
+        }
+
+        if (oldRequests.length > 0) {
+          await ctx.scheduler.runAfter(0, internal.requests.decrementRequestCount, {
+            endpointId: endpoint._id,
+            count: oldRequests.length,
+          });
+        }
+      }
+
+      // If user has more endpoints, schedule dedicated cleanup for remaining
+      if (!endpointResult.isDone) {
+        await ctx.scheduler.runAfter(0, internal.requests.cleanupOldRequestsForUser, {
+          userId: user._id,
+          endpointCursor: endpointResult.continueCursor,
+          cutoffMs: cutoff,
+        });
+      }
+    }
+
+    // Schedule continuation if there are more users
+    if (!result.isDone) {
+      await ctx.scheduler.runAfter(100, internal.requests.cleanupOldFreeRequests, {
+        cursor: result.continueCursor,
+      });
+    }
+
+    return { deleted: totalDeleted, done: result.isDone };
+  },
+});
+
 // Delete requests older than 30 days for pro users.
 // Runs daily to enforce retention policy.
 // Uses pagination to process all pro users across multiple cron invocations.
@@ -802,6 +869,7 @@ export const cleanupOldRequests = internalMutation({
         await ctx.scheduler.runAfter(0, internal.requests.cleanupOldRequestsForUser, {
           userId: user._id,
           endpointCursor: endpointResult.continueCursor,
+          cutoffMs: cutoff,
         });
       }
     }
@@ -818,16 +886,17 @@ export const cleanupOldRequests = internalMutation({
 });
 
 // Clean up old requests for a single user's endpoints beyond the first page.
-// Scheduled by cleanupOldRequests when a user has more than 20 endpoints.
+// Scheduled by cleanupOldRequests/cleanupOldFreeRequests when a user has >20 endpoints.
 // Tracks whether any endpoint had remaining stale requests and does a full re-pass.
 export const cleanupOldRequestsForUser = internalMutation({
   args: {
     userId: v.id("users"),
     endpointCursor: v.optional(v.string()),
     hasRemainingRequests: v.optional(v.boolean()),
+    cutoffMs: v.optional(v.number()),
   },
-  handler: async (ctx, { userId, endpointCursor, hasRemainingRequests = false }) => {
-    const cutoff = Date.now() - PRO_REQUEST_RETENTION_MS;
+  handler: async (ctx, { userId, endpointCursor, hasRemainingRequests = false, cutoffMs }) => {
+    const cutoff = cutoffMs ?? Date.now() - PRO_REQUEST_RETENTION_MS;
     const ENDPOINT_PAGE_SIZE = 20;
 
     const endpointResult = await ctx.db
@@ -869,6 +938,7 @@ export const cleanupOldRequestsForUser = internalMutation({
         userId,
         endpointCursor: endpointResult.continueCursor,
         hasRemainingRequests: needsMoreRequests,
+        cutoffMs: cutoff,
       });
       return { deleted, done: false };
     }
@@ -877,6 +947,7 @@ export const cleanupOldRequestsForUser = internalMutation({
     if (needsMoreRequests) {
       await ctx.scheduler.runAfter(100, internal.requests.cleanupOldRequestsForUser, {
         userId,
+        cutoffMs: cutoff,
       });
       return { deleted, done: false };
     }

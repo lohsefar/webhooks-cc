@@ -27,8 +27,6 @@ describe("resetFreeUserPeriod", () => {
     });
 
     await t.mutation(internal.users.resetFreeUserPeriod, { userId });
-    // Wait for scheduled cleanupUserRequests to finish (avoids unhandled rejection)
-    await t.finishInProgressScheduledFunctions();
 
     const user = await t.run(async (ctx) => ctx.db.get(userId));
     expect(user!.periodEnd).toBeUndefined();
@@ -78,7 +76,7 @@ describe("resetFreeUserPeriod", () => {
     await t.mutation(internal.users.resetFreeUserPeriod, { userId });
   });
 
-  test("schedules cleanup of user requests via cleanupUserRequests", async () => {
+  test("does not delete user requests on period reset", async () => {
     const now = Date.now();
     const userId = await t.run(async (ctx) => {
       return await ctx.db.insert("users", {
@@ -119,12 +117,11 @@ describe("resetFreeUserPeriod", () => {
     });
     expect(before).toHaveLength(1);
 
-    // Call cleanupUserRequests directly (resetFreeUserPeriod schedules this via runAfter(0))
-    await t.mutation(internal.requests.cleanupUserRequests, { userId });
+    await t.mutation(internal.users.resetFreeUserPeriod, { userId });
 
     const after = await t.run(async (ctx) => {
       return await ctx.db.query("requests").collect();
     });
-    expect(after).toHaveLength(0);
+    expect(after).toHaveLength(1);
   });
 });

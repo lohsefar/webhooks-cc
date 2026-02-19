@@ -32,6 +32,8 @@ export type {
   CreateEndpointOptions,
   UpdateEndpointOptions,
   SendOptions,
+  SendTemplateOptions,
+  TemplateProvider,
   ListRequestsOptions,
   WaitForOptions,
   SubscribeOptions,

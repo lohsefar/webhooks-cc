@@ -71,6 +71,34 @@ const METHODS: { section: string; methods: MethodDef[] }[] = [
         ],
         returns: "Raw fetch Response from the receiver",
       },
+      {
+        name: "client.endpoints.sendTemplate",
+        description:
+          "Send a provider template webhook (Stripe, GitHub, Shopify, Twilio) with generated signature headers.",
+        signature: "sendTemplate(slug: string, options: SendTemplateOptions): Promise<Response>",
+        params: [
+          { name: "slug", type: "string", description: "Endpoint slug" },
+          {
+            name: "provider",
+            type: '"stripe" | "github" | "shopify" | "twilio"',
+            description: "Provider template to generate",
+          },
+          {
+            name: "template",
+            type: "string?",
+            description: "Provider-specific template preset (for example: pull_request.opened)",
+          },
+          {
+            name: "secret",
+            type: "string",
+            description: "Shared secret used for signature generation",
+          },
+          { name: "event", type: "string?", description: "Provider event/topic override" },
+          { name: "headers", type: "Record?", description: "Additional headers" },
+          { name: "body", type: "unknown?", description: "Template body override" },
+        ],
+        returns: "Raw fetch Response from the receiver",
+      },
     ],
   },
   {
@@ -167,7 +195,7 @@ const METHODS: { section: string; methods: MethodDef[] }[] = [
         description:
           "Returns a static description of all SDK operations and their parameters. No API call is made. Useful for AI agents and tool discovery.",
         signature: "describe(): SDKDescription",
-        returns: "Object with version, endpoints (6 operations), and requests (5 operations)",
+        returns: "Object with version, endpoints (7 operations), and requests (5 operations)",
       },
     ],
   },

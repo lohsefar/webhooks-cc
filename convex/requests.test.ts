@@ -3,7 +3,13 @@ import { describe, test, expect, beforeEach } from "vitest";
 import { modules } from "./test.setup";
 import schema from "./schema";
 import { api, internal } from "./_generated/api";
-import { FREE_REQUEST_LIMIT, PRO_REQUEST_LIMIT, BILLING_PERIOD_MS, FREE_PERIOD_MS } from "./config";
+import {
+  FREE_REQUEST_LIMIT,
+  PRO_REQUEST_LIMIT,
+  BILLING_PERIOD_MS,
+  FREE_PERIOD_MS,
+  FREE_REQUEST_RETENTION_MS,
+} from "./config";
 
 // Helper to create a free user
 async function createFreeUser(
@@ -815,6 +821,88 @@ describe("listSummaries", () => {
     });
 
     expect(summaries).toHaveLength(3);
+  });
+});
+
+describe("retention cleanup", () => {
+  let t: ReturnType<typeof convexTest>;
+
+  beforeEach(() => {
+    t = convexTest(schema, modules);
+  });
+
+  test("cleanupOldFreeRequests deletes free-user requests older than 7 days", async () => {
+    const userId = await createFreeUser(t);
+    const endpointId = await createEndpoint(t, { slug: "free-retention", userId });
+
+    const now = Date.now();
+    const oldTs = now - FREE_REQUEST_RETENTION_MS - 1000;
+    const freshTs = now - 1000;
+
+    await t.run(async (ctx) => {
+      await ctx.db.insert("requests", {
+        endpointId,
+        method: "POST",
+        path: "/old",
+        headers: {},
+        queryParams: {},
+        ip: "1.2.3.4",
+        size: 0,
+        receivedAt: oldTs,
+      });
+      await ctx.db.insert("requests", {
+        endpointId,
+        method: "POST",
+        path: "/fresh",
+        headers: {},
+        queryParams: {},
+        ip: "1.2.3.4",
+        size: 0,
+        receivedAt: freshTs,
+      });
+    });
+
+    await t.mutation(internal.requests.cleanupOldFreeRequests, {});
+
+    const remaining = await t.run(async (ctx) =>
+      ctx.db
+        .query("requests")
+        .withIndex("by_endpoint_time", (q) => q.eq("endpointId", endpointId))
+        .collect()
+    );
+
+    expect(remaining).toHaveLength(1);
+    expect(remaining[0].path).toBe("/fresh");
+  });
+
+  test("cleanupOldFreeRequests does not delete pro-user requests", async () => {
+    const userId = await createProUser(t);
+    const endpointId = await createEndpoint(t, { slug: "pro-retention", userId });
+    const oldTs = Date.now() - FREE_REQUEST_RETENTION_MS - 1000;
+
+    await t.run(async (ctx) => {
+      await ctx.db.insert("requests", {
+        endpointId,
+        method: "POST",
+        path: "/pro-old",
+        headers: {},
+        queryParams: {},
+        ip: "1.2.3.4",
+        size: 0,
+        receivedAt: oldTs,
+      });
+    });
+
+    await t.mutation(internal.requests.cleanupOldFreeRequests, {});
+
+    const remaining = await t.run(async (ctx) =>
+      ctx.db
+        .query("requests")
+        .withIndex("by_endpoint_time", (q) => q.eq("endpointId", endpointId))
+        .collect()
+    );
+    expect(remaining).toHaveLength(1);
+    expect(remaining[0].path).toBe("/pro-old");
   });
 });
 

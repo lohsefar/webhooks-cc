@@ -12,12 +12,14 @@ interface AppHeaderProps {
   showEndpointSwitcher?: boolean;
   showNewEndpoint?: boolean;
   showBackToDashboard?: boolean;
+  showBlogLink?: boolean;
 }
 
 export function AppHeader({
   showEndpointSwitcher = false,
   showNewEndpoint = false,
   showBackToDashboard = false,
+  showBlogLink = true,
 }: AppHeaderProps) {
   const { signOut } = useAuthActions();
 
@@ -54,6 +56,11 @@ export function AppHeader({
           >
             Install
           </Link>
+          {showBlogLink && (
+            <Link href="/blog" className="text-sm text-muted-foreground hover:text-foreground">
+              Blog
+            </Link>
+          )}
           <ThemeToggle />
           <Link href="/account" className="text-sm text-muted-foreground hover:text-foreground">
             Account

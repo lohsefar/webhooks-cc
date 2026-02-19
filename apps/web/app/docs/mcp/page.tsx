@@ -48,8 +48,9 @@ const TOOLS = [
   },
   {
     name: "send_webhook",
-    description: "Send a test webhook to an endpoint",
-    example: '"Send a POST with {"event":"test"} to stripe-test"',
+    description: "Send a test webhook (manual or provider template) to an endpoint",
+    example:
+      '"Send a Stripe checkout.session.completed template to stripe-test using secret whsec_test"',
   },
   {
     name: "wait_for_request",
@@ -125,12 +126,12 @@ Agent: Created endpoint "stripe-test" at https://go.webhooks.cc/w/abc123
 You: "Set it to return 201 with {"received": true}"
 Agent: Updated mock response for stripe-test
 
-You: "Send a test POST with a checkout.session.completed event"
-Agent: Sent POST to stripe-test with event payload
+You: "Send a Stripe checkout.session.completed template webhook to stripe-test"
+Agent: Sent signed Stripe template to stripe-test
 
 You: "Show me what was captured"
 Agent: 1 request captured:
-  POST /w/abc123 — {"event": "checkout.session.completed", ...}
+  POST /w/abc123 — stripe-signature + checkout.session.completed payload
 
 You: "Replay that to my local server"
 Agent: Replayed to http://localhost:3000/webhooks — got 200 OK`}</pre>

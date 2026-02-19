@@ -28,6 +28,7 @@ const NAV_SECTIONS: NavSection[] = [
     title: "Dashboard",
     items: [
       { title: "Endpoints", href: "/docs/endpoints" },
+      { title: "Test Webhooks", href: "/docs/endpoints/test-webhooks" },
       { title: "Requests", href: "/docs/requests" },
       { title: "Mock Responses", href: "/docs/mock-responses" },
     ],
@@ -46,6 +47,9 @@ const NAV_SECTIONS: NavSection[] = [
       { title: "Overview", href: "/docs/sdk" },
       { title: "API Reference", href: "/docs/sdk/api" },
       { title: "Testing", href: "/docs/sdk/testing" },
+      { title: "Stripe + Vitest", href: "/docs/sdk/testing/stripe-vitest" },
+      { title: "GitHub + Jest", href: "/docs/sdk/testing/github-jest" },
+      { title: "Playwright E2E", href: "/docs/sdk/testing/playwright-e2e" },
     ],
   },
   {
