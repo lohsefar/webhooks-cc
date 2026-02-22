@@ -7,7 +7,7 @@ export const metadata = createPageMetadata({
   path: "/docs/endpoints/test-webhooks",
 });
 
-const PROVIDER_ROWS = [
+const providerRows = [
   {
     provider: "Stripe",
     presets: "payment_intent.succeeded, checkout.session.completed, invoice.paid",
@@ -80,14 +80,22 @@ Body:
           <table className="w-full">
             <thead>
               <tr className="border-b border-foreground/20">
-                <th className="text-left py-2 pr-4 font-bold">Provider</th>
-                <th className="text-left py-2 pr-4 font-bold">Presets</th>
-                <th className="text-left py-2 pr-4 font-bold">Content-Type</th>
-                <th className="text-left py-2 font-bold">Signature header</th>
+                <th scope="col" className="text-left py-2 pr-4 font-bold">
+                  Provider
+                </th>
+                <th scope="col" className="text-left py-2 pr-4 font-bold">
+                  Presets
+                </th>
+                <th scope="col" className="text-left py-2 pr-4 font-bold">
+                  Content-Type
+                </th>
+                <th scope="col" className="text-left py-2 font-bold">
+                  Signature header
+                </th>
               </tr>
             </thead>
             <tbody>
-              {PROVIDER_ROWS.map((row) => (
+              {providerRows.map((row) => (
                 <tr key={row.provider} className="border-b border-foreground/20 last:border-b-0">
                   <td className="py-2 pr-4 font-bold">{row.provider}</td>
                   <td className="py-2 pr-4">{row.presets}</td>

@@ -186,6 +186,7 @@ export function RequestDetail({ request }: RequestDetailProps) {
               </button>
             )}
             <pre className="neo-code syntax-highlight overflow-x-auto text-sm whitespace-pre-wrap break-words">
+              {/* Safe: highlightBody escapes plain/form/text/binary output and Prism.highlight encodes token text for json/xml. */}
               <code
                 className={`language-${highlightLanguage}`}
                 dangerouslySetInnerHTML={{ __html: highlightedBody }}

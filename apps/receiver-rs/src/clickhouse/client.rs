@@ -47,7 +47,10 @@ impl ClickHouseClient {
             return Ok(());
         }
 
-        let query = format!("INSERT INTO {}.requests FORMAT JSONEachRow", self.database);
+        let query = format!(
+            "INSERT INTO `{}`.`requests` FORMAT JSONEachRow",
+            escape_clickhouse_identifier(&self.database)
+        );
 
         // Build JSONEachRow body: one JSON object per line
         let mut body = String::with_capacity(requests.len() * 512);
@@ -172,8 +175,12 @@ impl ClickHouseClient {
     }
 }
 
-fn escape_clickhouse_string(input: &str) -> String {
+pub(crate) fn escape_clickhouse_string(input: &str) -> String {
     input.replace('\\', "\\\\").replace('\'', "\\'")
+}
+
+pub(crate) fn escape_clickhouse_identifier(input: &str) -> String {
+    input.replace('`', "``")
 }
 
 fn build_delete_sql(database: &str, user_ids: &[String], retention_days: u32) -> Option<String> {
@@ -188,10 +195,12 @@ fn build_delete_sql(database: &str, user_ids: &[String], retention_days: u32) ->
         .join(", ");
 
     Some(format!(
-        "ALTER TABLE {}.requests DELETE \
+        "ALTER TABLE `{}`.`requests` DELETE \
          WHERE user_id IN ({}) \
          AND received_at < now() - INTERVAL {} DAY",
-        database, user_list, retention_days
+        escape_clickhouse_identifier(database),
+        user_list,
+        retention_days
     ))
 }
 
@@ -210,8 +219,14 @@ mod tests {
         let user_ids = vec!["user_plain".to_string(), "user'quoted\\slash".to_string()];
         let sql = build_delete_sql("webhooks", &user_ids, 7).expect("expected SQL");
 
-        assert!(sql.contains("ALTER TABLE webhooks.requests DELETE"));
+        assert!(sql.contains("ALTER TABLE `webhooks`.`requests` DELETE"));
         assert!(sql.contains("user_id IN ('user_plain', 'user\\'quoted\\\\slash')"));
         assert!(sql.contains("INTERVAL 7 DAY"));
+    }
+
+    #[test]
+    fn build_delete_sql_escapes_database_identifier() {
+        let sql = build_delete_sql("web`hooks", &["user_1".to_string()], 7).expect("expected SQL");
+        assert!(sql.contains("ALTER TABLE `web``hooks`.`requests` DELETE"));
     }
 }

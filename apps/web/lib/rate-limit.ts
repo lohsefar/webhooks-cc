@@ -31,6 +31,14 @@ export function checkRateLimit(
   windowMs: number = 60_000
 ): Response | null {
   const ip = getClientIp(request);
+  return checkRateLimitByKey(ip, maxRequests, windowMs);
+}
+
+export function checkRateLimitByKey(
+  key: string,
+  maxRequests: number,
+  windowMs: number = 60_000
+): Response | null {
   const now = Date.now();
 
   // Lazy cleanup: remove expired entries periodically (every ~100 calls)
@@ -45,7 +53,7 @@ export function checkRateLimit(
     }
   }
 
-  const timestamps = store.get(ip) ?? [];
+  const timestamps = store.get(key) ?? [];
   const valid = timestamps.filter((t) => now - t < windowMs);
 
   if (valid.length >= maxRequests) {
@@ -59,6 +67,6 @@ export function checkRateLimit(
   }
 
   valid.push(now);
-  store.set(ip, valid);
+  store.set(key, valid);
   return null;
 }

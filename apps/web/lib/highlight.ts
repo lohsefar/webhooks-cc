@@ -1,4 +1,5 @@
 import Prism from "prismjs";
+Prism.manual = true;
 import "prismjs/components/prism-json";
 import "prismjs/components/prism-markup";
 import type { BodyFormat } from "./format";

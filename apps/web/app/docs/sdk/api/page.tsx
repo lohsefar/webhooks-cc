@@ -385,6 +385,19 @@ interface ListRequestsOptions {
 interface SubscribeOptions {
   signal?: AbortSignal;
   timeout?: number | string;
+}
+
+type TemplateProvider = "stripe" | "github" | "shopify" | "twilio";
+
+interface SendTemplateOptions {
+  provider: TemplateProvider;
+  template?: string;
+  secret: string;
+  event?: string;
+  method?: string;
+  headers?: Record<string, string>;
+  body?: unknown;
+  timestamp?: number;
 }`}</pre>
       </section>
 

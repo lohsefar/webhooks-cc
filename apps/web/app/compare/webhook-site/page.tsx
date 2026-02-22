@@ -36,9 +36,15 @@ export default function CompareWebhookSitePage() {
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b-2 border-foreground">
-                <th className="text-left py-2 pr-3">Category</th>
-                <th className="text-left py-2 pr-3">webhooks.cc</th>
-                <th className="text-left py-2">Webhook.site</th>
+                <th scope="col" className="text-left py-2 pr-3">
+                  Category
+                </th>
+                <th scope="col" className="text-left py-2 pr-3">
+                  webhooks.cc
+                </th>
+                <th scope="col" className="text-left py-2">
+                  Webhook.site
+                </th>
               </tr>
             </thead>
             <tbody>

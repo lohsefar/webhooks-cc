@@ -357,7 +357,7 @@ mod tests {
         let sql = clickhouse_log.sql.lock().expect("clickhouse sql").clone();
         assert_eq!(sql.len(), 3);
         for statement in &sql {
-            assert!(statement.contains("ALTER TABLE webhooks.requests DELETE"));
+            assert!(statement.contains("ALTER TABLE `webhooks`.`requests` DELETE"));
             assert!(statement.contains("received_at < now() - INTERVAL 7 DAY"));
         }
         assert_eq!(count_users_in_delete_sql(&sql[0]), DELETE_CHUNK_SIZE);

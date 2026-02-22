@@ -1,5 +1,6 @@
 import { extractBearerToken, validateApiKeyWithPlan } from "@/lib/api-auth";
 import { serverEnv, publicEnv } from "@/lib/env";
+import { checkRateLimitByKey } from "@/lib/rate-limit";
 import { ConvexHttpClient } from "convex/browser";
 import { api } from "@convex/_generated/api";
 
@@ -38,6 +39,11 @@ export async function GET(request: Request) {
       }
       userId = user._id;
       plan = user.plan === "free" || user.plan === "pro" ? user.plan : undefined;
+    }
+
+    const rateLimited = checkRateLimitByKey(`search:${userId}`, 60, 10 * 60_000);
+    if (rateLimited) {
+      return rateLimited;
     }
 
     const url = new URL(request.url);

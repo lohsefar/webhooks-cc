@@ -23,18 +23,20 @@ const client = new WebhooksCC({ apiKey: process.env.WHK_API_KEY! });
 
 test("checkout triggers webhook", async ({ page }) => {
   const endpoint = await client.endpoints.create({ name: "playwright-e2e" });
+  try {
+    await page.goto(process.env.APP_URL!);
+    await page.fill("[name=email]", "qa@example.com");
+    await page.click("button[data-testid=checkout]");
 
-  await page.goto(process.env.APP_URL!);
-  await page.fill("[name=email]", "qa@example.com");
-  await page.click("button[data-testid=checkout]");
+    const req = await client.requests.waitFor(endpoint.slug, {
+      timeout: "45s",
+      match: matchJsonField("event", "checkout.completed"),
+    });
 
-  const req = await client.requests.waitFor(endpoint.slug, {
-    timeout: "45s",
-    match: matchJsonField("event", "checkout.completed"),
-  });
-
-  expect(req.method).toBe("POST");
-  await client.endpoints.delete(endpoint.slug);
+    expect(req.method).toBe("POST");
+  } finally {
+    await client.endpoints.delete(endpoint.slug);
+  }
 });`}</pre>
 
       <p className="text-muted-foreground">

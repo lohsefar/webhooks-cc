@@ -10,7 +10,7 @@ export interface TemplatePreset {
   contentType: "application/json" | "application/x-www-form-urlencoded";
 }
 
-interface BuildTemplateInput {
+export interface BuildTemplateInput {
   provider: TemplateProvider;
   template?: string;
   secret: string;
@@ -19,7 +19,7 @@ interface BuildTemplateInput {
   bodyOverride?: unknown;
 }
 
-interface TemplateRequest {
+export interface TemplateRequest {
   method: "POST";
   headers: Record<string, string>;
   body: string;
@@ -557,6 +557,10 @@ function buildPayload(
     };
   }
 
+  if (provider !== "twilio") {
+    throw new Error(`Unsupported provider: ${provider}`);
+  }
+
   const defaultTwilioParamsByTemplate: Record<string, Record<string, string>> = {
     "messaging.inbound": {
       AccountSid: randomSid("AC"),
@@ -683,7 +687,7 @@ function toBase64(bytes: Uint8Array): string {
 function buildTwilioSignaturePayload(endpointUrl: string, params: TwilioParamEntry[]): string {
   const sortedParams = params
     .map(([key, value], index) => ({ key, value, index }))
-    .sort((a, b) => a.key.localeCompare(b.key) || a.index - b.index);
+    .sort((a, b) => (a.key < b.key ? -1 : a.key > b.key ? 1 : a.index - b.index));
   let payload = endpointUrl;
   for (const { key, value } of sortedParams) {
     payload += `${key}${value}`;

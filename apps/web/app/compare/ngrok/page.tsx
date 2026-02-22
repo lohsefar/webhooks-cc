@@ -27,7 +27,9 @@ export default function CompareNgrokPage() {
             <h2 className="text-xl font-bold mb-2">Choose webhooks.cc when</h2>
             <ul className="list-disc list-inside text-muted-foreground space-y-1">
               <li>You need webhook capture + inspection + replay in one tool.</li>
-              <li>You want SDK `waitFor` assertions in CI.</li>
+              <li>
+                You want SDK <code>waitFor</code> assertions in CI.
+              </li>
               <li>You want MCP-driven webhook testing with coding agents.</li>
               <li>You want search/export/mock response controls from the same endpoint.</li>
             </ul>

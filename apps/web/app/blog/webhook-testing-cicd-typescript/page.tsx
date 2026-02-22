@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { notFound } from "next/navigation";
 import { BlogPostShell } from "@/components/blog/blog-post-shell";
 import { getBlogPostBySlug } from "@/lib/blog";
 import { createPageMetadata } from "@/lib/seo";
@@ -21,7 +22,7 @@ const sections = [
 ] as const;
 
 export default function CiTypescriptBlogPage() {
-  if (!post) return null;
+  if (!post) notFound();
 
   return (
     <BlogPostShell post={post} sections={sections}>

@@ -25,7 +25,9 @@ export default function CompareBeeceptorPage() {
           <h2 className="text-xl font-bold mb-2">Developer workflow differences</h2>
           <ul className="list-disc list-inside text-muted-foreground space-y-1">
             <li>webhooks.cc includes a native CLI tunnel optimized for webhook flows.</li>
-            <li>webhooks.cc includes a TypeScript SDK with `waitFor` test assertions.</li>
+            <li>
+              webhooks.cc includes a TypeScript SDK with <code>waitFor</code> test assertions.
+            </li>
             <li>webhooks.cc includes first-party MCP tooling for AI coding agents.</li>
             <li>Both can inspect incoming requests and support practical replay workflows.</li>
           </ul>

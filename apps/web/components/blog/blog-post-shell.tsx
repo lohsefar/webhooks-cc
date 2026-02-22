@@ -2,7 +2,7 @@ import Link from "next/link";
 import { ArrowLeft, ArrowRight, CalendarDays, Clock3 } from "lucide-react";
 import { BLOG_POSTS, formatBlogDate, type BlogPostMeta } from "@/lib/blog";
 
-interface BlogSection {
+export interface BlogSection {
   id: string;
   label: string;
 }

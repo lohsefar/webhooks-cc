@@ -1,3 +1,5 @@
+use std::time::Duration;
+
 use axum::extract::{Query, State};
 use axum::http::{HeaderMap, StatusCode};
 use axum::response::IntoResponse;
@@ -5,6 +7,7 @@ use axum::response::IntoResponse;
 use serde::Deserialize;
 
 use crate::AppState;
+use crate::clickhouse::client::{escape_clickhouse_identifier, escape_clickhouse_string};
 use crate::handlers::auth::verify_bearer_token;
 use crate::handlers::webhook::is_valid_slug;
 
@@ -22,24 +25,23 @@ pub struct SearchParams {
     order: Option<String>,
 }
 
-/// Escape a string for safe inclusion in ClickHouse SQL string literals.
-/// Only escapes backslash and single-quote (the two characters that can
-/// break out of a ClickHouse string literal).
-fn escape_clickhouse_string(s: &str) -> String {
-    s.replace('\\', "\\\\").replace('\'', "\\'")
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum SearchSqlError {
+    InvalidPlan,
+    InvalidSlug,
 }
 
 fn free_retention_clause_for_plan(
     plan: Option<&str>,
-) -> Result<Option<&'static str>, &'static str> {
+) -> Result<Option<&'static str>, SearchSqlError> {
     match plan {
         Some("free") => Ok(Some("received_at >= now() - INTERVAL 7 DAY")),
         Some("pro") | None => Ok(None),
-        Some(_) => Err("invalid plan"),
+        Some(_) => Err(SearchSqlError::InvalidPlan),
     }
 }
 
-fn build_search_sql(params: &SearchParams, db: &str) -> Result<String, &'static str> {
+fn build_search_sql(params: &SearchParams, db: &str) -> Result<String, SearchSqlError> {
     let limit = params.limit.unwrap_or(50).min(200);
     let offset = params.offset.unwrap_or(0).min(10_000);
     let order = match params.order.as_deref() {
@@ -56,12 +58,12 @@ fn build_search_sql(params: &SearchParams, db: &str) -> Result<String, &'static 
     match free_retention_clause_for_plan(params.plan.as_deref()) {
         Ok(Some(clause)) => conditions.push(clause.to_string()),
         Ok(None) => {}
-        Err(_) => return Err("invalid plan"),
+        Err(err) => return Err(err),
     }
 
     if let Some(slug) = &params.slug {
         if !is_valid_slug(slug) {
-            return Err("invalid slug");
+            return Err(SearchSqlError::InvalidSlug);
         }
         conditions.push(format!("slug = '{}'", escape_clickhouse_string(slug)));
     }
@@ -103,10 +105,11 @@ fn build_search_sql(params: &SearchParams, db: &str) -> Result<String, &'static 
     }
 
     let where_clause = conditions.join(" AND ");
+    let db = escape_clickhouse_identifier(db);
 
     Ok(format!(
         "SELECT endpoint_id, slug, user_id, method, path, headers, body, query_params, ip, content_type, size, is_ephemeral, received_at \
-         FROM {db}.requests \
+         FROM `{db}`.`requests` \
          WHERE {where_clause} \
          ORDER BY received_at {order} \
          LIMIT {limit} OFFSET {offset}"
@@ -152,34 +155,34 @@ pub async fn search(
 
     let sql = match build_search_sql(&params, &state.config.clickhouse_database) {
         Ok(sql) => sql,
-        Err("invalid plan") => {
+        Err(SearchSqlError::InvalidPlan) => {
             return (
                 StatusCode::BAD_REQUEST,
                 axum::Json(serde_json::json!({"error": "invalid plan"})),
             );
         }
-        Err("invalid slug") => {
+        Err(SearchSqlError::InvalidSlug) => {
             return (
                 StatusCode::BAD_REQUEST,
                 axum::Json(serde_json::json!({"error": "invalid slug"})),
             );
         }
-        Err(_) => {
-            tracing::error!("search SQL builder returned unexpected error");
-            return (
-                StatusCode::INTERNAL_SERVER_ERROR,
-                axum::Json(serde_json::json!({"error": "search query failed"})),
-            );
-        }
     };
 
-    match clickhouse.query_requests(&sql).await {
-        Ok(results) => (StatusCode::OK, axum::Json(serde_json::json!(results))),
-        Err(e) => {
+    match tokio::time::timeout(Duration::from_secs(5), clickhouse.query_requests(&sql)).await {
+        Ok(Ok(results)) => (StatusCode::OK, axum::Json(serde_json::json!(results))),
+        Ok(Err(e)) => {
             tracing::error!(error = %e, "ClickHouse search query failed");
             (
                 StatusCode::INTERNAL_SERVER_ERROR,
                 axum::Json(serde_json::json!({"error": "search query failed"})),
+            )
+        }
+        Err(_) => {
+            tracing::error!("ClickHouse search query timed out");
+            (
+                StatusCode::GATEWAY_TIMEOUT,
+                axum::Json(serde_json::json!({"error": "search query timed out"})),
             )
         }
     }
@@ -187,7 +190,7 @@ pub async fn search(
 
 #[cfg(test)]
 mod tests {
-    use super::{SearchParams, build_search_sql, free_retention_clause_for_plan};
+    use super::{SearchParams, SearchSqlError, build_search_sql, free_retention_clause_for_plan};
 
     #[test]
     fn free_plan_gets_retention_clause() {
@@ -210,7 +213,7 @@ mod tests {
     #[test]
     fn invalid_plan_is_rejected() {
         let result = free_retention_clause_for_plan(Some("enterprise"));
-        assert!(result.is_err());
+        assert_eq!(result, Err(SearchSqlError::InvalidPlan));
     }
 
     #[test]
@@ -230,11 +233,74 @@ mod tests {
 
         let sql = build_search_sql(&params, "webhooks").expect("sql should build");
 
-        assert!(sql.contains("FROM webhooks.requests"));
+        assert!(sql.contains("FROM `webhooks`.`requests`"));
         assert!(sql.contains("user_id = 'user_123'"));
         assert!(sql.contains("received_at >= now() - INTERVAL 7 DAY"));
         assert!(sql.contains("slug = 'demo_slug'"));
         assert!(sql.contains("method = 'POST'"));
         assert!(sql.contains("LIMIT 25 OFFSET 10"));
+    }
+
+    #[test]
+    fn build_search_sql_omits_retention_for_pro_plan() {
+        let params = SearchParams {
+            user_id: "user_123".to_string(),
+            plan: Some("pro".to_string()),
+            slug: None,
+            method: None,
+            q: None,
+            from: None,
+            to: None,
+            limit: None,
+            offset: None,
+            order: None,
+        };
+
+        let sql = build_search_sql(&params, "webhooks").expect("sql should build");
+        assert!(!sql.contains("INTERVAL 7 DAY"));
+    }
+
+    #[test]
+    fn build_search_sql_rejects_invalid_slug() {
+        let params = SearchParams {
+            user_id: "user_123".to_string(),
+            plan: Some("free".to_string()),
+            slug: Some("../bad".to_string()),
+            method: None,
+            q: None,
+            from: None,
+            to: None,
+            limit: None,
+            offset: None,
+            order: None,
+        };
+
+        let err = build_search_sql(&params, "webhooks").expect_err("invalid slug should fail");
+        assert_eq!(err, SearchSqlError::InvalidSlug);
+    }
+
+    #[test]
+    fn build_search_sql_escapes_inputs_and_handles_negative_timestamps() {
+        let params = SearchParams {
+            user_id: "user'; DROP TABLE requests--".to_string(),
+            plan: None,
+            slug: None,
+            method: None,
+            q: Some("needle'\\\\test".to_string()),
+            from: Some(-1),
+            to: Some(-1001),
+            limit: None,
+            offset: None,
+            order: Some("asc".to_string()),
+        };
+
+        let sql = build_search_sql(&params, "web`hooks").expect("sql should build");
+
+        assert!(sql.contains("FROM `web``hooks`.`requests`"));
+        assert!(sql.contains("user_id = 'user\\'; DROP TABLE requests--'"));
+        assert!(sql.contains("multiSearchAny(path, ['needle\\'\\\\\\\\test'])"));
+        assert!(sql.contains("received_at >= toDateTime64('-1.999', 3, 'UTC')"));
+        assert!(sql.contains("received_at <= toDateTime64('-2.999', 3, 'UTC')"));
+        assert!(sql.contains("ORDER BY received_at ASC"));
     }
 }

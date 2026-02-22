@@ -9,6 +9,8 @@ describe("api-auth", () => {
 
   afterEach(() => {
     vi.unstubAllGlobals();
+    delete process.env.CONVEX_SITE_URL;
+    delete process.env.CAPTURE_SHARED_SECRET;
   });
 
   test("validateApiKeyWithPlan returns user id and plan", async () => {

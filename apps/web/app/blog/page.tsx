@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { notFound } from "next/navigation";
 import { ArrowRight, CalendarDays, Clock3 } from "lucide-react";
 import { createPageMetadata } from "@/lib/seo";
 import { BLOG_POSTS, formatBlogDate } from "@/lib/blog";
@@ -12,6 +13,7 @@ export const metadata = createPageMetadata({
 
 export default function BlogIndexPage() {
   const featured = BLOG_POSTS[0];
+  if (!featured) notFound();
   const posts = BLOG_POSTS.slice(1);
 
   return (
@@ -95,7 +97,7 @@ export default function BlogIndexPage() {
           <div className="grid gap-4 md:grid-cols-2">
             {posts.map((post, index) => (
               <Link
-                key={post.href}
+                key={post.slug}
                 href={post.href}
                 className="neo-card neo-card-static block p-0 overflow-hidden group"
               >

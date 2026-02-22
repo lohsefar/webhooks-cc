@@ -115,12 +115,11 @@ export function SendWebhookDialog({ slug }: SendWebhookDialogProps) {
       : "/";
     const url = `${endpointUrl}${normalizedPath === "/" ? "" : normalizedPath}`;
 
-    let customHeaders: Record<string, string>;
-    try {
-      customHeaders = parseHeaders(headersInput);
-    } catch (error) {
+    const customHeaders = parseHeaders(headersInput);
+    const hasHeaderInput = headersInput.split("\n").some((line) => line.trim().length > 0);
+    if (hasHeaderInput && Object.keys(customHeaders).length === 0) {
       setStatus("error");
-      setStatusText(error instanceof Error ? error.message : "Headers must be a valid JSON object");
+      setStatusText("Headers must use one 'Key: Value' entry per line");
       return;
     }
 
@@ -155,10 +154,21 @@ export function SendWebhookDialog({ slug }: SendWebhookDialogProps) {
       });
       setStatus("sent");
       setStatusText(`${response.status} ${response.statusText}`.trim());
-    } catch {
+    } catch (error) {
       // Browser CORS can hide response details even if request reached receiver.
-      setStatus("sent");
-      setStatusText("Request sent (response unavailable due to browser restrictions)");
+      const message = error instanceof Error ? error.message : "";
+      const likelyCorsOpaque =
+        error instanceof TypeError &&
+        /Failed to fetch|Load failed|NetworkError/i.test(message || "Failed to fetch");
+
+      if (likelyCorsOpaque) {
+        setStatus("sent");
+        setStatusText("Request sent (response unavailable due to browser restrictions)");
+        return;
+      }
+
+      setStatus("error");
+      setStatusText(message || "Request failed");
     }
   };
 
