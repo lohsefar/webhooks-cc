@@ -9,6 +9,7 @@ import { Menu, X } from "lucide-react";
 interface NavItem {
   title: string;
   href: string;
+  depth?: number;
 }
 
 interface NavSection {
@@ -28,6 +29,7 @@ const NAV_SECTIONS: NavSection[] = [
     title: "Dashboard",
     items: [
       { title: "Endpoints", href: "/docs/endpoints" },
+      { title: "Test Webhooks", href: "/docs/endpoints/test-webhooks", depth: 1 },
       { title: "Requests", href: "/docs/requests" },
       { title: "Mock Responses", href: "/docs/mock-responses" },
     ],
@@ -46,6 +48,9 @@ const NAV_SECTIONS: NavSection[] = [
       { title: "Overview", href: "/docs/sdk" },
       { title: "API Reference", href: "/docs/sdk/api" },
       { title: "Testing", href: "/docs/sdk/testing" },
+      { title: "Stripe + Vitest", href: "/docs/sdk/testing/stripe-vitest", depth: 1 },
+      { title: "GitHub + Jest", href: "/docs/sdk/testing/github-jest", depth: 1 },
+      { title: "Playwright E2E", href: "/docs/sdk/testing/playwright-e2e", depth: 1 },
     ],
   },
   {
@@ -66,7 +71,9 @@ function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
           </h3>
           <ul className="space-y-0.5">
             {section.items.map((item) => {
-              const isActive = pathname === item.href;
+              const isActive =
+                pathname === item.href ||
+                (!item.depth && item.href !== "/docs" && pathname.startsWith(`${item.href}/`));
               return (
                 <li key={item.href}>
                   <Link
@@ -74,7 +81,8 @@ function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
                     onClick={onNavigate}
                     aria-current={isActive ? "page" : undefined}
                     className={cn(
-                      "block px-3 py-1.5 text-sm font-medium border-l-4 transition-colors",
+                      "block py-1.5 text-sm font-medium border-l-4 transition-colors",
+                      item.depth ? "pl-6 pr-3" : "px-3",
                       isActive
                         ? "bg-foreground text-background border-l-primary font-bold"
                         : "border-l-transparent text-muted-foreground hover:text-foreground hover:bg-muted"

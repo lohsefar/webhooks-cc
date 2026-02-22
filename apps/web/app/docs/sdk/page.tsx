@@ -80,6 +80,17 @@ console.log(endpoint.url);
       </section>
 
       <section className="mb-10">
+        <h2 className="text-xl font-bold mb-3">Send provider templates with signatures</h2>
+        <pre className="neo-code text-sm">{`await client.endpoints.sendTemplate(endpoint.slug, {
+  provider: "stripe",
+  template: "checkout.session.completed",
+  secret: "whsec_test_123",
+  // Optional:
+  // event: "checkout.session.completed",
+});`}</pre>
+      </section>
+
+      <section className="mb-10">
         <h2 className="text-xl font-bold mb-3">Wait for a request</h2>
         <p className="text-muted-foreground mb-4">
           Timeouts accept human-readable strings like{" "}

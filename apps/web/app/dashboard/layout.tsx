@@ -14,7 +14,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   return (
     <RequireAuth>
       <div className="h-screen flex flex-col overflow-hidden">
-        <AppHeader showEndpointSwitcher showNewEndpoint />
+        <AppHeader showEndpointSwitcher showNewEndpoint showBlogLink={false} />
         {children}
       </div>
     </RequireAuth>
