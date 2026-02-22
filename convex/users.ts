@@ -270,7 +270,6 @@ export const processAccountDeletion = internalMutation({
  * Called via scheduler when a free user's 24-hour period expires.
  * Clears periodEnd and requestsUsed to mark as "ready for new period" -
  * next request will trigger a new period (lazy activation).
- * Also schedules cleanup of all requests from the expired period.
  */
 export const resetFreeUserPeriod = internalMutation({
   args: { userId: v.id("users") },
@@ -284,10 +283,42 @@ export const resetFreeUserPeriod = internalMutation({
       periodEnd: undefined,
       requestsUsed: 0,
     });
+  },
+});
 
-    // Schedule request cleanup for this user
-    await ctx.scheduler.runAfter(0, internal.requests.cleanupUserRequests, {
-      userId,
-    });
+/**
+ * Internal query to fetch a user's current plan by id.
+ * Used by internal HTTP actions (shared-secret authenticated).
+ */
+export const getPlanById = internalQuery({
+  args: { userId: v.id("users") },
+  handler: async (ctx, { userId }) => {
+    const user = await ctx.db.get(userId);
+    return user?.plan ?? null;
+  },
+});
+
+/**
+ * Internal query to page users by plan.
+ * Used by receiver retention workers to enforce plan-specific retention in ClickHouse.
+ */
+export const listByPlanPaginated = internalQuery({
+  args: {
+    plan: v.union(v.literal("free"), v.literal("pro")),
+    cursor: v.optional(v.string()),
+    limit: v.optional(v.number()),
+  },
+  handler: async (ctx, { plan, cursor, limit }) => {
+    const pageSize = Math.max(1, Math.min(500, Math.floor(limit ?? 200)));
+    const result = await ctx.db
+      .query("users")
+      .withIndex("by_plan", (q) => q.eq("plan", plan))
+      .paginate({ cursor: cursor ?? null, numItems: pageSize });
+
+    return {
+      userIds: result.page.map((user) => String(user._id)),
+      nextCursor: result.isDone ? null : result.continueCursor,
+      done: result.isDone,
+    };
   },
 });

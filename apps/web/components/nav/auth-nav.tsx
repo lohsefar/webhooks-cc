@@ -7,6 +7,7 @@ import { ThemeToggle } from "@/components/ui/theme-toggle";
 
 const NAV_LINKS = [
   { href: "/docs", label: "Docs" },
+  { href: "/blog", label: "Blog" },
   { href: "/installation", label: "Install" },
 ];
 

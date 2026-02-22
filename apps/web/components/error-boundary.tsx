@@ -54,7 +54,7 @@ export class ErrorBoundary extends Component<Props, State> {
             <button
               type="button"
               onClick={this.handleRetry}
-              className="neo-btn-primary !py-2 !px-4 text-sm"
+              className="neo-btn-primary py-2! px-4! text-sm"
             >
               Try again
             </button>

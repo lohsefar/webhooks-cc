@@ -219,9 +219,9 @@ export function EndpointSettingsDialog({
           <button
             onClick={handleDelete}
             disabled={isDeleting}
-            className={`neo-btn-outline !py-1.5 !px-3 text-xs ${
+            className={`neo-btn-outline py-1.5! px-3! text-xs ${
               confirmDelete
-                ? "!bg-destructive !text-destructive-foreground !border-destructive"
+                ? "bg-destructive! text-destructive-foreground! border-destructive!"
                 : "text-destructive"
             }`}
           >
@@ -230,14 +230,14 @@ export function EndpointSettingsDialog({
           <div className="flex gap-2">
             <button
               onClick={() => setOpen(false)}
-              className="neo-btn-outline !py-1.5 !px-3 text-xs"
+              className="neo-btn-outline py-1.5! px-3! text-xs"
             >
               Cancel
             </button>
             <button
               onClick={handleSave}
               disabled={isSaving}
-              className="neo-btn-primary !py-1.5 !px-3 text-xs"
+              className="neo-btn-primary py-1.5! px-3! text-xs"
             >
               {isSaving ? "Saving..." : "Save Changes"}
             </button>

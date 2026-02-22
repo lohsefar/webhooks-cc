@@ -4,13 +4,31 @@ import { WebhooksCCError, UnauthorizedError, NotFoundError } from "../errors";
 
 const API_KEY = "whcc_testkey123";
 const BASE_URL = "https://test.webhooks.cc";
+const WEBHOOK_URL = "https://go.test.webhooks.cc";
 
-function createClient(opts?: { timeout?: number }) {
+function createClient(opts?: { timeout?: number; webhookUrl?: string }) {
   return new WebhooksCC({
     apiKey: API_KEY,
     baseUrl: BASE_URL,
+    webhookUrl: WEBHOOK_URL,
     ...opts,
   });
+}
+
+async function hmacSha1Base64(secret: string, payload: string): Promise<string> {
+  const subtle = globalThis.crypto?.subtle;
+  if (!subtle) {
+    throw new Error("crypto.subtle is required for this test");
+  }
+  const key = await subtle.importKey(
+    "raw",
+    new TextEncoder().encode(secret),
+    { name: "HMAC", hash: "SHA-1" },
+    false,
+    ["sign"]
+  );
+  const signature = await subtle.sign("HMAC", key, new TextEncoder().encode(payload));
+  return Buffer.from(new Uint8Array(signature)).toString("base64");
 }
 
 function mockFetch(response: {
@@ -102,6 +120,164 @@ describe("WebhooksCC", () => {
       const [url, opts] = fetchMock.mock.calls[0];
       expect(url).toBe(`${BASE_URL}/api/endpoints`);
       expect(opts.method).toBe("GET");
+    });
+  });
+
+  describe("endpoints.sendTemplate", () => {
+    it("sends a Stripe template webhook with signed stripe-signature header", async () => {
+      const fetchMock = vi.fn().mockResolvedValue({
+        ok: true,
+        status: 200,
+        statusText: "OK",
+        headers: new Headers(),
+        text: () => Promise.resolve("ok"),
+      });
+      globalThis.fetch = fetchMock;
+
+      const client = createClient();
+      await client.endpoints.sendTemplate("abc123", {
+        provider: "stripe",
+        secret: "whsec_test_123",
+        timestamp: 1700000000,
+      });
+
+      expect(fetchMock).toHaveBeenCalledOnce();
+      const [url, opts] = fetchMock.mock.calls[0];
+      expect(url).toBe(`${WEBHOOK_URL}/w/abc123`);
+      expect(opts.method).toBe("POST");
+      expect(opts.headers["content-type"] ?? opts.headers["Content-Type"]).toContain(
+        "application/json"
+      );
+      expect(opts.headers["stripe-signature"]).toMatch(/^t=1700000000,v1=[a-f0-9]+$/);
+      expect(opts.headers["x-webhooks-cc-template-template"]).toBe("payment_intent.succeeded");
+      expect(opts.body).toContain('"type":"payment_intent.succeeded"');
+    });
+
+    it("sends a GitHub pull_request template webhook with signature and event headers", async () => {
+      const fetchMock = vi.fn().mockResolvedValue({
+        ok: true,
+        status: 200,
+        statusText: "OK",
+        headers: new Headers(),
+        text: () => Promise.resolve("ok"),
+      });
+      globalThis.fetch = fetchMock;
+
+      const client = createClient();
+      await client.endpoints.sendTemplate("abc123", {
+        provider: "github",
+        template: "pull_request.opened",
+        secret: "github_secret",
+      });
+
+      const [, opts] = fetchMock.mock.calls[0];
+      expect(opts.headers["x-github-event"]).toBe("pull_request");
+      expect(opts.headers["x-hub-signature-256"]).toMatch(/^sha256=[a-f0-9]+$/);
+      expect(opts.headers["x-github-delivery"]).toBeTruthy();
+      expect(opts.body).toContain('"action":"opened"');
+      expect(opts.body).toContain('"pull_request"');
+    });
+
+    it("sends a Shopify template with topic and HMAC headers", async () => {
+      const fetchMock = vi.fn().mockResolvedValue({
+        ok: true,
+        status: 200,
+        statusText: "OK",
+        headers: new Headers(),
+        text: () => Promise.resolve("ok"),
+      });
+      globalThis.fetch = fetchMock;
+
+      const client = createClient();
+      await client.endpoints.sendTemplate("abc123", {
+        provider: "shopify",
+        template: "products/update",
+        secret: "shopify_secret",
+      });
+
+      const [, opts] = fetchMock.mock.calls[0];
+      expect(opts.headers["x-shopify-topic"]).toBe("products/update");
+      expect(opts.headers["x-shopify-hmac-sha256"]).toMatch(/^[A-Za-z0-9+/=]+$/);
+      expect(opts.headers["x-shopify-shop-domain"]).toBeTruthy();
+      expect(opts.body).toContain('"title":"Webhook Tester Hoodie"');
+    });
+
+    it("sends a Twilio template webhook as form-encoded body", async () => {
+      const fetchMock = vi.fn().mockResolvedValue({
+        ok: true,
+        status: 200,
+        statusText: "OK",
+        headers: new Headers(),
+        text: () => Promise.resolve("ok"),
+      });
+      globalThis.fetch = fetchMock;
+
+      const client = createClient();
+      await client.endpoints.sendTemplate("abc123", {
+        provider: "twilio",
+        template: "messaging.status_callback",
+        secret: "twilio_auth_token",
+      });
+
+      const [, opts] = fetchMock.mock.calls[0];
+      expect(opts.headers["content-type"] ?? opts.headers["Content-Type"]).toContain(
+        "application/x-www-form-urlencoded"
+      );
+      expect(opts.headers["x-twilio-signature"]).toMatch(/^[A-Za-z0-9+/=]+$/);
+      expect(opts.body).toContain("MessageSid=");
+      expect(opts.body).toContain("MessageStatus=delivered");
+    });
+
+    it("signs Twilio string body override using URL + sorted params", async () => {
+      const fetchMock = vi.fn().mockResolvedValue({
+        ok: true,
+        status: 200,
+        statusText: "OK",
+        headers: new Headers(),
+        text: () => Promise.resolve("ok"),
+      });
+      globalThis.fetch = fetchMock;
+
+      const bodyOverride =
+        "MessageStatus=delivered&To=%2B14155559876&From=%2B14155550123&MessageSid=SM123";
+      const client = createClient();
+      await client.endpoints.sendTemplate("abc123", {
+        provider: "twilio",
+        secret: "twilio_auth_token",
+        body: bodyOverride,
+      });
+
+      const [, opts] = fetchMock.mock.calls[0];
+      const endpointUrl = `${WEBHOOK_URL}/w/abc123`;
+      const sorted = Array.from(new URLSearchParams(bodyOverride).entries()).sort(([a], [b]) =>
+        a.localeCompare(b)
+      );
+      const signaturePayload = `${endpointUrl}${sorted.map(([k, v]) => `${k}${v}`).join("")}`;
+      const expectedSignature = await hmacSha1Base64("twilio_auth_token", signaturePayload);
+
+      expect(opts.body).toBe(bodyOverride);
+      expect(opts.headers["x-twilio-signature"]).toBe(expectedSignature);
+    });
+
+    it("throws on unsupported provider template", async () => {
+      const client = createClient();
+      await expect(
+        client.endpoints.sendTemplate("abc123", {
+          provider: "stripe",
+          template: "not-a-template",
+          secret: "whsec_test_123",
+        })
+      ).rejects.toThrow(/Unsupported template/i);
+    });
+
+    it("throws when secret is missing", async () => {
+      const client = createClient();
+      await expect(
+        client.endpoints.sendTemplate("abc123", {
+          provider: "stripe",
+          secret: "",
+        })
+      ).rejects.toThrow(/non-empty secret/i);
     });
   });
 

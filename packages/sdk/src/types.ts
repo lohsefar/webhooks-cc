@@ -74,6 +74,30 @@ export interface SendOptions {
   body?: unknown;
 }
 
+export type TemplateProvider = "stripe" | "github" | "shopify" | "twilio";
+
+/**
+ * Options for sending a provider template webhook with signed headers.
+ */
+export interface SendTemplateOptions {
+  /** Provider template to use */
+  provider: TemplateProvider;
+  /** Provider-specific template preset (uses provider default if omitted) */
+  template?: string;
+  /** Shared secret used for provider signature generation */
+  secret: string;
+  /** Provider event/topic name (provider default used if omitted) */
+  event?: string;
+  /** HTTP method override (default: "POST") */
+  method?: string;
+  /** Additional headers merged after template headers */
+  headers?: Record<string, string>;
+  /** Body override; if omitted a provider-specific template body is generated */
+  body?: unknown;
+  /** Unix timestamp (seconds) override for deterministic signatures in tests */
+  timestamp?: number;
+}
+
 /**
  * Options for listing captured requests.
  */

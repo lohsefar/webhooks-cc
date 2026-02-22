@@ -9,6 +9,7 @@ import { formatBytes } from "@/types/request";
 import type { Request, ClickHouseRequest } from "@/types/request";
 import { WEBHOOK_BASE_URL, SKIP_HEADERS_FOR_CURL } from "@/lib/constants";
 import { detectFormat, formatBody, getFormatLabel } from "@/lib/format";
+import { getHighlightLanguage, highlightBody } from "@/lib/highlight";
 
 /** Any request shape that has the fields needed for display. */
 export type DisplayableRequest = Request | ClickHouseRequest;
@@ -109,6 +110,9 @@ export function RequestDetail({ request }: RequestDetailProps) {
   const curlCommand = generateCurlCommand(request);
   const fullTime = new Date(request.receivedAt).toLocaleString();
   const bodyFormat = detectFormat(request.contentType, request.body);
+  const formattedBody = request.body ? formatBody(request.body, bodyFormat) : "(empty body)";
+  const highlightedBody = highlightBody(formattedBody, bodyFormat);
+  const highlightLanguage = getHighlightLanguage(bodyFormat);
 
   return (
     <div className="flex flex-col h-full">
@@ -128,7 +132,7 @@ export function RequestDetail({ request }: RequestDetailProps) {
           <div className="flex items-center gap-2 shrink-0">
             <button
               onClick={() => handleCopy(curlCommand, "curl")}
-              className="neo-btn-outline !py-1.5 !px-3 text-xs flex items-center gap-1.5"
+              className="neo-btn-outline py-1.5! px-3! text-xs flex items-center gap-1.5"
             >
               {copied === "curl" ? (
                 <>
@@ -175,14 +179,18 @@ export function RequestDetail({ request }: RequestDetailProps) {
             {request.body && (
               <button
                 onClick={() => request.body && handleCopy(request.body, "body")}
-                className="absolute top-0 right-0 neo-btn-outline !py-1 !px-2 text-xs flex items-center gap-1"
+                className="absolute top-0 right-0 neo-btn-outline py-1! px-2! text-xs flex items-center gap-1"
                 aria-label={copied === "body" ? "Copied to clipboard" : "Copy body to clipboard"}
               >
                 {copied === "body" ? <Check className="h-3 w-3" /> : <Copy className="h-3 w-3" />}
               </button>
             )}
-            <pre className="neo-code overflow-x-auto text-sm whitespace-pre-wrap break-words">
-              {request.body ? formatBody(request.body, bodyFormat) : "(empty body)"}
+            <pre className="neo-code syntax-highlight overflow-x-auto text-sm whitespace-pre-wrap break-words">
+              {/* Safe: highlightBody escapes plain/form/text/binary output and Prism.highlight encodes token text for json/xml. */}
+              <code
+                className={`language-${highlightLanguage}`}
+                dangerouslySetInnerHTML={{ __html: highlightedBody }}
+              />
             </pre>
           </div>
         )}

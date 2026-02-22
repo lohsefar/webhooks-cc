@@ -233,6 +233,32 @@
   color: hsl(var(--secondary));
 }
 
+/* Prism syntax highlighting inside request/detail code blocks */
+.syntax-highlight .token.property,
+.syntax-highlight .token.tag,
+.syntax-highlight .token.attr-name {
+  color: hsl(var(--primary));
+}
+
+.syntax-highlight .token.string,
+.syntax-highlight .token.attr-value {
+  color: hsl(45 100% 35%);
+}
+.dark .syntax-highlight .token.string,
+.dark .syntax-highlight .token.attr-value {
+  color: hsl(var(--secondary));
+}
+
+.syntax-highlight .token.number,
+.syntax-highlight .token.boolean,
+.syntax-highlight .token.constant {
+  color: hsl(var(--accent));
+}
+
+.syntax-highlight .token.punctuation {
+  color: hsl(var(--muted-foreground));
+}
+
 /* Fade-in animation for new requests and page content */
 @keyframes fade-in {
   from {

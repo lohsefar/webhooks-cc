@@ -11,7 +11,7 @@ import { JsonLd, softwareApplicationSchema, faqSchema, type FAQItem } from "@/li
 export const metadata = createPageMetadata({
   title: "Webhook Testing Platform: CLI, SDK & MCP",
   description:
-    "Capture and inspect webhooks in real time. Forward to localhost with the CLI, test in CI with the TypeScript SDK, and automate workflows with the MCP server.",
+    "Capture and inspect webhooks in real time. Send signed Stripe, GitHub, Shopify, and Twilio test webhooks from the dashboard. Forward to localhost with the CLI, test in CI with the SDK, and connect AI coding agents via MCP.",
   path: "/",
 });
 
@@ -49,6 +49,11 @@ const LANDING_FAQ: FAQItem[] = [
       "Install @webhooks-cc/sdk, create an endpoint, and call client.requests.waitFor() with composable matchers. Assert on method, headers, or body fields. Works with Vitest, Jest, and any Node.js test runner.",
   },
   {
+    question: "Can I send signed Stripe, GitHub, Shopify, and Twilio webhooks?",
+    answer:
+      "Yes. Use the Send button in the dashboard and select a provider template. webhooks.cc generates realistic payloads and signature headers so you can test your verification code end-to-end.",
+  },
+  {
     question: "How do I inspect webhook payloads?",
     answer:
       "Send a webhook to your endpoint URL and open the dashboard. Each request shows method, headers, body (auto-formatted JSON and XML), query parameters, IP, and timestamp. Export as JSON or CSV.",
@@ -56,7 +61,7 @@ const LANDING_FAQ: FAQItem[] = [
   {
     question: "Is webhooks.cc free?",
     answer:
-      "Yes. The free plan gives you 200 requests per day, unlimited endpoints, and full CLI, SDK, and MCP access. Pro ($8/month) raises the limit to 500,000 requests per month with 30-day retention.",
+      "Yes. The free plan gives you 200 requests per day, 7-day retention, unlimited endpoints, and full CLI, SDK, and MCP access. Pro ($8/month) raises the limit to 500,000 requests per month with 30-day retention.",
   },
   {
     question: "How do I connect an AI coding agent?",
@@ -89,8 +94,9 @@ export default async function Home() {
                 <span className="bg-primary text-primary-foreground px-2">instantly</span>
               </h1>
               <p className="text-xl md:text-2xl text-muted-foreground mb-8 max-w-2xl leading-relaxed">
-                Get a URL, send a webhook, see it live. Forward to localhost with the CLI. Test in
-                CI with the SDK. Let your AI agent handle it via MCP.
+                Get a URL, send a webhook, inspect it instantly. Send signed Stripe, GitHub,
+                Shopify, and Twilio templates from the dashboard. Forward to localhost with the CLI,
+                test in CI with the SDK, and use MCP with your AI coding agent.
               </p>
               <p className="text-lg font-semibold mb-8">Start free. No credit card required.</p>
               <HeroCTA />
@@ -107,9 +113,7 @@ export default async function Home() {
           <div className="mt-6 neo-code overflow-x-auto">
             <pre className="text-sm md:text-base">
               <code>
-                <span className="text-muted-foreground">
-                  # Send a webhook — from curl, your app, or your test suite
-                </span>
+                <span className="text-muted-foreground"># Send manually with curl</span>
                 {"\n"}
                 <span className="text-primary">$</span> curl -X POST https://go.webhooks.cc/w/abc123
                 \{"\n"}
@@ -121,7 +125,23 @@ export default async function Home() {
                   &apos;{`{"event": "payment.success", "amount": 4999}`}&apos;
                 </span>
                 {"\n\n"}
-                <span className="text-muted-foreground"># Or from your TypeScript tests</span>
+                <span className="text-muted-foreground">
+                  # Or send a signed provider template in TypeScript
+                </span>
+                {"\n"}
+                <span className="text-code-keyword">
+                  await
+                </span> client.endpoints.sendTemplate(slug, {"{"}
+                {"\n"}
+                {"  "}provider: <span className="text-code-string">&quot;stripe&quot;</span>,{"\n"}
+                {"  "}template:{" "}
+                <span className="text-code-string">&quot;checkout.session.completed&quot;</span>,
+                {"\n"}
+                {"  "}secret: <span className="text-code-string">&quot;whsec_test_123&quot;</span>,
+                {"\n"}
+                {"}"});
+                {"\n\n"}
+                <span className="text-muted-foreground"># Wait for it in your tests</span>
                 {"\n"}
                 <span className="text-code-keyword">const</span> req ={" "}
                 <span className="text-code-keyword">await</span> client.requests.waitFor(slug, {"{"}{" "}
@@ -162,10 +182,10 @@ export default async function Home() {
               <div className="w-12 h-12 border-2 border-foreground bg-secondary flex items-center justify-center mb-4 shadow-neo-sm">
                 <Zap className="h-6 w-6 text-secondary-foreground" />
               </div>
-              <h3 className="font-bold text-xl mb-2">Mock & replay</h3>
+              <h3 className="font-bold text-xl mb-2">Send signed templates</h3>
               <p className="text-muted-foreground">
-                Configure what your endpoint returns — status code, headers, body. Replay captured
-                requests to localhost or any URL.
+                Send realistic Stripe, GitHub, Shopify, and Twilio webhooks from the dashboard.
+                Signature headers are generated for each provider.
               </p>
             </div>
 
@@ -200,7 +220,7 @@ export default async function Home() {
         <div className="max-w-6xl mx-auto">
           <div className="text-center mb-12">
             <h2 className="text-3xl md:text-4xl font-bold mb-4">Simple pricing</h2>
-            <p className="text-xl text-muted-foreground">Start free, upgrade when you need more</p>
+            <p className="text-xl text-muted-foreground">All features. Every tier. No gotchas.</p>
           </div>
 
           <div className="grid md:grid-cols-2 gap-8 max-w-4xl mx-auto">
@@ -216,7 +236,7 @@ export default async function Home() {
               <ul className="space-y-3 mb-8">
                 {[
                   "200 requests/day",
-                  "24-hour data retention",
+                  "7-day data retention",
                   "Unlimited endpoints",
                   "CLI, SDK & MCP access",
                 ].map((feature) => (
@@ -320,6 +340,11 @@ export default async function Home() {
                   </Link>
                 </li>
                 <li>
+                  <Link href="/compare" className="text-muted-foreground hover:text-foreground">
+                    Compare
+                  </Link>
+                </li>
+                <li>
                   <Link href="/login" className="text-muted-foreground hover:text-foreground">
                     Dashboard
                   </Link>
@@ -342,6 +367,11 @@ export default async function Home() {
                 <li>
                   <Link href="/docs/mcp" className="text-muted-foreground hover:text-foreground">
                     MCP Server
+                  </Link>
+                </li>
+                <li>
+                  <Link href="/blog" className="text-muted-foreground hover:text-foreground">
+                    Blog
                   </Link>
                 </li>
               </ul>

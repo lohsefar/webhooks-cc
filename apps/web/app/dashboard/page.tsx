@@ -4,6 +4,7 @@ import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { useQuery } from "convex/react";
 import { useAuthToken } from "@convex-dev/auth/react";
 import { useSearchParams } from "next/navigation";
+import Link from "next/link";
 import { api } from "@convex/_generated/api";
 import type { Id } from "@convex/_generated/dataModel";
 import { UrlBar } from "@/components/dashboard/url-bar";
@@ -661,7 +662,7 @@ function ExportDropdown({
     <div className="relative shrink-0" ref={ref}>
       <button
         onClick={() => setOpen(!open)}
-        className="neo-btn-outline !py-1.5 !px-3 text-xs flex items-center gap-1.5"
+        className="neo-btn-outline py-1.5! px-3! text-xs flex items-center gap-1.5"
       >
         <Download className="h-3.5 w-3.5" />
         Export
@@ -829,6 +830,18 @@ function WaitingForRequests({ slug }: { slug: string }) {
           <Send className="h-4 w-4" />
           {sending ? "Sending..." : sent ? "Sent!" : "Send test request"}
         </button>
+
+        <p className="text-xs text-muted-foreground">
+          Need signed provider templates? Use the{" "}
+          <span className="font-bold text-foreground">Send</span> button in the URL bar or read{" "}
+          <Link
+            href="/docs/endpoints/test-webhooks"
+            className="underline font-bold text-foreground"
+          >
+            dashboard test webhook docs
+          </Link>
+          .
+        </p>
       </div>
     </div>
   );

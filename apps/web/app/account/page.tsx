@@ -264,7 +264,7 @@ export default function AccountPage() {
                 <div>
                   <p className="font-medium">Free Plan</p>
                   <p className="text-sm text-muted-foreground">
-                    200 requests/day, 24-hour data retention
+                    200 requests/day, 7-day data retention
                   </p>
                 </div>
               </div>

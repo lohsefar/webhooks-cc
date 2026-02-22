@@ -7,7 +7,7 @@ export const DEFAULT_PAGE_DESCRIPTION =
   "Capture and inspect webhooks in real time. Forward to localhost with the CLI, test in CI with the TypeScript SDK, and automate workflows with the MCP server.";
 export const DEFAULT_OG_IMAGE_PATH = "/og-image.png";
 
-export const LAST_CONTENT_UPDATE = new Date("2026-02-10T00:00:00.000Z");
+export const LAST_CONTENT_UPDATE = new Date("2026-02-19T00:00:00.000Z");
 
 export interface SitemapPageDefinition {
   path: string;
@@ -20,6 +20,7 @@ export const PUBLIC_SITEMAP_PAGES: readonly SitemapPageDefinition[] = [
   { path: "/go", changeFrequency: "weekly", priority: 0.9 },
   { path: "/docs", changeFrequency: "weekly", priority: 0.9 },
   { path: "/docs/endpoints", changeFrequency: "monthly", priority: 0.7 },
+  { path: "/docs/endpoints/test-webhooks", changeFrequency: "monthly", priority: 0.6 },
   { path: "/docs/requests", changeFrequency: "monthly", priority: 0.7 },
   { path: "/docs/mock-responses", changeFrequency: "monthly", priority: 0.7 },
   { path: "/docs/cli", changeFrequency: "monthly", priority: 0.7 },
@@ -28,7 +29,18 @@ export const PUBLIC_SITEMAP_PAGES: readonly SitemapPageDefinition[] = [
   { path: "/docs/sdk", changeFrequency: "monthly", priority: 0.7 },
   { path: "/docs/sdk/api", changeFrequency: "monthly", priority: 0.7 },
   { path: "/docs/sdk/testing", changeFrequency: "monthly", priority: 0.7 },
+  { path: "/docs/sdk/testing/stripe-vitest", changeFrequency: "monthly", priority: 0.6 },
+  { path: "/docs/sdk/testing/github-jest", changeFrequency: "monthly", priority: 0.6 },
+  { path: "/docs/sdk/testing/playwright-e2e", changeFrequency: "monthly", priority: 0.6 },
   { path: "/docs/mcp", changeFrequency: "monthly", priority: 0.7 },
+  { path: "/compare", changeFrequency: "monthly", priority: 0.7 },
+  { path: "/compare/webhook-site", changeFrequency: "monthly", priority: 0.6 },
+  { path: "/compare/ngrok", changeFrequency: "monthly", priority: 0.6 },
+  { path: "/compare/beeceptor", changeFrequency: "monthly", priority: 0.6 },
+  { path: "/blog", changeFrequency: "weekly", priority: 0.7 },
+  { path: "/blog/test-stripe-webhooks-locally-2026", changeFrequency: "monthly", priority: 0.6 },
+  { path: "/blog/webhook-testing-cicd-typescript", changeFrequency: "monthly", priority: 0.6 },
+  { path: "/blog/ai-agents-debug-webhooks-mcp", changeFrequency: "monthly", priority: 0.6 },
   { path: "/installation", changeFrequency: "monthly", priority: 0.8 },
   { path: "/support", changeFrequency: "monthly", priority: 0.6 },
   { path: "/privacy", changeFrequency: "yearly", priority: 0.3 },

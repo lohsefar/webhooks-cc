@@ -41,6 +41,24 @@ export default function EndpointsPage() {
       </section>
 
       <section className="mb-10">
+        <h2 className="text-xl font-bold mb-3">Sending test webhooks from the dashboard</h2>
+        <p className="text-muted-foreground mb-4">
+          Use the <strong className="text-foreground">Send</strong> button in the URL bar to send a
+          manual request or a signed provider template (Stripe, GitHub, Shopify, Twilio).
+        </p>
+        <p className="text-muted-foreground">
+          See{" "}
+          <Link
+            href="/docs/endpoints/test-webhooks"
+            className="text-primary hover:underline font-bold"
+          >
+            Dashboard test webhook docs
+          </Link>{" "}
+          for template presets, signature headers, and verification tips.
+        </p>
+      </section>
+
+      <section className="mb-10">
         <h2 className="text-xl font-bold mb-3">Endpoint settings</h2>
         <p className="text-muted-foreground mb-4">
           Click the gear icon next to the endpoint name in the URL bar to open settings. You can:
@@ -74,7 +92,7 @@ export default function EndpointsPage() {
                 <td className="py-2 pr-4">Free</td>
                 <td className="py-2 pr-4">Unlimited</td>
                 <td className="py-2 pr-4">200/day</td>
-                <td className="py-2">24 hours</td>
+                <td className="py-2">7 days</td>
               </tr>
               <tr>
                 <td className="py-2 pr-4 font-bold">Pro</td>
