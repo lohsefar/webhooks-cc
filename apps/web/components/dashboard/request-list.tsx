@@ -190,7 +190,7 @@ export function RequestList({
                   onClick={onLoadMore}
                   disabled={loadingMore}
                   className={cn(
-                    "neo-btn-outline !py-1.5 !px-4 text-xs font-bold uppercase tracking-wide flex items-center gap-2",
+                    "neo-btn-outline py-1.5! px-4! text-xs font-bold uppercase tracking-wide flex items-center gap-2",
                     loadingMore && "opacity-60 cursor-not-allowed"
                   )}
                 >

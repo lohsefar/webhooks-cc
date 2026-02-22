@@ -73,7 +73,7 @@ export function NewEndpointDialog() {
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogTrigger asChild>
-        <button className="neo-btn-primary !py-1.5 !px-3 text-xs flex items-center gap-1.5">
+        <button className="neo-btn-primary py-1.5! px-3! text-xs flex items-center gap-1.5">
           <Plus className="h-3.5 w-3.5" />
           New Endpoint
         </button>
@@ -135,7 +135,7 @@ export function NewEndpointDialog() {
             <Button
               type="submit"
               disabled={isSubmitting}
-              className="neo-btn-primary !rounded-none flex-1"
+              className="neo-btn-primary rounded-none! flex-1"
             >
               {isSubmitting ? "Creating..." : "Create Endpoint"}
             </Button>
@@ -143,7 +143,7 @@ export function NewEndpointDialog() {
               type="button"
               variant="outline"
               onClick={() => setOpen(false)}
-              className="neo-btn-outline !rounded-none"
+              className="neo-btn-outline rounded-none!"
             >
               Cancel
             </Button>

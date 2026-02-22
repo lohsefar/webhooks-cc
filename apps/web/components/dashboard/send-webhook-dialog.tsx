@@ -183,7 +183,7 @@ export function SendWebhookDialog({ slug }: SendWebhookDialogProps) {
   return (
     <Dialog open={open} onOpenChange={resetAndClose}>
       <DialogTrigger asChild>
-        <button className="neo-btn-outline !py-1.5 !px-3 text-xs flex items-center gap-1.5">
+        <button className="neo-btn-outline py-1.5! px-3! text-xs flex items-center gap-1.5">
           <Send className="h-3.5 w-3.5" />
           Send
         </button>
@@ -256,7 +256,7 @@ export function SendWebhookDialog({ slug }: SendWebhookDialogProps) {
                 />
               </div>
 
-              <div className="neo-code !p-3 text-xs space-y-1">
+              <div className="neo-code p-3! text-xs space-y-1">
                 <p>
                   <span className="font-bold">Template:</span> {selectedTemplate?.description}
                 </p>
@@ -331,7 +331,7 @@ export function SendWebhookDialog({ slug }: SendWebhookDialogProps) {
               className={
                 status === "error"
                   ? "border-2 border-destructive bg-destructive/10 p-3 text-sm text-destructive"
-                  : "neo-code !p-3 text-sm"
+                  : "neo-code p-3! text-sm"
               }
             >
               {status === "sending" ? "Sending..." : statusText || "Sent"}
@@ -341,7 +341,7 @@ export function SendWebhookDialog({ slug }: SendWebhookDialogProps) {
           <Button
             onClick={handleSend}
             disabled={status === "sending"}
-            className="w-full neo-btn-primary !rounded-none"
+            className="w-full neo-btn-primary rounded-none!"
           >
             {status === "sending" ? "Sending..." : "Send webhook"}
           </Button>

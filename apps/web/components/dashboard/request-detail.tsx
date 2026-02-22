@@ -132,7 +132,7 @@ export function RequestDetail({ request }: RequestDetailProps) {
           <div className="flex items-center gap-2 shrink-0">
             <button
               onClick={() => handleCopy(curlCommand, "curl")}
-              className="neo-btn-outline !py-1.5 !px-3 text-xs flex items-center gap-1.5"
+              className="neo-btn-outline py-1.5! px-3! text-xs flex items-center gap-1.5"
             >
               {copied === "curl" ? (
                 <>
@@ -179,7 +179,7 @@ export function RequestDetail({ request }: RequestDetailProps) {
             {request.body && (
               <button
                 onClick={() => request.body && handleCopy(request.body, "body")}
-                className="absolute top-0 right-0 neo-btn-outline !py-1 !px-2 text-xs flex items-center gap-1"
+                className="absolute top-0 right-0 neo-btn-outline py-1! px-2! text-xs flex items-center gap-1"
                 aria-label={copied === "body" ? "Copied to clipboard" : "Copy body to clipboard"}
               >
                 {copied === "body" ? <Check className="h-3 w-3" /> : <Copy className="h-3 w-3" />}

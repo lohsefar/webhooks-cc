@@ -34,7 +34,7 @@ export function AppHeader({
           {showBackToDashboard && (
             <Link
               href="/dashboard"
-              className="neo-btn-outline !py-1.5 !px-3 text-xs flex items-center gap-1.5"
+              className="neo-btn-outline py-1.5! px-3! text-xs flex items-center gap-1.5"
             >
               <ArrowLeft className="h-3.5 w-3.5" />
               Dashboard

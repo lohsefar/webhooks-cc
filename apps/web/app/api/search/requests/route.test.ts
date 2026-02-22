@@ -96,6 +96,7 @@ describe("GET /api/search/requests", () => {
 
     expect(mockFns.convexSetAuth).toHaveBeenCalledWith("jwt-token");
     expect(mockFns.validateApiKeyWithPlan).not.toHaveBeenCalled();
+    expect(mockFns.convexQuery).toHaveBeenCalled();
     expect(fetchMock).toHaveBeenCalledTimes(1);
 
     const [url, options] = fetchMock.mock.calls[0] as unknown as [
