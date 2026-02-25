@@ -530,6 +530,207 @@ For a webhook inspection SaaS with clear tiered architecture (hot path → buffe
 
 ---
 
+## Appendix: Could the Receiver Be Rebuilt to Better Fit SpacetimeDB?
+
+The short answer is **yes, but with significant tradeoffs**. Here are three architectural patterns that could make the receiver work with SpacetimeDB, ranked by practicality.
+
+### Option A: SpacetimeDB Client Cache as the Hot Path (Best Fit)
+
+**Concept:** The Rust receiver remains an Axum HTTP server but uses SpacetimeDB's **client-side subscription cache** as its read layer instead of Redis. Writes go directly to SpacetimeDB reducers.
+
+```
+                    ┌─────────────────────────────────────┐
+                    │       Rust Receiver (Axum)          │
+                    │                                     │
+Webhook POST ────► │  1. Slug lookup: LOCAL cache (0μs)  │
+                    │     (SpacetimeDB client subscription │
+                    │      keeps endpoints table in sync) │
+                    │  2. Quota check: LOCAL cache (0μs)  │
+                    │  3. Dedup: in-process HashMap (0μs) │
+                    │  4. Insert: call reducer (~5-20ms)  │ ─── WebSocket ──► SpacetimeDB
+                    │  5. Return mock response             │
+                    └─────────────────────────────────────┘
+                              │
+                              │ (subscription pushes)
+                              ▼
+                    Dashboard updates in ~10-30ms
+```
+
+**How it works:**
+1. The receiver connects to SpacetimeDB as a client and subscribes to:
+   - `SELECT * FROM endpoints` (or filtered by active slugs)
+   - `SELECT * FROM quota WHERE ...` (user quota state)
+2. SpacetimeDB maintains an **in-process client cache** of all matching rows — updated automatically via WebSocket deltas
+3. Hot-path reads (endpoint lookup, quota check) hit this local cache with **zero network latency** — sub-microsecond access, faster than Redis
+4. Hot-path writes (quota decrement, request insert) call SpacetimeDB reducers over WebSocket — this is the slow part (~5-20ms)
+5. Dedup uses an in-process `HashMap<String, Instant>` with a 2s eviction (replaces Redis SET NX)
+
+**What changes in the receiver:**
+```
+Current Redis operations          →  SpacetimeDB equivalent
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+ep:{slug} GET (0.5ms)             →  client_cache.endpoints.get(slug) (0μs)
+quota Lua check+decrement (1ms)   →  Reads: local cache (0μs)
+                                     Write: call_reducer("decrement_quota") (~10ms)
+SET NX dedup (1ms)                →  in-process HashMap with TTL (0μs)
+LPUSH buf + SADD active (1ms)     →  call_reducer("capture_request") (~10ms)
+Background flush workers (4x)     →  ELIMINATED — data goes directly to SpacetimeDB
+Cache warmer                      →  ELIMINATED — subscription keeps cache warm
+Circuit breaker                   →  ELIMINATED — no intermediary to circuit-break
+```
+
+**Estimated hot-path latency:**
+| Step | Current (Redis) | Option A (SpacetimeDB) |
+|------|----------------|----------------------|
+| Endpoint lookup | 0.5ms (Redis GET) | **0μs** (local cache) |
+| Quota read | 0.5ms (Redis HGET) | **0μs** (local cache) |
+| Dedup | 1ms (SET NX) | **0μs** (in-process HashMap) |
+| Quota decrement + request insert | 1ms (Redis pipeline) | **5-20ms** (reducer call) |
+| **Total** | **~4ms** | **~5-20ms** |
+
+**The key insight:** Reads become instant (0μs vs 0.5-1ms each), but writes become the bottleneck. You could decouple the write from the response:
+
+```rust
+// Return response immediately, write async
+let response = build_response(&endpoint);
+
+// Fire-and-forget reducer call (don't block the HTTP response)
+tokio::spawn(async move {
+    stdb_client.call_reducer("capture_request", payload).await;
+});
+
+response // Return to webhook sender in ~0μs
+```
+
+With fire-and-forget writes, the hot-path latency drops to **~0.01ms** (local cache reads only), and the actual persistence happens asynchronously in ~5-20ms. This is effectively the same pattern as today (buffer then flush) but with SpacetimeDB replacing both Redis and Convex.
+
+**Tradeoffs:**
+- (+) Reads are faster than Redis (zero network hop)
+- (+) Eliminates the entire flush pipeline (4 workers, batch logic, circuit breaker)
+- (+) Dashboard gets updates in ~10-30ms instead of ~600ms
+- (+) No Redis dependency at all
+- (-) Client cache memory grows with total endpoint count (not just active slugs)
+- (-) WebSocket connection to SpacetimeDB is a single point of failure
+- (-) Quota decrement is eventually consistent (local cache may be stale by one reducer cycle)
+- (-) Fire-and-forget writes lose the "100% delivery" guarantee (if process crashes before reducer completes)
+- (-) SpacetimeDB TypeScript SDK for Rust is not a thing — you'd need to use the Rust SDK's WebSocket client directly
+
+**Feasibility: Medium.** The SpacetimeDB Rust SDK exists but is primarily designed for WASM modules, not standalone Rust applications acting as clients. You'd likely need to use the raw WebSocket protocol (BSATN binary format) or contribute a native Rust client SDK. The [SpacetimeDB Rust SDK](https://docs.rs/spacetimedb/latest/spacetimedb/) is module-side only — there's no official "Rust client SDK" equivalent to the TypeScript client.
+
+### Option B: Thin HTTP Proxy + SpacetimeDB Module
+
+**Concept:** Strip the receiver down to a minimal HTTP proxy that does zero logic — just serializes the request and forwards it to SpacetimeDB. All business logic (endpoint lookup, quota, dedup, mock responses) runs inside SpacetimeDB as WASM reducers.
+
+```
+Webhook POST ──► Thin Axum proxy (~0.5ms)
+                   │
+                   │ WebSocket call_reducer("handle_webhook", payload)
+                   ▼
+               SpacetimeDB WASM Module (~1-5ms in-memory):
+                 1. Lookup endpoint (table read, 0μs)
+                 2. Check quota (table read + write, 0μs)
+                 3. Dedup (table read + write, 0μs)
+                 4. Insert request (table write, 0μs)
+                 5. Return mock response config
+                   │
+                   │ reducer result
+                   ▼
+               Proxy returns mock response to caller
+```
+
+**Estimated hot-path latency: ~10-30ms** (dominated by WebSocket round-trip to SpacetimeDB).
+
+**Tradeoffs:**
+- (+) Simplest receiver code (~50 lines, just HTTP → WebSocket translation)
+- (+) All logic is in one place (SpacetimeDB module)
+- (+) Atomic operations guaranteed (single reducer = single transaction)
+- (-) Every request requires a WebSocket round-trip (can't fire-and-forget because you need the mock response)
+- (-) Mock response latency goes from ~4ms to ~10-30ms
+- (-) SpacetimeDB becomes the throughput bottleneck for webhook capture
+- (-) The proxy still needs to exist as a separate process (WASM can't serve HTTP)
+
+**Feasibility: High** (architecturally simple) but **performance is poor** for the hot path.
+
+### Option C: Hybrid — SpacetimeDB for Persistence + In-Process Cache for Hot Path
+
+**Concept:** Keep the current receiver architecture but replace Redis with in-process data structures, and replace Convex with SpacetimeDB. The receiver maintains its own endpoint cache and quota state in memory, synced from SpacetimeDB via subscriptions.
+
+```
+               ┌──────────────────────────────────────────┐
+               │          Rust Receiver (Axum)             │
+               │                                           │
+Webhook POST ► │  In-process cache (DashMap):              │
+               │    endpoints: DashMap<String, Endpoint>   │
+               │    quotas: DashMap<String, AtomicI64>     │
+               │    dedup: DashMap<String, Instant>        │
+               │                                           │
+               │  Hot path: ~0.5ms (all in-process)        │
+               │  1. DashMap lookup for endpoint           │
+               │  2. AtomicI64 decrement for quota         │
+               │  3. DashMap insert for dedup              │
+               │  4. Channel send for async persistence    │
+               └───────────────┬───────────────────────────┘
+                               │ mpsc channel (async)
+                               ▼
+               ┌───────────────────────────────────────────┐
+               │  Background Writer (tokio task)           │
+               │  - Batches requests from channel          │
+               │  - Calls SpacetimeDB reducer every 50ms   │
+               │  - Receives subscription updates back     │
+               │    (quota corrections, endpoint changes)  │
+               └───────────────────────────────────────────┘
+                               │ WebSocket
+                               ▼
+                         SpacetimeDB
+                    (persistent store + real-time)
+                               │ subscription deltas
+                               ▼
+                    Dashboard clients (~10-30ms)
+```
+
+**Estimated hot-path latency: ~0.5ms** (all in-process, no network at all).
+
+This is essentially what you have today, except:
+- Redis is replaced by `DashMap` + `AtomicI64` (in-process, zero-copy)
+- Convex is replaced by SpacetimeDB (faster flush, real-time subscriptions)
+- Flush latency drops from ~500ms (Convex HTTP) to ~10-50ms (SpacetimeDB reducer)
+- Dashboard latency drops from ~600ms to ~60-100ms
+
+**Tradeoffs:**
+- (+) Fastest possible hot path (no network at all)
+- (+) Dashboard real-time is much faster than current
+- (+) No Redis dependency
+- (-) Cache state is lost on process restart (must re-sync from SpacetimeDB)
+- (-) Quota is eventually consistent between receiver and SpacetimeDB
+- (-) Multiple receiver instances would each have independent caches (no shared state without Redis)
+- (-) Still requires SpacetimeDB infra management
+
+**Feasibility: High.** This is architecturally the most pragmatic option. It's essentially the current design with Redis swapped for in-process state and Convex swapped for SpacetimeDB.
+
+### Comparison Matrix
+
+| Aspect | Current | Option A (Client Cache) | Option B (Thin Proxy) | Option C (In-Process) |
+|--------|---------|------------------------|-----------------------|-----------------------|
+| Hot-path latency | ~4ms | ~5-20ms (sync) or ~0ms (fire-forget) | ~10-30ms | **~0.5ms** |
+| Peak RPS | 86k | ~10-30k | ~5-15k | **~100k+** |
+| Dashboard latency | ~600ms | **~10-30ms** | **~10-30ms** | ~60-100ms |
+| Architectural complexity | Medium | Medium | Low | Medium |
+| Multi-instance support | Yes (Redis shared) | Yes (each subscribes) | Yes (stateless proxy) | **No** (unless adding Redis back for shared state) |
+| Data durability on crash | Good (Redis persists) | Medium (in-flight reducers lost) | Good (sync writes) | Poor (in-process buffer lost) |
+| Receiver Rust SDK exists? | N/A | **No** (module SDK only) | Needs raw WebSocket | N/A (just uses HTTP/WS client) |
+| Eliminates Redis? | No | **Yes** | **Yes** | **Yes** |
+| Eliminates flush pipeline? | No | **Yes** | **Yes** | No (but simpler) |
+
+### Bottom Line
+
+**Option C (in-process cache + SpacetimeDB background sync) is the most practical rebuild** if you're committed to SpacetimeDB. It preserves the sub-millisecond hot path, eliminates Redis, and improves dashboard real-time latency. But it trades away multi-instance horizontal scaling and crash durability of the buffer.
+
+**Option A is the most "SpacetimeDB-native"** approach but is blocked by the lack of a Rust client SDK for standalone applications (the existing Rust SDK is for WASM modules only).
+
+**The honest assessment:** None of these options are clearly better than the current Redis + Convex architecture for this specific workload. The current design already achieves the optimal separation of concerns — the receiver only needs to answer one question fast ("should I accept and buffer this request?") and the persistent store only needs to answer a different question well ("show me the latest requests in real-time"). SpacetimeDB's value proposition of "database and server in one" doesn't help when you intentionally want them separated for performance isolation.
+
+---
+
 ## Sources
 
 - [SpacetimeDB Official Site](https://spacetimedb.com/)
