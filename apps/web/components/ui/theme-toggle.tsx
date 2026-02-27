@@ -4,6 +4,10 @@ import { useTheme } from "@/components/providers/theme-provider";
 import { Monitor, Moon, Sun } from "lucide-react";
 
 export function ThemeToggle() {
+  return <ThemeToggleButtons />;
+}
+
+function ThemeToggleButtons() {
   const { theme, setTheme } = useTheme();
 
   return (
