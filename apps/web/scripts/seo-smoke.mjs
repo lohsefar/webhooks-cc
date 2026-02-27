@@ -56,7 +56,8 @@ async function main() {
       errors.push(`${path}: expected 200, got ${page.response.status}`);
     if (!title) errors.push(`${path}: missing <title>`);
     if (!description) errors.push(`${path}: missing meta description`);
-    if (!robots.includes("index")) errors.push(`${path}: expected indexable robots meta`);
+    if (/\bnoindex\b/i.test(robots) || !/\bindex\b/i.test(robots))
+      errors.push(`${path}: expected indexable robots meta`);
     if (canonical !== canonicalUrl && !(path === "/" && canonical === siteUrl)) {
       errors.push(`${path}: canonical mismatch (${canonical || "missing"})`);
     }

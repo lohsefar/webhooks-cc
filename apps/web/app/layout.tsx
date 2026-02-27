@@ -99,7 +99,7 @@ export default function RootLayout({
       <body className={`${spaceGrotesk.variable} ${jetbrainsMono.variable} font-sans`}>
         <ThemeProvider>
           <noscript>
-            <div style={{ padding: "1rem", fontFamily: "system-ui, sans-serif", lineHeight: 1.5 }}>
+            <div style={{ padding: "1rem", fontFamily: "var(--font-sans), sans-serif", lineHeight: 1.5 }}>
               <strong>webhooks.cc</strong>: Webhook testing tools with CLI, TypeScript SDK, and MCP
               server. Start at{" "}
               <a href="https://webhooks.cc/docs" style={{ textDecoration: "underline" }}>
