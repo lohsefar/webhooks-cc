@@ -6,9 +6,8 @@ const baseUrl = (process.env.SEO_BASE_URL || "http://localhost:3000").replace(/\
 const siteUrl = "https://webhooks.cc";
 
 function normalizePath(url) {
-  if (url.startsWith(siteUrl)) return url.slice(siteUrl.length) || "/";
-  const parsed = new URL(url);
-  return `${parsed.pathname}${parsed.search}`;
+  const parsed = new URL(url, siteUrl);
+  return `${parsed.pathname}${parsed.search}` || "/";
 }
 
 function readFirst(html, re) {
