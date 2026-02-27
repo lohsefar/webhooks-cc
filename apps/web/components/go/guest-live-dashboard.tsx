@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import dynamic from "next/dynamic";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useConvexAuth, useMutation, useQuery } from "convex/react";
 import { api } from "@convex/_generated/api";
@@ -8,14 +9,12 @@ import { useRouter } from "next/navigation";
 import { cn } from "@/lib/utils";
 import { copyToClipboard } from "@/lib/clipboard";
 import { getWebhookUrl } from "@/lib/constants";
-import { RequestList } from "@/components/dashboard/request-list";
-import { RequestDetail, RequestDetailEmpty } from "@/components/dashboard/request-detail";
 import { ErrorBoundary } from "@/components/error-boundary";
 import { ThemeToggle } from "@/components/ui/theme-toggle";
 import { OAuthSignInButtons } from "@/components/auth/oauth-signin-buttons";
 import type { Id } from "@convex/_generated/dataModel";
 import type { Request, RequestSummary } from "@/types/request";
-import { Check, Circle, Copy, Plus, Send } from "lucide-react";
+import { ArrowRight, Bot, Check, Circle, Copy, Eye, Plus, Send, Terminal } from "lucide-react";
 import { ConvexAuthProvider } from "@/components/providers/convex-auth-provider";
 
 const REQUEST_LIMIT = 50;
@@ -25,6 +24,72 @@ const EXPIRY_MS = 10 * 60 * 60 * 1000;
 const COPY_FEEDBACK_MS = 2000;
 const SEND_FEEDBACK_MS = 3000;
 const DEMO_ENDPOINT_STORAGE_KEY = "demo_endpoint";
+const WEBHOOK_SITE_DIFF_ROWS = [
+  ["Core webhook inspection", "Yes", "Yes"],
+  ["CLI tunnel to localhost", "Yes", "Yes"],
+  ["TypeScript SDK for automated tests", "Yes", "No first-party SDK"],
+  ["MCP server for AI coding agents", "Yes", "No first-party server"],
+  ["Pricing model", "Core features on every tier", "Feature-gated tiers"],
+] as const;
+const FREE_ACCOUNT_FEATURES = [
+  "200 requests/day",
+  "7-day data retention",
+  "Unlimited endpoints",
+  "CLI, SDK & MCP access",
+] as const;
+const GO_LANDING_FEATURES = [
+  {
+    title: "Inspect live payloads",
+    description:
+      "See method, headers, query params, and body in real time while your integration runs.",
+    Icon: Eye,
+  },
+  {
+    title: "Tunnel with the CLI",
+    description:
+      "Forward webhooks to localhost with `whk tunnel` so you can debug handlers on your local app.",
+    Icon: Terminal,
+  },
+  {
+    title: "Assert with the SDK",
+    description:
+      "Use the TypeScript SDK in test suites to wait for webhook events and assert payload shape.",
+    Icon: Check,
+  },
+  {
+    title: "Automate with MCP",
+    description:
+      "Let AI coding agents create endpoints, send tests, inspect requests, and replay events.",
+    Icon: Bot,
+  },
+] as const;
+const GO_VALUE_PILLS = [
+  "No signup to start",
+  "200 requests/day on free",
+  "CLI, SDK, and MCP included",
+] as const;
+
+const RequestList = dynamic(
+  () => import("@/components/dashboard/request-list").then((module) => module.RequestList),
+  {
+    ssr: false,
+    loading: () => <RequestListLoading />,
+  }
+);
+const RequestDetail = dynamic(
+  () => import("@/components/dashboard/request-detail").then((module) => module.RequestDetail),
+  {
+    ssr: false,
+    loading: () => <RequestDetailLoading />,
+  }
+);
+const RequestDetailEmpty = dynamic(
+  () => import("@/components/dashboard/request-detail").then((module) => module.RequestDetailEmpty),
+  {
+    ssr: false,
+    loading: () => <RequestDetailLoading />,
+  }
+);
 
 function formatRemainingTime(ms: number): string {
   const totalSeconds = Math.max(0, Math.floor(ms / 1000));
@@ -37,6 +102,22 @@ function formatRemainingTime(ms: number): string {
   }
 
   return `${minutes}:${seconds.toString().padStart(2, "0")}`;
+}
+
+function RequestListLoading() {
+  return (
+    <div className="h-full flex items-center justify-center text-xs font-bold uppercase tracking-wide text-muted-foreground">
+      Loading requests...
+    </div>
+  );
+}
+
+function RequestDetailLoading() {
+  return (
+    <div className="h-full flex items-center justify-center text-xs font-bold uppercase tracking-wide text-muted-foreground">
+      Loading request...
+    </div>
+  );
 }
 
 export function GuestLiveDashboard() {
@@ -334,34 +415,11 @@ function GuestLiveDashboardInner() {
     return (
       <div className="h-screen flex flex-col overflow-hidden">
         <GoHeader isAuthenticated={isAuthenticated} isLoading={isLoading} />
-        <div className="flex-1 flex items-center justify-center p-8">
-          <div className="text-center space-y-4 max-w-md">
-            <div className="w-16 h-16 border-2 border-foreground bg-muted flex items-center justify-center mx-auto mb-2">
-              <Send className="h-8 w-8 text-muted-foreground" />
-            </div>
-            <h1 className="text-2xl font-bold uppercase tracking-wide">Try Webhooks Live</h1>
-            <p className="text-muted-foreground">
-              Create a temporary endpoint to see requests in the same dashboard layout as paid/free
-              accounts. No signup required.
-            </p>
-            <button
-              onClick={handleCreateEndpoint}
-              disabled={isCreating}
-              className="neo-btn-primary disabled:opacity-50"
-            >
-              <Plus className="inline-block mr-2 h-4 w-4" />
-              {isCreating ? "Creating..." : "Create test endpoint"}
-            </button>
-            {createError && (
-              <p role="alert" className="text-sm text-destructive font-medium">
-                {createError}
-              </p>
-            )}
-            <p className="text-xs text-muted-foreground">
-              Test endpoints support up to 50 requests and expire after 10 hours.
-            </p>
-          </div>
-        </div>
+        <GoPreCreateLanding
+          isCreating={isCreating}
+          createError={createError}
+          onCreateEndpoint={handleCreateEndpoint}
+        />
       </div>
     );
   }
@@ -462,6 +520,182 @@ function GuestLiveDashboardInner() {
           <DemoWaitingState url={endpointUrl} />
         )}
       </ErrorBoundary>
+    </div>
+  );
+}
+
+function GoPreCreateLanding({
+  isCreating,
+  createError,
+  onCreateEndpoint,
+}: {
+  isCreating: boolean;
+  createError: string | null;
+  onCreateEndpoint: () => Promise<void>;
+}) {
+  return (
+    <div className="flex-1 overflow-auto">
+      <section className="px-4 pt-8 md:pt-12 pb-8 md:pb-10">
+        <div className="max-w-7xl mx-auto grid gap-6 lg:grid-cols-[minmax(0,1.35fr)_minmax(0,0.95fr)]">
+          <div className="neo-card neo-card-static space-y-6">
+            <p className="text-xs font-bold uppercase tracking-wide text-muted-foreground">
+              Webhook testing workspace
+            </p>
+            <h1 className="text-3xl md:text-5xl font-bold leading-tight max-w-4xl">
+              Test webhooks live, then scale with CLI, SDK, and MCP
+            </h1>
+            <p className="text-base md:text-lg text-muted-foreground leading-relaxed max-w-2xl">
+              Create a temporary endpoint in one click and inspect real webhook payloads instantly.
+              When you are ready, move to a free account for permanent endpoints and full developer
+              tooling.
+            </p>
+            <div className="flex flex-wrap gap-2">
+              {GO_VALUE_PILLS.map((pill) => (
+                <span
+                  key={pill}
+                  className="border-2 border-foreground/60 px-2.5 py-1 text-xs font-semibold uppercase tracking-wide bg-muted"
+                >
+                  {pill}
+                </span>
+              ))}
+            </div>
+            <div className="flex flex-wrap items-center gap-3">
+              <button
+                onClick={onCreateEndpoint}
+                disabled={isCreating}
+                className="neo-btn-primary disabled:opacity-50 min-w-52"
+              >
+                <Plus className="inline-block mr-2 h-4 w-4" />
+                {isCreating ? "Creating..." : "Create test endpoint"}
+              </button>
+              <Link href="/login" className="neo-btn-outline">
+                Create free account
+              </Link>
+            </div>
+            {createError && (
+              <p role="alert" className="text-sm text-destructive font-medium">
+                {createError}
+              </p>
+            )}
+            <p className="text-sm text-muted-foreground leading-relaxed">
+              Guest endpoints support up to 50 requests and expire after 10 hours.
+            </p>
+          </div>
+
+          <aside className="neo-card space-y-5">
+            <div className="space-y-1.5">
+              <p className="text-xs font-bold uppercase tracking-wide text-muted-foreground">
+                Pricing snapshot
+              </p>
+              <h2 className="text-2xl font-bold leading-tight">Free account includes</h2>
+            </div>
+            <ul className="space-y-2.5">
+              {FREE_ACCOUNT_FEATURES.map((feature) => (
+                <li key={feature} className="flex items-center gap-2">
+                  <Check className="h-4 w-4 text-primary flex-shrink-0" />
+                  <span>{feature}</span>
+                </li>
+              ))}
+            </ul>
+            <p className="text-sm text-muted-foreground leading-relaxed">
+              Start on free with no credit card. Pro is $8/month for 500,000 requests/month and
+              30-day retention.
+            </p>
+            <div className="flex flex-wrap gap-3">
+              <Link href="/compare/webhook-site" className="neo-btn-outline text-sm py-2 px-3">
+                Compare vs Webhook.site
+              </Link>
+              <Link href="/docs/cli" className="neo-btn-outline text-sm py-2 px-3">
+                CLI docs
+              </Link>
+            </div>
+          </aside>
+        </div>
+      </section>
+
+      <section className="px-4 pb-10">
+        <div className="max-w-7xl mx-auto space-y-5">
+          <div className="space-y-2">
+            <p className="text-xs font-bold uppercase tracking-wide text-muted-foreground">
+              Workflow coverage
+            </p>
+            <h2 className="text-2xl md:text-3xl font-bold">One platform for manual tests and automation</h2>
+          </div>
+
+          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+            {GO_LANDING_FEATURES.map((feature) => {
+              const Icon = feature.Icon;
+              return (
+                <article key={feature.title} className="neo-card neo-card-static">
+                  <div className="w-10 h-10 border-2 border-foreground bg-muted flex items-center justify-center mb-3">
+                    <Icon className="h-5 w-5" />
+                  </div>
+                  <h3 className="font-bold text-lg mb-2">{feature.title}</h3>
+                  <p className="text-sm text-muted-foreground">{feature.description}</p>
+                </article>
+              );
+            })}
+          </div>
+        </div>
+      </section>
+
+      <section className="px-4 pb-16">
+        <div className="max-w-7xl mx-auto neo-card neo-card-static space-y-5">
+          <div className="flex flex-wrap items-end justify-between gap-3">
+            <div className="space-y-1.5">
+              <p className="text-xs font-bold uppercase tracking-wide text-muted-foreground">
+                Comparison
+              </p>
+              <h2 className="text-2xl md:text-3xl font-bold">webhooks.cc vs Webhook.site</h2>
+              <p className="text-muted-foreground">
+                Compare request inspection, price model, and workflow support for CLI, SDK, and MCP.
+              </p>
+            </div>
+            <Link href="/compare/webhook-site" className="neo-btn-outline text-sm py-2 px-3">
+              Read full comparison <ArrowRight className="inline h-4 w-4 ml-1" />
+            </Link>
+          </div>
+
+          <div className="neo-code overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b-2 border-foreground">
+                  <th scope="col" className="text-left py-2 pr-3">
+                    Category
+                  </th>
+                  <th scope="col" className="text-left py-2 pr-3">
+                    webhooks.cc
+                  </th>
+                  <th scope="col" className="text-left py-2">
+                    Webhook.site
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                {WEBHOOK_SITE_DIFF_ROWS.map(([label, left, right]) => (
+                  <tr key={label} className="border-b border-foreground/20 last:border-0">
+                    <td className="py-2 pr-3 font-semibold">{label}</td>
+                    <td className="py-2 pr-3">{left}</td>
+                    <td className="py-2">{right}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+
+          <div className="flex flex-wrap gap-3">
+            <Link href="/docs/sdk" className="neo-btn-outline text-sm py-2 px-3">
+              SDK docs
+            </Link>
+            <Link href="/docs/mcp" className="neo-btn-outline text-sm py-2 px-3">
+              MCP docs
+            </Link>
+            <Link href="/" className="neo-btn-outline text-sm py-2 px-3">
+              Pricing overview
+            </Link>
+          </div>
+        </div>
+      </section>
     </div>
   );
 }
