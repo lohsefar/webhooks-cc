@@ -7,6 +7,20 @@ import { trackQuotaWarningShown } from "@/lib/analytics";
 
 export function UsageDisplay() {
   const user = useQuery(api.users.current);
+  const warningFired = useRef(false);
+
+  const percentage =
+    user && user.requestLimit > 0
+      ? Math.min((user.requestsUsed / user.requestLimit) * 100, 100)
+      : 0;
+  const isNearLimit = percentage > 80;
+
+  useEffect(() => {
+    if (user && isNearLimit && !warningFired.current) {
+      warningFired.current = true;
+      trackQuotaWarningShown(user.plan, percentage);
+    }
+  }, [user, isNearLimit, percentage]);
 
   if (user === undefined) {
     return (
@@ -21,18 +35,6 @@ export function UsageDisplay() {
   }
 
   if (user === null) return null;
-
-  const percentage =
-    user.requestLimit > 0 ? Math.min((user.requestsUsed / user.requestLimit) * 100, 100) : 0;
-  const isNearLimit = percentage > 80;
-
-  const warningFired = useRef(false);
-  useEffect(() => {
-    if (isNearLimit && !warningFired.current) {
-      warningFired.current = true;
-      trackQuotaWarningShown(user.plan, percentage);
-    }
-  }, [isNearLimit, user.plan, percentage]);
 
   return (
     <div className="space-y-2">

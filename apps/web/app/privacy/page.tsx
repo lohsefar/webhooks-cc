@@ -125,9 +125,9 @@ export default function PrivacyPage() {
               webhooks.cc.
             </p>
             <p>
-              <span className="font-bold text-foreground">What we collect.</span> Page views,
-              button clicks, referrer URL, and UTM campaign parameters. For logged-in users we
-              associate analytics events with your account to understand usage patterns.
+              <span className="font-bold text-foreground">What we collect.</span> Page views, button
+              clicks, referrer URL, and UTM campaign parameters. For logged-in users we associate
+              analytics events with your account to understand usage patterns.
             </p>
             <p>
               <span className="font-bold text-foreground">What we do not collect.</span> We do not
@@ -135,8 +135,8 @@ export default function PrivacyPage() {
             </p>
             <p>
               <span className="font-bold text-foreground">Legal basis.</span> We process this data
-              under legitimate interest (GDPR Art.&nbsp;6(1)(f)) to improve our service. You can
-              opt out by using a standard content blocker that blocks PostHog.
+              under legitimate interest (GDPR Art.&nbsp;6(1)(f)) to improve our service. You can opt
+              out by using a standard content blocker that blocks PostHog.
             </p>
             <p>
               <span className="font-bold text-foreground">Data location.</span> By default,
@@ -183,8 +183,8 @@ export default function PrivacyPage() {
           <div className="space-y-3 text-sm text-muted-foreground">
             <p>
               Authentication is managed by Convex and uses standard session mechanisms. We store
-              your theme preference (light/dark) and a PostHog anonymous identifier in
-              localStorage. We do not use tracking cookies.
+              your theme preference (light/dark) and a PostHog anonymous identifier in localStorage.
+              We do not use tracking cookies.
             </p>
           </div>
         </section>
