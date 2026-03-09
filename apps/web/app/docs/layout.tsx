@@ -1,5 +1,6 @@
 import { DocsSidebar } from "@/components/docs/sidebar";
 import { DocsBreadcrumbs } from "@/components/docs/breadcrumbs";
+import { SearchModal } from "@/components/docs/search-modal";
 import { FloatingNavbar } from "@/components/nav/floating-navbar";
 import { BackButton } from "@/components/nav/back-button";
 
@@ -25,6 +26,8 @@ export default function DocsLayout({ children }: { children: React.ReactNode }) 
           </main>
         </div>
       </div>
+
+      <SearchModal />
     </div>
   );
 }
