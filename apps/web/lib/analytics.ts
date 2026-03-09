@@ -24,25 +24,9 @@ export function trackSignInStarted(provider: "github" | "google") {
   capture("sign_in_started", { provider });
 }
 
-export function trackSignInCompleted() {
-  capture("sign_in_completed");
-}
-
 // ── Dashboard ───────────────────────────────────────────────────
 export function trackEndpointCreated(slug: string) {
   capture("endpoint_created", { slug });
-}
-
-export function trackRequestViewed() {
-  capture("request_viewed");
-}
-
-export function trackRequestExported(format: "json" | "csv") {
-  capture("request_exported", { format });
-}
-
-export function trackWebhookSent(provider?: string) {
-  capture("webhook_sent", { provider });
 }
 
 // ── Billing / Upgrade ───────────────────────────────────────────
@@ -81,11 +65,3 @@ export function identifyUser(userId: string, properties?: Record<string, unknown
   }
 }
 
-export function resetUser() {
-  if (typeof window === "undefined") return;
-  try {
-    posthog.reset();
-  } catch {
-    // PostHog not initialized
-  }
-}

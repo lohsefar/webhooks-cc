@@ -10,6 +10,18 @@ const POSTHOG_HOST = process.env.NEXT_PUBLIC_POSTHOG_HOST || "https://us.i.posth
 
 const UTM_PARAMS = ["utm_source", "utm_medium", "utm_campaign", "utm_term", "utm_content"] as const;
 
+// Initialize at module load time so posthog is ready before any React effects fire.
+// This ensures the first pageview (landing page with referrer/UTM data) is never dropped.
+if (typeof window !== "undefined" && POSTHOG_KEY) {
+  posthog.init(POSTHOG_KEY, {
+    api_host: POSTHOG_HOST,
+    persistence: "memory",
+    capture_pageview: false, // we handle this manually
+    capture_pageleave: true,
+    autocapture: true,
+  });
+}
+
 function getUtmParams(searchParams: URLSearchParams): Record<string, string> {
   const utms: Record<string, string> = {};
   for (const key of UTM_PARAMS) {
@@ -36,17 +48,6 @@ function getReferrerInfo(): Record<string, string> {
 }
 
 export function PostHogProvider({ children }: { children: React.ReactNode }) {
-  useEffect(() => {
-    if (!POSTHOG_KEY) return;
-    posthog.init(POSTHOG_KEY, {
-      api_host: POSTHOG_HOST,
-      persistence: "memory",
-      capture_pageview: false, // we handle this manually
-      capture_pageleave: true,
-      autocapture: true,
-    });
-  }, []);
-
   if (!POSTHOG_KEY) return <>{children}</>;
 
   return <PHProvider client={posthog}>{children}</PHProvider>;

@@ -103,7 +103,7 @@ export default function AccountPage() {
     if (user) {
       identifyUser(user._id, { email: user.email, plan: user.plan });
     }
-  }, [user]);
+  }, [user?._id, user?.email, user?.plan]);
 
   if (user === undefined) {
     return (
