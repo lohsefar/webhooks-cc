@@ -2,17 +2,18 @@
 
 import Link from "next/link";
 import { ArrowRight } from "lucide-react";
+import { trackCTAClick } from "@/lib/analytics";
 
 export function HeroCTA() {
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-center gap-4">
-        <Link href="/login" className="neo-btn-primary">
+        <Link href="/login" className="neo-btn-primary" onClick={() => trackCTAClick("register")}>
           Register now
           <ArrowRight className="inline-block ml-2 h-5 w-5" />
         </Link>
         <span className="text-muted-foreground font-semibold">or</span>
-        <Link href="/go" className="neo-btn-outline">
+        <Link href="/go" className="neo-btn-outline" onClick={() => trackCTAClick("try_live")}>
           Try it live
         </Link>
       </div>
@@ -21,6 +22,7 @@ export function HeroCTA() {
         <Link
           href="#faq"
           className="text-foreground font-bold hover:text-primary transition-colors"
+          onClick={() => trackCTAClick("faq")}
         >
           FAQ
         </Link>{" "}
@@ -28,6 +30,7 @@ export function HeroCTA() {
         <Link
           href="/docs"
           className="text-foreground font-bold hover:text-primary transition-colors"
+          onClick={() => trackCTAClick("docs")}
         >
           read the docs
         </Link>
