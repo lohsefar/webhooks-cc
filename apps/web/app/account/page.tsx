@@ -23,7 +23,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { UpgradeButton } from "@/components/billing/upgrade-button";
 import { ManageSubscriptionDialog } from "@/components/billing/manage-subscription-dialog";
 import { PastDueBanner } from "@/components/billing/past-due-banner";
-import { trackUpgradeCompleted, trackAccountDeleted, identifyUser } from "@/lib/analytics";
+import { trackUpgradeCompleted, trackAccountDeleted } from "@/lib/analytics";
 
 function UsageResetCountdown({ periodEnd }: { periodEnd: number }) {
   const [timeRemaining, setTimeRemaining] = useState<string>("");
@@ -98,12 +98,6 @@ export default function AccountPage() {
   const [revoking, setRevoking] = useState(false);
   const [revokeError, setRevokeError] = useState<string | null>(null);
   const [deleteError, setDeleteError] = useState<string | null>(null);
-
-  useEffect(() => {
-    if (user) {
-      identifyUser(user._id, { email: user.email, plan: user.plan });
-    }
-  }, [user?._id, user?.email, user?.plan]);
 
   if (user === undefined) {
     return (

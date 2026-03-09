@@ -18,7 +18,10 @@ if (typeof window !== "undefined" && POSTHOG_KEY) {
     persistence: "memory",
     capture_pageview: false, // we handle this manually
     capture_pageleave: true,
-    autocapture: true,
+    autocapture: {
+      dom_event_allowlist: ["click"],
+      element_allowlist: ["a", "button"],
+    },
   });
 }
 
