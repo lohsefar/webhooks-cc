@@ -11,6 +11,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { RequireAuth } from "@/components/auth/require-auth";
 import { parseStatusCode } from "@/lib/http";
 import Link from "next/link";
+import { trackEndpointCreated } from "@/lib/analytics";
 
 export default function NewEndpointPage() {
   return (
@@ -47,6 +48,7 @@ function NewEndpointForm() {
           : undefined,
       });
 
+      trackEndpointCreated();
       router.push(`/dashboard?endpoint=${result.slug}`);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to create endpoint");

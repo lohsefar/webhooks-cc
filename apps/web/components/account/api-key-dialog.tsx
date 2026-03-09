@@ -17,6 +17,7 @@ import {
 } from "@/components/ui/dialog";
 import { Copy, Check, AlertTriangle } from "lucide-react";
 import { copyToClipboard } from "@/lib/clipboard";
+import { trackApiKeyCreated } from "@/lib/analytics";
 
 export function ApiKeyDialog() {
   const [open, setOpen] = useState(false);
@@ -39,6 +40,7 @@ export function ApiKeyDialog() {
 
     try {
       const result = await createApiKey({ name: name.trim() });
+      trackApiKeyCreated();
       setCreatedKey(result.key);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to create API key");
