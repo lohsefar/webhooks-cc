@@ -10,7 +10,7 @@ export const metadata = createPageMetadata({
 
 export default function StandardWebhooksPage() {
   return (
-    <article>
+    <article className="max-w-3xl">
       <h1 className="text-3xl md:text-4xl font-bold mb-4">Standard Webhooks + Vitest</h1>
       <p className="text-lg text-muted-foreground mb-8">
         Test webhook handlers for services that use the{" "}

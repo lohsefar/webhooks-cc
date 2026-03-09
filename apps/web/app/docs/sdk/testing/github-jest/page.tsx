@@ -10,7 +10,7 @@ export const metadata = createPageMetadata({
 
 export default function GitHubJestPage() {
   return (
-    <article>
+    <article className="max-w-3xl">
       <h1 className="text-3xl md:text-4xl font-bold mb-4">GitHub + Jest</h1>
       <p className="text-lg text-muted-foreground mb-8">
         Validate push and pull request webhook events in a Jest integration suite.

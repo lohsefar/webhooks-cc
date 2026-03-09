@@ -10,7 +10,7 @@ export const metadata = createPageMetadata({
 
 export default function EndpointsPage() {
   return (
-    <article>
+    <article className="max-w-3xl">
       <h1 className="text-3xl md:text-4xl font-bold mb-4">Endpoints</h1>
       <p className="text-lg text-muted-foreground mb-10">
         Endpoints are unique URLs that capture incoming webhooks. Each endpoint has its own request

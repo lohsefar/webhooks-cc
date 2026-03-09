@@ -9,7 +9,7 @@ export const metadata = createPageMetadata({
 
 export default function RequestsPage() {
   return (
-    <article>
+    <article className="max-w-3xl">
       <h1 className="text-3xl md:text-4xl font-bold mb-4">Requests</h1>
       <p className="text-lg text-muted-foreground mb-10">
         Every webhook sent to your endpoint is captured and displayed in real-time. Inspect every

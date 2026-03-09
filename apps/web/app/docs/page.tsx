@@ -11,7 +11,7 @@ export const metadata = createPageMetadata({
 
 export default function DocsPage() {
   return (
-    <article>
+    <article className="max-w-3xl">
       <JsonLd
         data={howToSchema({
           name: "How to test webhooks with webhooks.cc",

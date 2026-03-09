@@ -24,7 +24,7 @@ const SDK_FAQ: FAQItem[] = [
 
 export default function SdkPage() {
   return (
-    <article>
+    <article className="max-w-3xl">
       <JsonLd data={faqSchema(SDK_FAQ)} />
       <h1 className="text-3xl md:text-4xl font-bold mb-4">SDK</h1>
       <p className="text-lg text-muted-foreground mb-10">

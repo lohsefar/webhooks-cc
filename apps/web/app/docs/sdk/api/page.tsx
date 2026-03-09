@@ -266,7 +266,7 @@ const METHODS: { section: string; methods: MethodDef[] }[] = [
 
 export default function ApiReferencePage() {
   return (
-    <article>
+    <article className="max-w-3xl">
       <h1 className="text-3xl md:text-4xl font-bold mb-4">API Reference</h1>
       <p className="text-lg text-muted-foreground mb-10">
         Complete method reference for the webhooks.cc TypeScript SDK.

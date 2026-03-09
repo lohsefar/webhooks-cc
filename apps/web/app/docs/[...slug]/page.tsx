@@ -7,6 +7,8 @@ import { createPageMetadata } from "@/lib/seo";
 import { mdxComponents } from "@/components/docs/mdx-components";
 import { PrevNextNav } from "@/components/docs/prev-next";
 import { getPrevNext } from "@/lib/docs-nav";
+import { rehypeExtractHeadings } from "@/lib/rehype-extract-headings";
+import { TableOfContents, type TocItem } from "@/components/docs/toc";
 import type { Metadata } from "next";
 
 interface PageProps {
@@ -38,6 +40,8 @@ export default async function DocsCatchAllPage({ params }: PageProps) {
 
   const { content, frontmatter: fm } = doc;
 
+  const headings: TocItem[] = [];
+
   const { content: mdxContent } = await compileMDX({
     source: content,
     components: mdxComponents,
@@ -45,6 +49,7 @@ export default async function DocsCatchAllPage({ params }: PageProps) {
       mdxOptions: {
         rehypePlugins: [
           rehypeSlug,
+          rehypeExtractHeadings(headings),
           [
             rehypePrettyCode,
             {
@@ -71,6 +76,7 @@ export default async function DocsCatchAllPage({ params }: PageProps) {
         {mdxContent}
         <PrevNextNav prev={prev} next={next} />
       </article>
+      <TableOfContents headings={headings} />
     </div>
   );
 }

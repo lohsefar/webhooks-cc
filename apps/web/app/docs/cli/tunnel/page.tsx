@@ -28,7 +28,7 @@ const TUNNEL_FAQ: FAQItem[] = [
 
 export default function TunnelPage() {
   return (
-    <article>
+    <article className="max-w-3xl">
       <JsonLd
         data={howToSchema({
           name: "How to forward webhooks to localhost",

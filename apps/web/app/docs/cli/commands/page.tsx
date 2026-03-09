@@ -102,7 +102,7 @@ const COMMANDS: CommandDef[] = [
 
 export default function CommandsPage() {
   return (
-    <article>
+    <article className="max-w-3xl">
       <h1 className="text-3xl md:text-4xl font-bold mb-4">Command Reference</h1>
       <p className="text-lg text-muted-foreground mb-4">
         All available commands for the <code className="font-mono font-bold">whk</code> CLI.

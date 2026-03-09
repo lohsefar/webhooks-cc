@@ -43,7 +43,7 @@ const providerRows = [
 
 export default function DashboardTestWebhooksPage() {
   return (
-    <article>
+    <article className="max-w-3xl">
       <h1 className="text-3xl md:text-4xl font-bold mb-4">Dashboard test webhooks</h1>
       <p className="text-lg text-muted-foreground mb-10">
         Use the <strong className="text-foreground">Send</strong> button in the dashboard URL bar to

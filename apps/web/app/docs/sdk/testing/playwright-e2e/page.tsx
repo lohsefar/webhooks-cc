@@ -9,7 +9,7 @@ export const metadata = createPageMetadata({
 
 export default function PlaywrightE2EPage() {
   return (
-    <article>
+    <article className="max-w-3xl">
       <h1 className="text-3xl md:text-4xl font-bold mb-4">Playwright E2E</h1>
       <p className="text-lg text-muted-foreground mb-8">
         Combine browser automation with webhook assertions for end-to-end checkout or onboarding

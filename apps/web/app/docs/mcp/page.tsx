@@ -90,7 +90,7 @@ const MCP_FAQ: FAQItem[] = [
 
 export default function McpPage() {
   return (
-    <article>
+    <article className="max-w-3xl">
       <JsonLd data={faqSchema(MCP_FAQ)} />
       <h1 className="text-3xl md:text-4xl font-bold mb-4">MCP Server</h1>
       <p className="text-lg text-muted-foreground mb-6">

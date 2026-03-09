@@ -9,7 +9,7 @@ export const metadata = createPageMetadata({
 
 export default function MockResponsesPage() {
   return (
-    <article>
+    <article className="max-w-3xl">
       <h1 className="text-3xl md:text-4xl font-bold mb-4">Mock Responses</h1>
       <p className="text-lg text-muted-foreground mb-10">
         Control what your endpoint returns to the sender. Set status codes, response headers, and
