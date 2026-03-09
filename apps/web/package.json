@@ -4,7 +4,7 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
-    "build": "next build",
+    "build": "next build && pagefind --site .next/server/app --output-path public/_pagefind",
     "start": "next start",
     "typecheck": "tsc --noEmit",
     "seo:check": "node scripts/seo-smoke.mjs"
