@@ -20,6 +20,8 @@ const publicEnvSchema = z.object({
   NEXT_PUBLIC_WEBHOOK_URL: z.string().url(),
   NEXT_PUBLIC_APP_URL: z.string().url().default("https://webhooks.cc"),
   NEXT_PUBLIC_SENTRY_DSN: z.string().optional(),
+  NEXT_PUBLIC_POSTHOG_KEY: z.string().optional(),
+  NEXT_PUBLIC_POSTHOG_HOST: z.string().url().optional(),
 });
 
 const serverEnvSchema = z.object({
@@ -37,6 +39,8 @@ export function publicEnv() {
       NEXT_PUBLIC_WEBHOOK_URL: process.env.NEXT_PUBLIC_WEBHOOK_URL,
       NEXT_PUBLIC_APP_URL: process.env.NEXT_PUBLIC_APP_URL,
       NEXT_PUBLIC_SENTRY_DSN: process.env.NEXT_PUBLIC_SENTRY_DSN,
+      NEXT_PUBLIC_POSTHOG_KEY: process.env.NEXT_PUBLIC_POSTHOG_KEY,
+      NEXT_PUBLIC_POSTHOG_HOST: process.env.NEXT_PUBLIC_POSTHOG_HOST,
     });
   }
   return _publicEnv;

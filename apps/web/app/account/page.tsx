@@ -23,6 +23,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { UpgradeButton } from "@/components/billing/upgrade-button";
 import { ManageSubscriptionDialog } from "@/components/billing/manage-subscription-dialog";
 import { PastDueBanner } from "@/components/billing/past-due-banner";
+import { trackUpgradeCompleted, trackAccountDeleted, identifyUser } from "@/lib/analytics";
 
 function UsageResetCountdown({ periodEnd }: { periodEnd: number }) {
   const [timeRemaining, setTimeRemaining] = useState<string>("");
@@ -54,6 +55,7 @@ function UpgradeSuccessBanner() {
   useEffect(() => {
     if (searchParams.get("upgraded") === "true") {
       setShow(true);
+      trackUpgradeCompleted();
       // Remove the query parameter from URL
       const url = new URL(window.location.href);
       url.searchParams.delete("upgraded");
@@ -96,6 +98,12 @@ export default function AccountPage() {
   const [revoking, setRevoking] = useState(false);
   const [revokeError, setRevokeError] = useState<string | null>(null);
   const [deleteError, setDeleteError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (user) {
+      identifyUser(user._id, { email: user.email, plan: user.plan });
+    }
+  }, [user]);
 
   if (user === undefined) {
     return (
@@ -143,6 +151,7 @@ export default function AccountPage() {
     // Keep dialog open during operation so user can see errors
     try {
       await deleteAccountMutation({});
+      trackAccountDeleted();
       setConfirmDialogOpen(false);
       await signOut();
       router.push("/");

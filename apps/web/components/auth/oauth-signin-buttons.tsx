@@ -5,6 +5,7 @@ import { useConvexAuth } from "convex/react";
 import { useAuthActions } from "@convex-dev/auth/react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
+import { trackSignInStarted } from "@/lib/analytics";
 
 type Provider = "github" | "google";
 
@@ -33,6 +34,7 @@ export function OAuthSignInButtons({
   const handleSignIn = async (provider: Provider) => {
     setSigningIn(provider);
     setError(null);
+    trackSignInStarted(provider);
     try {
       await signIn(provider, { redirectTo });
     } catch {
