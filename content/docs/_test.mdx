@@ -1,0 +1,24 @@
+---
+title: "Infrastructure Test Page"
+description: "Temporary page to validate the MDX pipeline. Delete after Phase 1."
+section: getting-started
+order: 99
+lastUpdated: 2026-03-09
+schema: none
+---
+
+# Infrastructure Test Page
+
+This page validates the MDX pipeline.
+
+## Code Block Test
+
+```ts title="example.ts"
+const client = new WebhooksCC({ apiKey: "whcc_test123" });
+const endpoint = await client.endpoints.create({ name: "test" });
+console.log(endpoint.url);
+```
+
+## Component Tests
+
+Components will be tested here as they are built in subsequent tasks.
