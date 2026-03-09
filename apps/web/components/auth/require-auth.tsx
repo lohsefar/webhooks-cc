@@ -30,7 +30,7 @@ function RequireAuthInner({ children }: { children: React.ReactNode }) {
     if (user) {
       identifyUser(user._id, { email: user.email, plan: user.plan });
     }
-  }, [user?._id, user?.email, user?.plan]);
+  }, [user]);
 
   if (isLoading) {
     return (
