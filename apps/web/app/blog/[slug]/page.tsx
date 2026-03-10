@@ -7,6 +7,8 @@ import { compileBlogMDX } from "@/lib/blog-mdx";
 import { createDynamicBlogPostMetadata } from "@/lib/seo";
 import { BlogPostShell, type BlogPostData } from "@/components/blog/blog-post-shell";
 
+export const dynamic = "force-dynamic";
+
 interface PageProps {
   params: Promise<{ slug: string }>;
 }
@@ -39,11 +41,7 @@ export default async function BlogPostPage({ params }: PageProps) {
     .map((p) => ({ slug: p.slug, title: p.title, description: p.description }));
 
   return (
-    <BlogPostShell
-      post={post as BlogPostData}
-      headings={headings}
-      relatedPosts={relatedPosts}
-    >
+    <BlogPostShell post={post as BlogPostData} headings={headings} relatedPosts={relatedPosts}>
       {content}
     </BlogPostShell>
   );

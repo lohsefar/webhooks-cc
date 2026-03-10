@@ -5,6 +5,8 @@ import { JsonLd, breadcrumbSchema } from "@/lib/schemas";
 import { getConvexClient } from "@/lib/convex-client";
 import { api } from "@convex/_generated/api";
 
+export const dynamic = "force-dynamic";
+
 export const metadata = createPageMetadata({
   title: "webhooks.cc Blog",
   description:
@@ -91,7 +93,10 @@ export default async function BlogIndexPage() {
           <p className="text-xs font-bold uppercase tracking-widest text-muted-foreground mb-3">
             Featured
           </p>
-          <Link href={`/blog/${featured.slug}`} className="neo-card block p-0 overflow-hidden group">
+          <Link
+            href={`/blog/${featured.slug}`}
+            className="neo-card block p-0 overflow-hidden group"
+          >
             <div className="h-2 bg-primary" />
             <div className="p-6 md:p-8">
               <div className="flex flex-wrap items-center gap-3 mb-4">
@@ -144,9 +149,7 @@ export default async function BlogIndexPage() {
                           {formatBlogDate(post.publishedAt)}
                         </span>
                       )}
-                      <span className="text-xs text-muted-foreground">
-                        {post.readMinutes} min
-                      </span>
+                      <span className="text-xs text-muted-foreground">{post.readMinutes} min</span>
                     </div>
                     <h3 className="text-xl font-bold mb-2 leading-snug group-hover:underline">
                       {post.title}

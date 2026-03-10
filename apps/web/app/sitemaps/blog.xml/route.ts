@@ -2,6 +2,7 @@ import { getConvexClient } from "@/lib/convex-client";
 import { api } from "@convex/_generated/api";
 import { SITE_URL } from "@/lib/seo";
 
+export const dynamic = "force-dynamic";
 export const revalidate = 3600;
 
 export async function GET() {

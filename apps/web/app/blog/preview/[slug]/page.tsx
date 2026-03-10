@@ -5,6 +5,8 @@ import { api } from "@convex/_generated/api";
 import { compileBlogMDX } from "@/lib/blog-mdx";
 import { BlogPostShell, type BlogPostData } from "@/components/blog/blog-post-shell";
 
+export const dynamic = "force-dynamic";
+
 interface PageProps {
   params: Promise<{ slug: string }>;
 }
@@ -25,12 +27,7 @@ export default async function BlogPreviewPage({ params }: PageProps) {
   const { content, headings } = await compileBlogMDX(post.content);
 
   return (
-    <BlogPostShell
-      post={post as BlogPostData}
-      headings={headings}
-      relatedPosts={[]}
-      isDraft
-    >
+    <BlogPostShell post={post as BlogPostData} headings={headings} relatedPosts={[]} isDraft>
       {content}
     </BlogPostShell>
   );

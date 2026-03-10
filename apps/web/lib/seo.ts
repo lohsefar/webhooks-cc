@@ -91,9 +91,7 @@ export function createDynamicBlogPostMetadata(post: BlogPostData): Metadata {
   const description = post.seoDescription || post.description;
   const canonical = post.canonicalUrl ?? `/blog/${post.slug}`;
   const absoluteUrl = toAbsoluteUrl(`/blog/${post.slug}`);
-  const publishedTime = post.publishedAt
-    ? new Date(post.publishedAt).toISOString()
-    : undefined;
+  const publishedTime = post.publishedAt ? new Date(post.publishedAt).toISOString() : undefined;
   const modifiedTime = new Date(post.updatedAt).toISOString();
 
   return {
@@ -126,8 +124,7 @@ export function createDynamicBlogPostMetadata(post: BlogPostData): Metadata {
       index: true,
       follow: true,
     },
-    keywords: [...post.keywords, ...post.tags],
+    keywords: [...new Set([...post.keywords, ...post.tags.map((t) => t.toLowerCase())])],
     authors: [{ name: post.authorName, url: SITE_URL }],
   };
 }
-

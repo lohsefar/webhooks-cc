@@ -115,9 +115,7 @@ export function BlogPostShell({
           <article className="neo-card neo-card-static p-0 overflow-hidden min-w-0">
             <div className="h-2 bg-gradient-to-r from-secondary via-primary to-secondary" />
             <div className="p-6 md:p-10">
-              <div className="docs-content">
-                {children}
-              </div>
+              <div className="docs-content">{children}</div>
             </div>
           </article>
 
@@ -147,11 +145,7 @@ export function BlogPostShell({
                 </p>
                 <div className="space-y-3">
                   {relatedPosts.map((related) => (
-                    <Link
-                      key={related.slug}
-                      href={`/blog/${related.slug}`}
-                      className="block group"
-                    >
+                    <Link key={related.slug} href={`/blog/${related.slug}`} className="block group">
                       <p className="font-bold leading-snug group-hover:underline">
                         {related.title}
                       </p>

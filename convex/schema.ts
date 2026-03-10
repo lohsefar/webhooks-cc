@@ -139,13 +139,9 @@ export default defineSchema({
       v.literal("howto"),
       v.literal("tech-article"),
       v.literal("faq"),
-      v.literal("blog-posting"),
+      v.literal("blog-posting")
     ),
-    changeFrequency: v.union(
-      v.literal("weekly"),
-      v.literal("monthly"),
-      v.literal("yearly"),
-    ),
+    changeFrequency: v.union(v.literal("weekly"), v.literal("monthly"), v.literal("yearly")),
     priority: v.number(),
   })
     .index("by_slug", ["slug"])

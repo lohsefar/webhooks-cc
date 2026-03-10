@@ -22,12 +22,12 @@ const schemaTypeValidator = v.union(
   v.literal("howto"),
   v.literal("tech-article"),
   v.literal("faq"),
-  v.literal("blog-posting"),
+  v.literal("blog-posting")
 );
 const changeFrequencyValidator = v.union(
   v.literal("weekly"),
   v.literal("monthly"),
-  v.literal("yearly"),
+  v.literal("yearly")
 );
 
 // --- Public queries (no auth) ---
