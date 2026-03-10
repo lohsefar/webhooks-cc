@@ -7,7 +7,8 @@
     "build": "next build && node scripts/build-pagefind.mjs",
     "start": "next start",
     "typecheck": "tsc --noEmit",
-    "seo:check": "node scripts/seo-smoke.mjs"
+    "seo:check": "node scripts/seo-smoke.mjs",
+    "indexnow": "node scripts/indexnow.mjs"
   },
   "dependencies": {
     "@convex-dev/auth": "^0.0.90",
