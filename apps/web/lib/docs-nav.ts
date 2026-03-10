@@ -23,6 +23,7 @@ export const NAV_SECTIONS: NavSection[] = [
     items: [
       { title: "Quick Start", href: "/docs" },
       { title: "Installation", href: "/installation" },
+      { title: "Core Concepts", href: "/docs/core-concepts", isNew: true },
     ],
   },
   {
@@ -50,11 +51,15 @@ export const NAV_SECTIONS: NavSection[] = [
     items: [
       { title: "Overview", href: "/docs/sdk" },
       { title: "API Reference", href: "/docs/sdk/api" },
+      { title: "Matchers & Helpers", href: "/docs/sdk/matchers", isNew: true },
+      { title: "Signature Verification", href: "/docs/sdk/signatures", isNew: true },
       { title: "Testing", href: "/docs/sdk/testing" },
       { title: "Standard Webhooks", href: "/docs/sdk/testing/standard-webhooks", depth: 1 },
       { title: "Stripe + Vitest", href: "/docs/sdk/testing/stripe-vitest", depth: 1 },
       { title: "GitHub + Jest", href: "/docs/sdk/testing/github-jest", depth: 1 },
+      { title: "Shopify + Vitest", href: "/docs/sdk/testing/shopify-vitest", depth: 1, isNew: true },
       { title: "Playwright E2E", href: "/docs/sdk/testing/playwright-e2e", depth: 1 },
+      { title: "Polar + Playwright", href: "/docs/sdk/testing/polar-playwright", depth: 1 },
     ],
   },
   {
@@ -62,6 +67,22 @@ export const NAV_SECTIONS: NavSection[] = [
     id: "mcp",
     items: [
       { title: "MCP Server", href: "/docs/mcp" },
+      { title: "Tool Reference", href: "/docs/mcp/tools", isNew: true },
+      { title: "Agent Workflows", href: "/docs/mcp/workflows", isNew: true },
+    ],
+  },
+  {
+    title: "Guides",
+    id: "guides",
+    items: [
+      { title: "Test Webhooks Locally", href: "/docs/guides/test-webhooks-locally", isNew: true },
+      { title: "Test Stripe Webhooks", href: "/docs/guides/test-stripe-webhooks", isNew: true },
+      { title: "Test GitHub Webhooks", href: "/docs/guides/test-github-webhooks", isNew: true },
+      { title: "Test Shopify Webhooks", href: "/docs/guides/test-shopify-webhooks", isNew: true },
+      { title: "Verify Signatures", href: "/docs/guides/verify-webhook-signatures", isNew: true },
+      { title: "Webhook Testing in CI/CD", href: "/docs/guides/webhook-testing-ci-cd", isNew: true },
+      { title: "ngrok vs webhooks.cc", href: "/docs/guides/ngrok-vs-webhooks-cc", isNew: true },
+      { title: "Webhook Testing Tools", href: "/docs/guides/webhook-testing-tools", isNew: true },
     ],
   },
 ];

@@ -4,6 +4,7 @@ import { useState, useEffect, useRef, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { Search, X } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { isDocsSearchUrl, normalizePagefindUrl } from "@/lib/docs-search";
 
 interface SearchResult {
   url: string;
@@ -87,11 +88,19 @@ export function SearchModal() {
       const searchResult = await pagefind.search(q);
       const items: SearchResult[] = [];
 
-      for (const result of searchResult.results.slice(0, 8)) {
+      for (const result of searchResult.results) {
+        if (items.length === 8) break;
+
         const data = await result.data();
+        const url = normalizePagefindUrl(data.url);
+
+        if (!isDocsSearchUrl(url)) {
+          continue;
+        }
+
         items.push({
-          url: data.url,
-          title: data.meta?.title ?? data.url,
+          url,
+          title: data.meta?.title ?? url,
           excerpt: data.excerpt ?? "",
           section: data.meta?.section,
         });

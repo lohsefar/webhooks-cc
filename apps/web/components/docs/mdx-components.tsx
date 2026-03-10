@@ -8,6 +8,7 @@ import { LinkCard } from "./mdx/link-card";
 import { ProviderCard } from "./mdx/provider-card";
 import { ApiMethod, ParamTable } from "./mdx/api-method";
 import { FAQ, FAQItem } from "./mdx/faq";
+import { McpInstallGuide } from "./mdx/mcp-setup";
 
 export const mdxComponents: MDXComponents = {
   // --- HTML element overrides ---
@@ -63,4 +64,5 @@ export const mdxComponents: MDXComponents = {
   ParamTable,
   FAQ,
   FAQItem,
+  McpInstallGuide,
 };

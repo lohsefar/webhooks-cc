@@ -11,7 +11,7 @@ export interface DocFrontmatter {
   description: string;
   section: string;
   order: number;
-  lastUpdated: string;
+  lastUpdated: string | Date;
   schema: "howto" | "faq" | "tech-article" | "none";
   keywords?: string[];
   seo?: {
