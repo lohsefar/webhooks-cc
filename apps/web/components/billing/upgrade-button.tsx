@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useAction } from "convex/react";
 import { api } from "@convex/_generated/api";
 import { Button } from "@/components/ui/button";
+import { trackUpgradeClicked } from "@/lib/analytics";
 
 export function UpgradeButton() {
   const createCheckout = useAction(api.billing.createCheckout);
@@ -13,6 +14,7 @@ export function UpgradeButton() {
   const handleUpgrade = async () => {
     setLoading(true);
     setError(null);
+    trackUpgradeClicked();
     try {
       const url = await createCheckout();
       // Set a timeout to reset if redirect doesn't happen (e.g., popup blocker)

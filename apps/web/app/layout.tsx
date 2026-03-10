@@ -10,6 +10,7 @@ import {
 } from "@/lib/seo";
 import { JsonLd, organizationSchema } from "@/lib/schemas";
 import { ThemeProvider } from "@/components/providers/theme-provider";
+import { PostHogProvider } from "@/components/providers/posthog-provider";
 
 const spaceGrotesk = Space_Grotesk({
   subsets: ["latin"],
@@ -97,25 +98,27 @@ export default function RootLayout({
         <JsonLd data={organizationSchema()} />
       </head>
       <body className={`${spaceGrotesk.variable} ${jetbrainsMono.variable} font-sans`}>
-        <ThemeProvider>
-          <noscript>
-            <div
-              style={{
-                padding: "1rem",
-                fontFamily: "var(--font-sans), sans-serif",
-                lineHeight: 1.5,
-              }}
-            >
-              <strong>webhooks.cc</strong>: Webhook testing tools with CLI, TypeScript SDK, and MCP
-              server. Start at{" "}
-              <a href="https://webhooks.cc/docs" style={{ textDecoration: "underline" }}>
-                /docs
-              </a>
-              .
-            </div>
-          </noscript>
-          {children}
-        </ThemeProvider>
+        <PostHogProvider>
+          <ThemeProvider>
+            <noscript>
+              <div
+                style={{
+                  padding: "1rem",
+                  fontFamily: "var(--font-sans), sans-serif",
+                  lineHeight: 1.5,
+                }}
+              >
+                <strong>webhooks.cc</strong>: Webhook testing tools with CLI, TypeScript SDK, and MCP
+                server. Start at{" "}
+                <a href="https://webhooks.cc/docs" style={{ textDecoration: "underline" }}>
+                  /docs
+                </a>
+                .
+              </div>
+            </noscript>
+            {children}
+          </ThemeProvider>
+        </PostHogProvider>
       </body>
     </html>
   );

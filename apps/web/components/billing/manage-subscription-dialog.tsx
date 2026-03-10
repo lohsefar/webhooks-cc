@@ -22,6 +22,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
+import { trackSubscriptionCancelled, trackSubscriptionReactivated } from "@/lib/analytics";
 
 export function ManageSubscriptionDialog() {
   const user = useQuery(api.users.current);
@@ -44,6 +45,7 @@ export function ManageSubscriptionDialog() {
     setError(null);
     try {
       await cancelSubscription();
+      trackSubscriptionCancelled();
       setConfirmCancelOpen(false);
       setOpen(false);
     } catch (err) {
@@ -60,6 +62,7 @@ export function ManageSubscriptionDialog() {
     setError(null);
     try {
       await resubscribe();
+      trackSubscriptionReactivated();
     } catch (err) {
       console.error("Resubscribe error:", err);
       setError("Failed to reactivate subscription. Please try again.");
