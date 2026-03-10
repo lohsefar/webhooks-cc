@@ -5,7 +5,13 @@ section: guides
 order: 6
 lastUpdated: 2026-03-10
 schema: howto
-keywords: ["webhook CI/CD", "webhook integration testing", "webhook GitHub Actions", "automated webhook testing"]
+keywords:
+  [
+    "webhook CI/CD",
+    "webhook integration testing",
+    "webhook GitHub Actions",
+    "automated webhook testing",
+  ]
 seo:
   ogTitle: "Webhook Testing in CI/CD — webhooks.cc"
   ogDescription: "Step-by-step guide to running webhook integration tests in CI/CD with signed payloads, assertions, and cleanup."
@@ -137,14 +143,18 @@ When a single action triggers multiple webhooks, use `captureDuring` to collect 
 ```ts
 import { captureDuring, assertRequest } from "@webhooks-cc/sdk/testing";
 
-const requests = await captureDuring(client, async (endpoint) => {
-  // Trigger your app to send webhooks to the endpoint
-  await processSubscription({
-    webhookUrl: endpoint.url,
-    plan: "pro",
-    customerId: "cust_test_456",
-  });
-}, { count: 2, timeout: "15s" });
+const requests = await captureDuring(
+  client,
+  async (endpoint) => {
+    // Trigger your app to send webhooks to the endpoint
+    await processSubscription({
+      webhookUrl: endpoint.url,
+      plan: "pro",
+      customerId: "cust_test_456",
+    });
+  },
+  { count: 2, timeout: "15s" }
+);
 
 // Assert on the captured requests
 assertRequest(requests[0], {
@@ -191,7 +201,8 @@ jobs:
 ```
 
 <Callout type="tip">
-Use a health check endpoint and a tool like `wait-on` to ensure your server is ready before tests run. Without this, early tests may fail with connection errors.
+  Use a health check endpoint and a tool like `wait-on` to ensure your server is ready before tests
+  run. Without this, early tests may fail with connection errors.
 </Callout>
 
 </Step>
@@ -257,12 +268,12 @@ The SDK provides four testing primitives that handle the complexity of async web
 
 ## Testing utilities reference
 
-| Utility | Purpose | Cleanup |
-|---------|---------|---------|
-| `withEndpoint(client, callback, options?)` | Create a temporary endpoint, run callback, delete endpoint | Automatic |
-| `withEphemeralEndpoint(client, callback, options?)` | Same as `withEndpoint` but creates an ephemeral endpoint | Automatic (also auto-expires after 12 hours) |
-| `captureDuring(client, action, options?)` | Create endpoint, run action, poll for `count` requests, delete endpoint | Automatic |
-| `assertRequest(request, expected, options?)` | Compare a captured request against expectations, return `{ pass, diff }` | N/A |
+| Utility                                             | Purpose                                                                  | Cleanup                                      |
+| --------------------------------------------------- | ------------------------------------------------------------------------ | -------------------------------------------- |
+| `withEndpoint(client, callback, options?)`          | Create a temporary endpoint, run callback, delete endpoint               | Automatic                                    |
+| `withEphemeralEndpoint(client, callback, options?)` | Same as `withEndpoint` but creates an ephemeral endpoint                 | Automatic (also auto-expires after 12 hours) |
+| `captureDuring(client, action, options?)`           | Create endpoint, run action, poll for `count` requests, delete endpoint  | Automatic                                    |
+| `assertRequest(request, expected, options?)`        | Compare a captured request against expectations, return `{ pass, diff }` | N/A                                          |
 
 ## Tips for CI webhook testing
 
@@ -301,6 +312,7 @@ Your server is not running or not ready when tests start. Start it in the backgr
 **"Timeout waiting for request"**
 
 Three possible causes:
+
 1. Your server did not start successfully. Check the server startup logs.
 2. Network latency exceeded the timeout. Increase `timeout` to `"15s"` or `"30s"`.
 3. Your handler threw an error and did not forward the webhook. Check handler logs for exceptions.

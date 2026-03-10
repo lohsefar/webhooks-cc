@@ -116,38 +116,36 @@ export async function captureDuring(
   action: (endpoint: Endpoint) => Promise<unknown>,
   options: CaptureDuringOptions = {}
 ): Promise<Request[]> {
-  const {
-    timeout = 30000,
-    pollInterval = 200,
-    count = 1,
-    match,
-    ...createOptions
-  } = options;
+  const { timeout = 30000, pollInterval = 200, count = 1, match, ...createOptions } = options;
 
   const timeoutMs = parseDuration(timeout);
   const pollIntervalMs = Math.max(MIN_CAPTURE_POLL_INTERVAL, parseDuration(pollInterval));
   const expectedCount = Math.max(1, Math.floor(count));
   const requestLimit = Math.max(DEFAULT_CAPTURE_LIMIT, expectedCount * 5);
 
-  return withEndpoint(client, async (endpoint) => {
-    const startedAt = Date.now();
-    await action(endpoint);
+  return withEndpoint(
+    client,
+    async (endpoint) => {
+      const startedAt = Date.now();
+      await action(endpoint);
 
-    while (Date.now() - startedAt < timeoutMs) {
-      const requests = await client.requests.list(endpoint.slug, { limit: requestLimit });
-      const matched = (match ? requests.filter(match) : requests)
-        .slice()
-        .sort((left, right) => left.receivedAt - right.receivedAt);
+      while (Date.now() - startedAt < timeoutMs) {
+        const requests = await client.requests.list(endpoint.slug, { limit: requestLimit });
+        const matched = (match ? requests.filter(match) : requests)
+          .slice()
+          .sort((left, right) => left.receivedAt - right.receivedAt);
 
-      if (matched.length >= expectedCount) {
-        return matched.slice(0, expectedCount);
+        if (matched.length >= expectedCount) {
+          return matched.slice(0, expectedCount);
+        }
+
+        await sleep(pollIntervalMs);
       }
 
-      await sleep(pollIntervalMs);
-    }
-
-    throw new TimeoutError(timeoutMs);
-  }, createOptions);
+      throw new TimeoutError(timeoutMs);
+    },
+    createOptions
+  );
 }
 
 export function assertRequest(

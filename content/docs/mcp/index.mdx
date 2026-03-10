@@ -21,53 +21,53 @@ For provider templates in `send_webhook`, **secret is required**. The MCP server
 
 ### Endpoint management
 
-| Tool | Description |
-|------|-------------|
-| `create_endpoint` | Create a new webhook endpoint |
-| `list_endpoints` | List all your endpoints |
-| `get_endpoint` | Get details for an endpoint by slug |
-| `update_endpoint` | Update an endpoint name or mock response |
-| `delete_endpoint` | Delete an endpoint and its requests |
-| `create_endpoints` | Create multiple endpoints in one call (1-20) |
+| Tool               | Description                                   |
+| ------------------ | --------------------------------------------- |
+| `create_endpoint`  | Create a new webhook endpoint                 |
+| `list_endpoints`   | List all your endpoints                       |
+| `get_endpoint`     | Get details for an endpoint by slug           |
+| `update_endpoint`  | Update an endpoint name or mock response      |
+| `delete_endpoint`  | Delete an endpoint and its requests           |
+| `create_endpoints` | Create multiple endpoints in one call (1-20)  |
 | `delete_endpoints` | Delete multiple endpoints in one call (1-100) |
 
 ### Sending and testing
 
-| Tool | Description |
-|------|-------------|
-| `send_webhook` | Send a test webhook (manual or provider template) to an endpoint |
-| `send_to` | Send a signed webhook directly to any URL (localhost, staging, etc.) |
-| `preview_webhook` | Preview a webhook request without sending it |
+| Tool                | Description                                                             |
+| ------------------- | ----------------------------------------------------------------------- |
+| `send_webhook`      | Send a test webhook (manual or provider template) to an endpoint        |
+| `send_to`           | Send a signed webhook directly to any URL (localhost, staging, etc.)    |
+| `preview_webhook`   | Preview a webhook request without sending it                            |
 | `test_webhook_flow` | Run a full test flow: create, mock, send, wait, verify, replay, cleanup |
 
 ### Request management
 
-| Tool | Description |
-|------|-------------|
-| `list_requests` | List captured requests for an endpoint |
-| `get_request` | Get full details of a captured request |
-| `wait_for_request` | Wait for an incoming request (polling) |
-| `wait_for_requests` | Wait for multiple incoming requests |
-| `search_requests` | Search requests across endpoints with full-text search |
-| `count_requests` | Count requests matching filters |
-| `clear_requests` | Delete requests for an endpoint without deleting the endpoint |
+| Tool                | Description                                                   |
+| ------------------- | ------------------------------------------------------------- |
+| `list_requests`     | List captured requests for an endpoint                        |
+| `get_request`       | Get full details of a captured request                        |
+| `wait_for_request`  | Wait for an incoming request (polling)                        |
+| `wait_for_requests` | Wait for multiple incoming requests                           |
+| `search_requests`   | Search requests across endpoints with full-text search        |
+| `count_requests`    | Count requests matching filters                               |
+| `clear_requests`    | Delete requests for an endpoint without deleting the endpoint |
 
 ### Request analysis
 
-| Tool | Description |
-|------|-------------|
-| `replay_request` | Replay a captured request to a target URL |
-| `compare_requests` | Compare two requests and show structured differences |
-| `extract_from_request` | Extract specific JSON fields from a request body |
-| `verify_signature` | Verify the webhook signature on a captured request |
+| Tool                   | Description                                          |
+| ---------------------- | ---------------------------------------------------- |
+| `replay_request`       | Replay a captured request to a target URL            |
+| `compare_requests`     | Compare two requests and show structured differences |
+| `extract_from_request` | Extract specific JSON fields from a request body     |
+| `verify_signature`     | Verify the webhook signature on a captured request   |
 
 ### Utilities
 
-| Tool | Description |
-|------|-------------|
+| Tool                      | Description                                               |
+| ------------------------- | --------------------------------------------------------- |
 | `list_provider_templates` | List supported providers, templates, and signing metadata |
-| `get_usage` | Check current request usage, quota, and plan |
-| `describe` | Describe all available SDK operations |
+| `get_usage`               | Check current request usage, quota, and plan              |
+| `describe`                | Describe all available SDK operations                     |
 
 ## Prompts
 

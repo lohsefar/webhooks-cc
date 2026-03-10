@@ -125,8 +125,8 @@ const { url, method, headers, body } = await client.buildRequest(
 );
 
 console.log(headers["webhook-signature"]); // v1,<base64>
-console.log(headers["webhook-id"]);        // msg_<hex>
-console.log(body);                         // JSON string
+console.log(headers["webhook-id"]); // msg_<hex>
+console.log(body); // JSON string
 ```
 
 ## Tips

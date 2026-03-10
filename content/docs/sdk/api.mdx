@@ -38,12 +38,12 @@ create(options?: CreateEndpointOptions): Promise<Endpoint>
 
 <ParamTable>
 
-| Param | Type | Required | Description |
-|-------|------|----------|-------------|
-| `name` | `string` | no | Display name |
-| `ephemeral` | `boolean` | no | Auto-delete after TTL |
-| `expiresIn` | `string` | no | Custom expiry duration |
-| `mockResponse` | `MockResponse` | no | Mock response config |
+| Param          | Type           | Required | Description            |
+| -------------- | -------------- | -------- | ---------------------- |
+| `name`         | `string`       | no       | Display name           |
+| `ephemeral`    | `boolean`      | no       | Auto-delete after TTL  |
+| `expiresIn`    | `string`       | no       | Custom expiry duration |
+| `mockResponse` | `MockResponse` | no       | Mock response config   |
 
 </ParamTable>
 </ApiMethod>
@@ -78,11 +78,11 @@ update(slug: string, options: UpdateEndpointOptions): Promise<Endpoint>
 
 <ParamTable>
 
-| Param | Type | Required | Description |
-|-------|------|----------|-------------|
-| `slug` | `string` | yes | Endpoint slug |
-| `name` | `string` | no | New display name |
-| `mockResponse` | `object \| null` | no | Mock response config `{ status, body, headers }`, or `null` to clear |
+| Param          | Type             | Required | Description                                                          |
+| -------------- | ---------------- | -------- | -------------------------------------------------------------------- |
+| `slug`         | `string`         | yes      | Endpoint slug                                                        |
+| `name`         | `string`         | no       | New display name                                                     |
+| `mockResponse` | `object \| null` | no       | Mock response config `{ status, body, headers }`, or `null` to clear |
 
 </ParamTable>
 </ApiMethod>
@@ -107,12 +107,12 @@ send(slug: string, options?: SendOptions): Promise<Response>
 
 <ParamTable>
 
-| Param | Type | Required | Description |
-|-------|------|----------|-------------|
-| `slug` | `string` | yes | Endpoint slug |
-| `method` | `string` | no | HTTP method (default: `"POST"`) |
-| `headers` | `Record<string, string>` | no | HTTP headers to include |
-| `body` | `unknown` | no | Request body (JSON-serialized) |
+| Param     | Type                     | Required | Description                     |
+| --------- | ------------------------ | -------- | ------------------------------- |
+| `slug`    | `string`                 | yes      | Endpoint slug                   |
+| `method`  | `string`                 | no       | HTTP method (default: `"POST"`) |
+| `headers` | `Record<string, string>` | no       | HTTP headers to include         |
+| `body`    | `unknown`                | no       | Request body (JSON-serialized)  |
 
 </ParamTable>
 </ApiMethod>
@@ -127,17 +127,17 @@ sendTemplate(slug: string, options: SendTemplateOptions): Promise<Response>
 
 <ParamTable>
 
-| Param | Type | Required | Description |
-|-------|------|----------|-------------|
-| `slug` | `string` | yes | Endpoint slug |
-| `provider` | `TemplateProvider` | yes | Provider template to generate |
-| `template` | `string` | no | Provider-specific template preset |
-| `secret` | `string` | yes | Shared secret for signature generation |
-| `event` | `string` | no | Provider event/topic override |
-| `method` | `string` | no | HTTP method override (defaults to POST) |
-| `timestamp` | `number` | no | Unix timestamp override for signature generation |
-| `headers` | `Record<string, string>` | no | Additional headers |
-| `body` | `unknown` | no | Template body override |
+| Param       | Type                     | Required | Description                                      |
+| ----------- | ------------------------ | -------- | ------------------------------------------------ |
+| `slug`      | `string`                 | yes      | Endpoint slug                                    |
+| `provider`  | `TemplateProvider`       | yes      | Provider template to generate                    |
+| `template`  | `string`                 | no       | Provider-specific template preset                |
+| `secret`    | `string`                 | yes      | Shared secret for signature generation           |
+| `event`     | `string`                 | no       | Provider event/topic override                    |
+| `method`    | `string`                 | no       | HTTP method override (defaults to POST)          |
+| `timestamp` | `number`                 | no       | Unix timestamp override for signature generation |
+| `headers`   | `Record<string, string>` | no       | Additional headers                               |
+| `body`      | `unknown`                | no       | Template body override                           |
 
 </ParamTable>
 </ApiMethod>
@@ -154,16 +154,16 @@ sendTo(url: string, options?: SendToOptions): Promise<Response>
 
 <ParamTable>
 
-| Param | Type | Required | Description |
-|-------|------|----------|-------------|
-| `url` | `string` | yes | Target URL (http or https) |
-| `provider` | `TemplateProvider` | no | Provider template for signing |
-| `secret` | `string` | no | Secret for signature generation (required when provider is set) |
-| `body` | `unknown` | no | Request body (JSON-serialized if not a string) |
-| `headers` | `Record<string, string>` | no | Additional headers |
-| `method` | `string` | no | HTTP method (default: `"POST"`) |
-| `event` | `string` | no | Event name |
-| `timestamp` | `number` | no | Unix timestamp override for deterministic signatures in tests |
+| Param       | Type                     | Required | Description                                                     |
+| ----------- | ------------------------ | -------- | --------------------------------------------------------------- |
+| `url`       | `string`                 | yes      | Target URL (http or https)                                      |
+| `provider`  | `TemplateProvider`       | no       | Provider template for signing                                   |
+| `secret`    | `string`                 | no       | Secret for signature generation (required when provider is set) |
+| `body`      | `unknown`                | no       | Request body (JSON-serialized if not a string)                  |
+| `headers`   | `Record<string, string>` | no       | Additional headers                                              |
+| `method`    | `string`                 | no       | HTTP method (default: `"POST"`)                                 |
+| `event`     | `string`                 | no       | Event name                                                      |
+| `timestamp` | `number`                 | no       | Unix timestamp override for deterministic signatures in tests   |
 
 </ParamTable>
 </ApiMethod>
@@ -190,11 +190,11 @@ list(endpointSlug: string, options?: ListRequestsOptions): Promise<Request[]>
 
 <ParamTable>
 
-| Param | Type | Required | Description |
-|-------|------|----------|-------------|
-| `endpointSlug` | `string` | yes | Endpoint slug |
-| `limit` | `number` | no | Max results (default: 50) |
-| `since` | `number` | no | Only return requests after this timestamp (ms) |
+| Param          | Type     | Required | Description                                    |
+| -------------- | -------- | -------- | ---------------------------------------------- |
+| `endpointSlug` | `string` | yes      | Endpoint slug                                  |
+| `limit`        | `number` | no       | Max results (default: 50)                      |
+| `since`        | `number` | no       | Only return requests after this timestamp (ms) |
 
 </ParamTable>
 </ApiMethod>
@@ -209,11 +209,11 @@ listPaginated(slug: string, options?: ListPaginatedRequestsOptions): Promise<Pag
 
 <ParamTable>
 
-| Param | Type | Required | Description |
-|-------|------|----------|-------------|
-| `slug` | `string` | yes | Endpoint slug |
-| `limit` | `number` | no | Max results per page |
-| `cursor` | `string` | no | Cursor from previous page |
+| Param    | Type     | Required | Description               |
+| -------- | -------- | -------- | ------------------------- |
+| `slug`   | `string` | yes      | Endpoint slug             |
+| `limit`  | `number` | no       | Max results per page      |
+| `cursor` | `string` | no       | Cursor from previous page |
 
 </ParamTable>
 </ApiMethod>
@@ -238,12 +238,12 @@ waitFor(endpointSlug: string, options?: WaitForOptions): Promise<Request>
 
 <ParamTable>
 
-| Param | Type | Required | Description |
-|-------|------|----------|-------------|
-| `endpointSlug` | `string` | yes | Endpoint slug to monitor |
-| `timeout` | `number \| string` | no | Max wait time — ms or `"30s"`, `"5m"`, `"1h"` (default: 30000) |
-| `pollInterval` | `number \| string` | no | Interval between polls (default: 500) |
-| `match` | `(request) => boolean` | no | Filter function |
+| Param          | Type                   | Required | Description                                                    |
+| -------------- | ---------------------- | -------- | -------------------------------------------------------------- |
+| `endpointSlug` | `string`               | yes      | Endpoint slug to monitor                                       |
+| `timeout`      | `number \| string`     | no       | Max wait time — ms or `"30s"`, `"5m"`, `"1h"` (default: 30000) |
+| `pollInterval` | `number \| string`     | no       | Interval between polls (default: 500)                          |
+| `match`        | `(request) => boolean` | no       | Filter function                                                |
 
 </ParamTable>
 </ApiMethod>
@@ -258,12 +258,12 @@ waitForAll(slug: string, options: WaitForAllOptions): Promise<Request[]>
 
 <ParamTable>
 
-| Param | Type | Required | Description |
-|-------|------|----------|-------------|
-| `slug` | `string` | yes | Endpoint slug |
-| `count` | `number` | yes | Number of requests to collect |
-| `timeout` | `number \| string` | no | Max wait time |
-| `match` | `(request) => boolean` | no | Filter function |
+| Param     | Type                   | Required | Description                   |
+| --------- | ---------------------- | -------- | ----------------------------- |
+| `slug`    | `string`               | yes      | Endpoint slug                 |
+| `count`   | `number`               | yes      | Number of requests to collect |
+| `timeout` | `number \| string`     | no       | Max wait time                 |
+| `match`   | `(request) => boolean` | no       | Filter function               |
 
 </ParamTable>
 </ApiMethod>
@@ -278,13 +278,13 @@ subscribe(slug: string, options?: SubscribeOptions): AsyncIterable<Request>
 
 <ParamTable>
 
-| Param | Type | Required | Description |
-|-------|------|----------|-------------|
-| `slug` | `string` | yes | Endpoint slug |
-| `signal` | `AbortSignal` | no | Signal to cancel the subscription |
-| `timeout` | `number \| string` | no | Max stream duration |
-| `reconnect` | `boolean` | no | Auto-reconnect on disconnect |
-| `maxReconnectAttempts` | `number` | no | Max reconnection attempts |
+| Param                  | Type               | Required | Description                       |
+| ---------------------- | ------------------ | -------- | --------------------------------- |
+| `slug`                 | `string`           | yes      | Endpoint slug                     |
+| `signal`               | `AbortSignal`      | no       | Signal to cancel the subscription |
+| `timeout`              | `number \| string` | no       | Max stream duration               |
+| `reconnect`            | `boolean`          | no       | Auto-reconnect on disconnect      |
+| `maxReconnectAttempts` | `number`           | no       | Max reconnection attempts         |
 
 </ParamTable>
 </ApiMethod>
@@ -299,10 +299,10 @@ replay(requestId: string, targetUrl: string): Promise<Response>
 
 <ParamTable>
 
-| Param | Type | Required | Description |
-|-------|------|----------|-------------|
-| `requestId` | `string` | yes | ID of the captured request |
-| `targetUrl` | `string` | yes | URL to send the replayed request to |
+| Param       | Type     | Required | Description                         |
+| ----------- | -------- | -------- | ----------------------------------- |
+| `requestId` | `string` | yes      | ID of the captured request          |
+| `targetUrl` | `string` | yes      | URL to send the replayed request to |
 
 </ParamTable>
 </ApiMethod>
@@ -317,16 +317,16 @@ search(filters?: SearchFilters): Promise<SearchResult[]>
 
 <ParamTable>
 
-| Param | Type | Required | Description |
-|-------|------|----------|-------------|
-| `slug` | `string` | no | Filter by endpoint slug |
-| `method` | `string` | no | Filter by HTTP method |
-| `q` | `string` | no | Free-text search |
-| `from` | `string` | no | Start time (duration or timestamp) |
-| `to` | `string` | no | End time (duration or timestamp) |
-| `limit` | `number` | no | Max results (default: 50) |
-| `offset` | `number` | no | Pagination offset |
-| `order` | `"asc" \| "desc"` | no | Sort order (default: `"desc"`) |
+| Param    | Type              | Required | Description                        |
+| -------- | ----------------- | -------- | ---------------------------------- |
+| `slug`   | `string`          | no       | Filter by endpoint slug            |
+| `method` | `string`          | no       | Filter by HTTP method              |
+| `q`      | `string`          | no       | Free-text search                   |
+| `from`   | `string`          | no       | Start time (duration or timestamp) |
+| `to`     | `string`          | no       | End time (duration or timestamp)   |
+| `limit`  | `number`          | no       | Max results (default: 50)          |
+| `offset` | `number`          | no       | Pagination offset                  |
+| `order`  | `"asc" \| "desc"` | no       | Sort order (default: `"desc"`)     |
 
 </ParamTable>
 </ApiMethod>
@@ -351,10 +351,10 @@ clear(slug: string, options?: ClearRequestsOptions): Promise<void>
 
 <ParamTable>
 
-| Param | Type | Required | Description |
-|-------|------|----------|-------------|
-| `slug` | `string` | yes | Endpoint slug |
-| `before` | `string` | no | Delete requests before this duration/timestamp |
+| Param    | Type     | Required | Description                                    |
+| -------- | -------- | -------- | ---------------------------------------------- |
+| `slug`   | `string` | yes      | Endpoint slug                                  |
+| `before` | `string` | no       | Delete requests before this duration/timestamp |
 
 </ParamTable>
 </ApiMethod>
@@ -369,12 +369,12 @@ export(slug: string, options: ExportRequestsOptions): Promise<RequestsExport>
 
 <ParamTable>
 
-| Param | Type | Required | Description |
-|-------|------|----------|-------------|
-| `slug` | `string` | yes | Endpoint slug |
-| `format` | `"har" \| "curl"` | yes | Export format |
-| `limit` | `number` | no | Max requests to export |
-| `since` | `number` | no | Only export requests after this timestamp |
+| Param    | Type              | Required | Description                               |
+| -------- | ----------------- | -------- | ----------------------------------------- |
+| `slug`   | `string`          | yes      | Endpoint slug                             |
+| `format` | `"har" \| "curl"` | yes      | Export format                             |
+| `limit`  | `number`          | no       | Max requests to export                    |
+| `since`  | `number`          | no       | Only export requests after this timestamp |
 
 </ParamTable>
 </ApiMethod>
@@ -422,7 +422,8 @@ usage(): Promise<UsageInfo>
 Create a fluent workflow builder for common webhook capture, verify, and replay workflows.
 
 ```ts
-const result = await client.flow()
+const result = await client
+  .flow()
   .createEndpoint({ name: "test" })
   .send({ body: { event: "test" } })
   .waitForCapture({ timeout: "10s" })
@@ -464,18 +465,18 @@ import {
   matchAny,
 } from "@webhooks-cc/sdk";
 
-matchMethod("POST")                         // match by HTTP method
-matchHeader("x-github-event")               // match header presence
-matchHeader("x-github-event", "push")       // match header value
-matchPath("/webhooks/**")                   // match path with glob wildcards
-matchQueryParam("token")                    // match query param presence
-matchQueryParam("token", "abc")             // match query param value
-matchBodyPath("data.object.id", "obj_123")  // match nested JSON path
-matchBodySubset({ type: "checkout" })       // match deep partial subset
-matchContentType("application/json")        // match content-type ignoring charset
-matchJsonField("type", "checkout")          // match top-level JSON field
-matchAll(matchMethod("POST"), matchHeader("stripe-signature"))
-matchAny(matchMethod("GET"), matchMethod("POST"))
+matchMethod("POST"); // match by HTTP method
+matchHeader("x-github-event"); // match header presence
+matchHeader("x-github-event", "push"); // match header value
+matchPath("/webhooks/**"); // match path with glob wildcards
+matchQueryParam("token"); // match query param presence
+matchQueryParam("token", "abc"); // match query param value
+matchBodyPath("data.object.id", "obj_123"); // match nested JSON path
+matchBodySubset({ type: "checkout" }); // match deep partial subset
+matchContentType("application/json"); // match content-type ignoring charset
+matchJsonField("type", "checkout"); // match top-level JSON field
+matchAll(matchMethod("POST"), matchHeader("stripe-signature"));
+matchAny(matchMethod("GET"), matchMethod("POST"));
 ```
 
 ## Provider Detection
@@ -484,15 +485,15 @@ Each helper checks for a provider-specific header (case-insensitive).
 
 ```ts
 import {
-  isStripeWebhook,      // stripe-signature
-  isGitHubWebhook,      // x-github-event
-  isShopifyWebhook,     // x-shopify-hmac-sha256
-  isSlackWebhook,       // x-slack-signature
-  isTwilioWebhook,      // x-twilio-signature
-  isPaddleWebhook,      // paddle-signature
-  isLinearWebhook,      // linear-signature
-  isDiscordWebhook,     // x-signature-ed25519 + x-signature-timestamp
-  isStandardWebhook,    // webhook-id + webhook-timestamp + webhook-signature
+  isStripeWebhook, // stripe-signature
+  isGitHubWebhook, // x-github-event
+  isShopifyWebhook, // x-shopify-hmac-sha256
+  isSlackWebhook, // x-slack-signature
+  isTwilioWebhook, // x-twilio-signature
+  isPaddleWebhook, // paddle-signature
+  isLinearWebhook, // linear-signature
+  isDiscordWebhook, // x-signature-ed25519 + x-signature-timestamp
+  isStandardWebhook, // webhook-id + webhook-timestamp + webhook-signature
 } from "@webhooks-cc/sdk";
 ```
 
@@ -520,8 +521,8 @@ const email = extractJsonField<string>(request, "data.customer.email");
 import { diffRequests } from "@webhooks-cc/sdk";
 
 const diff = diffRequests(requestA, requestB);
-console.log(diff.matches);       // boolean
-console.log(diff.differences);   // { method?, path?, headers?, body? }
+console.log(diff.matches); // boolean
+console.log(diff.differences); // { method?, path?, headers?, body? }
 ```
 
 ## Signature Verification
@@ -592,7 +593,7 @@ interface Request {
 }
 
 interface MockResponse {
-  status: number;   // 100-599
+  status: number; // 100-599
   body: string;
   headers: Record<string, string>;
 }
@@ -612,8 +613,14 @@ interface PaginatedResult<T> {
 }
 
 type TemplateProvider =
-  | "stripe" | "github" | "shopify" | "twilio"
-  | "slack" | "paddle" | "linear" | "standard-webhooks";
+  | "stripe"
+  | "github"
+  | "shopify"
+  | "twilio"
+  | "slack"
+  | "paddle"
+  | "linear"
+  | "standard-webhooks";
 
 type VerifyProvider = TemplateProvider | "discord";
 ```
@@ -624,10 +631,10 @@ Errors include actionable recovery hints when the server message is generic.
 
 ```ts
 import {
-  WebhooksCCError,   // Base error (has statusCode)
+  WebhooksCCError, // Base error (has statusCode)
   UnauthorizedError, // 401 — includes link to get API key
-  NotFoundError,     // 404 — suggests using endpoints.list()
-  RateLimitError,    // 429 — includes retryAfter seconds
-  TimeoutError,      // Request timeout
+  NotFoundError, // 404 — suggests using endpoints.list()
+  RateLimitError, // 429 — includes retryAfter seconds
+  TimeoutError, // Request timeout
 } from "@webhooks-cc/sdk";
 ```

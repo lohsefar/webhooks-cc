@@ -5,7 +5,6 @@ import {
   extractJsonField,
   NotFoundError,
   RateLimitError,
-  TEMPLATE_METADATA,
   TimeoutError,
   UnauthorizedError,
   verifySignature,
@@ -28,7 +27,10 @@ const TEMPLATE_PROVIDER_VALUES = [
   "linear",
   "standard-webhooks",
 ] as const satisfies readonly TemplateProvider[];
-const VERIFY_PROVIDER_VALUES = [...TEMPLATE_PROVIDER_VALUES, "discord"] as const satisfies readonly VerifyProvider[];
+const VERIFY_PROVIDER_VALUES = [
+  ...TEMPLATE_PROVIDER_VALUES,
+  "discord",
+] as const satisfies readonly VerifyProvider[];
 const TIME_SEPARATOR = " — ";
 
 const httpUrlSchema = z
@@ -45,10 +47,7 @@ const httpUrlSchema = z
     },
     { message: "Only http and https URLs are supported" }
   );
-const methodSchema = z
-  .enum(HTTP_METHODS)
-  .default("POST")
-  .describe("HTTP method (default: POST)");
+const methodSchema = z.enum(HTTP_METHODS).default("POST").describe("HTTP method (default: POST)");
 const durationOrTimestampSchema = z.union([z.string(), z.number()]);
 const mockResponseSchema = z.object({
   status: z.number().int().min(100).max(599).describe("HTTP status code (100-599)"),
@@ -174,7 +173,9 @@ function serializeError(error: unknown): string {
 }
 
 /** Wrap a tool handler with error handling that returns structured MCP errors. */
-function withErrorHandling<T>(handler: (args: T) => Promise<ToolResult>): (args: T) => Promise<ToolResult> {
+function withErrorHandling<T>(
+  handler: (args: T) => Promise<ToolResult>
+): (args: T) => Promise<ToolResult> {
   return async (args: T) => {
     try {
       return await handler(args);
@@ -348,10 +349,7 @@ export function registerTools(server: McpServer, client: WebhooksCC): void {
     "Create a webhook endpoint. Returns the endpoint slug, URL, and metadata.",
     {
       name: z.string().optional().describe("Display name for the endpoint"),
-      ephemeral: z
-        .boolean()
-        .optional()
-        .describe("Create a temporary endpoint that auto-expires"),
+      ephemeral: z.boolean().optional().describe("Create a temporary endpoint that auto-expires"),
       expiresIn: durationOrTimestampSchema
         .optional()
         .describe('Auto-expire after this duration, for example "12h"'),
@@ -418,10 +416,7 @@ export function registerTools(server: McpServer, client: WebhooksCC): void {
     {
       count: z.number().int().min(1).max(20).describe("Number of endpoints to create"),
       namePrefix: z.string().optional().describe("Optional prefix for endpoint names"),
-      ephemeral: z
-        .boolean()
-        .optional()
-        .describe("Create temporary endpoints that auto-expire"),
+      ephemeral: z.boolean().optional().describe("Create temporary endpoints that auto-expire"),
       expiresIn: durationOrTimestampSchema
         .optional()
         .describe('Auto-expire after this duration, for example "12h"'),
@@ -457,7 +452,9 @@ export function registerTools(server: McpServer, client: WebhooksCC): void {
 
       return jsonContent({
         deleted: settled
-          .filter((result): result is PromiseFulfilledResult<string> => result.status === "fulfilled")
+          .filter(
+            (result): result is PromiseFulfilledResult<string> => result.status === "fulfilled"
+          )
           .map((result) => result.value),
         failed: settled.flatMap((result, index) =>
           result.status === "rejected"
@@ -488,40 +485,39 @@ export function registerTools(server: McpServer, client: WebhooksCC): void {
         .describe("Optional provider template to send with signed headers"),
       template: z.string().optional().describe("Provider-specific template preset"),
       event: z.string().optional().describe("Provider event or topic name"),
-      secret: z
-        .string()
-        .optional()
-        .describe("Signing secret. Required when provider is set."),
+      secret: z.string().optional().describe("Signing secret. Required when provider is set."),
     },
-    withErrorHandling(async ({ slug, method, headers, body, provider, template, event, secret }) => {
-      let response: Response;
+    withErrorHandling(
+      async ({ slug, method, headers, body, provider, template, event, secret }) => {
+        let response: Response;
 
-      if (provider) {
-        const templateSecret = secret?.trim();
-        if (!templateSecret) {
-          throw new Error("send_webhook with provider templates requires a non-empty secret");
+        if (provider) {
+          const templateSecret = secret?.trim();
+          if (!templateSecret) {
+            throw new Error("send_webhook with provider templates requires a non-empty secret");
+          }
+
+          response = await client.endpoints.sendTemplate(slug, {
+            provider,
+            template,
+            event,
+            secret: templateSecret,
+            method,
+            headers,
+            body,
+          });
+        } else {
+          response = await client.endpoints.send(slug, { method, headers, body });
         }
 
-        response = await client.endpoints.sendTemplate(slug, {
-          provider,
-          template,
-          event,
-          secret: templateSecret,
-          method,
-          headers,
-          body,
+        const responseBody = await readBodyTruncated(response);
+        return jsonContent({
+          status: response.status,
+          statusText: response.statusText,
+          body: responseBody,
         });
-      } else {
-        response = await client.endpoints.send(slug, { method, headers, body });
       }
-
-      const responseBody = await readBodyTruncated(response);
-      return jsonContent({
-        status: response.status,
-        statusText: response.statusText,
-        body: responseBody,
-      });
-    })
+    )
   );
 
   server.tool(
@@ -667,10 +663,7 @@ export function registerTools(server: McpServer, client: WebhooksCC): void {
     {
       leftRequestId: z.string().describe("The first request ID"),
       rightRequestId: z.string().describe("The second request ID"),
-      ignoreHeaders: z
-        .array(z.string())
-        .optional()
-        .describe("Headers to ignore during comparison"),
+      ignoreHeaders: z.array(z.string()).optional().describe("Headers to ignore during comparison"),
     },
     withErrorHandling(async ({ leftRequestId, rightRequestId, ignoreHeaders }) => {
       const [leftRequest, rightRequest] = await Promise.all([
@@ -688,11 +681,7 @@ export function registerTools(server: McpServer, client: WebhooksCC): void {
     "Extract specific JSON fields from a captured request body.",
     {
       requestId: z.string().describe("The request ID"),
-      jsonPaths: z
-        .array(z.string())
-        .min(1)
-        .max(50)
-        .describe("Dot-notation JSON paths to extract"),
+      jsonPaths: z.array(z.string()).min(1).max(50).describe("Dot-notation JSON paths to extract"),
     },
     withErrorHandling(async ({ requestId, jsonPaths }) => {
       const request = await client.requests.get(requestId);
@@ -763,10 +752,7 @@ export function registerTools(server: McpServer, client: WebhooksCC): void {
         .describe("Optional provider template for signing"),
       template: z.string().optional().describe("Provider-specific template preset"),
       event: z.string().optional().describe("Provider event or topic name"),
-      secret: z
-        .string()
-        .optional()
-        .describe("Signing secret. Required when provider is set."),
+      secret: z.string().optional().describe("Signing secret. Required when provider is set."),
     },
     withErrorHandling(async ({ url, method, headers, body, provider, template, event, secret }) => {
       const response = await client.sendTo(url, {
@@ -801,10 +787,7 @@ export function registerTools(server: McpServer, client: WebhooksCC): void {
         .describe("Optional provider template for signing"),
       template: z.string().optional().describe("Provider-specific template preset"),
       event: z.string().optional().describe("Provider event or topic name"),
-      secret: z
-        .string()
-        .optional()
-        .describe("Signing secret. Required when provider is set."),
+      secret: z.string().optional().describe("Signing secret. Required when provider is set."),
     },
     withErrorHandling(async ({ url, method, headers, body, provider, template, event, secret }) => {
       const preview = await client.buildRequest(url, {
@@ -824,17 +807,16 @@ export function registerTools(server: McpServer, client: WebhooksCC): void {
     "list_provider_templates",
     "List supported webhook providers, templates, and signing metadata.",
     {
-      provider: z
-        .enum(TEMPLATE_PROVIDER_VALUES)
-        .optional()
-        .describe("Filter to a single provider"),
+      provider: z.enum(TEMPLATE_PROVIDER_VALUES).optional().describe("Filter to a single provider"),
     },
     withErrorHandling(async ({ provider }) => {
       if (provider) {
         return jsonContent([client.templates.get(provider)]);
       }
 
-      return jsonContent(client.templates.listProviders().map((name) => client.templates.get(name)));
+      return jsonContent(
+        client.templates.listProviders().map((name) => client.templates.get(name))
+      );
     })
   );
 
@@ -863,7 +845,9 @@ export function registerTools(server: McpServer, client: WebhooksCC): void {
       secret: z
         .string()
         .optional()
-        .describe("Signing secret. Required when provider is set or signature verification is enabled."),
+        .describe(
+          "Signing secret. Required when provider is set or signature verification is enabled."
+        ),
       mockStatus: z
         .number()
         .int()
@@ -884,8 +868,19 @@ export function registerTools(server: McpServer, client: WebhooksCC): void {
         .describe("Delete the created endpoint after the flow completes"),
     },
     withErrorHandling(
-      async ({ provider, event, secret, mockStatus, targetUrl, verifySignature: shouldVerify, cleanup }) => {
-        const flow = client.flow().createEndpoint({ expiresIn: "1h" }).waitForCapture({ timeout: "30s" });
+      async ({
+        provider,
+        event,
+        secret,
+        mockStatus,
+        targetUrl,
+        verifySignature: shouldVerify,
+        cleanup,
+      }) => {
+        const flow = client
+          .flow()
+          .createEndpoint({ expiresIn: "1h" })
+          .waitForCapture({ timeout: "30s" });
 
         if (mockStatus !== undefined) {
           flow.setMock({
@@ -898,7 +893,9 @@ export function registerTools(server: McpServer, client: WebhooksCC): void {
         if (provider) {
           const templateSecret = secret?.trim();
           if (!templateSecret) {
-            throw new Error("test_webhook_flow with provider templates requires a non-empty secret");
+            throw new Error(
+              "test_webhook_flow with provider templates requires a non-empty secret"
+            );
           }
 
           flow.sendTemplate({
@@ -933,7 +930,9 @@ export function registerTools(server: McpServer, client: WebhooksCC): void {
           endpoint: result.endpoint,
           request: result.request ?? null,
           verification: result.verification ?? null,
-          replayResponse: result.replayResponse ? await summarizeResponse(result.replayResponse) : null,
+          replayResponse: result.replayResponse
+            ? await summarizeResponse(result.replayResponse)
+            : null,
           cleanedUp: result.cleanedUp,
         });
       }

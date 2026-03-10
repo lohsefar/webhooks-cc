@@ -1011,10 +1011,7 @@ export class WebhooksCC {
       return this.request<Request>("GET", `/requests/${requestId}`);
     },
 
-    waitForAll: async (
-      endpointSlug: string,
-      options: WaitForAllOptions
-    ): Promise<Request[]> => {
+    waitForAll: async (endpointSlug: string, options: WaitForAllOptions): Promise<Request[]> => {
       validatePathSegment(endpointSlug, "endpointSlug");
       const listLimit = Math.min(1000, Math.max(100, Math.floor(options.count) * 2));
       return collectMatchingRequests(
@@ -1259,7 +1256,11 @@ export class WebhooksCC {
           };
 
           const reconnectStream = async (): Promise<boolean> => {
-            if (!reconnect || reconnectAttempts >= maxReconnectAttempts || controller.signal.aborted) {
+            if (
+              !reconnect ||
+              reconnectAttempts >= maxReconnectAttempts ||
+              controller.signal.aborted
+            ) {
               cleanup();
               return false;
             }

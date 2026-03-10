@@ -59,7 +59,8 @@ const requests = await client.requests.list(endpoint.slug);
 ```
 
 <Callout type="tip">
-The receiver accepts any HTTP method, content type, and body size. There is no validation or filtering on the incoming request.
+  The receiver accepts any HTTP method, content type, and body size. There is no validation or
+  filtering on the incoming request.
 </Callout>
 
 ## Mock responses
@@ -94,7 +95,7 @@ const endpoint = await client.endpoints.create({
 Guest users (no account) can create up to 25 ephemeral endpoints per 12-hour window. No cleanup needed — expired endpoints and their requests are removed automatically.
 
 <Callout type="tip">
-Ephemeral endpoints are perfect for quick testing. No account required, no cleanup needed.
+  Ephemeral endpoints are perfect for quick testing. No account required, no cleanup needed.
 </Callout>
 
 ## Tunneling
@@ -116,7 +117,8 @@ whk tunnel 3000 -e
 ```
 
 <Callout type="tip">
-Your local server's response does not affect what the webhook sender receives. The sender always gets your configured mock response.
+  Your local server's response does not affect what the webhook sender receives. The sender always
+  gets your configured mock response.
 </Callout>
 
 ## Provider templates
@@ -140,11 +142,7 @@ Send templates from the dashboard (Send button), SDK, or MCP server.
 Most webhook providers sign payloads with HMAC-SHA256 so you can verify the request came from them and was not tampered with in transit. The SDK includes detection helpers for common providers:
 
 ```ts
-import {
-  isStripeWebhook,
-  isGitHubWebhook,
-  isStandardWebhook,
-} from "@webhooks-cc/sdk";
+import { isStripeWebhook, isGitHubWebhook, isStandardWebhook } from "@webhooks-cc/sdk";
 
 if (isStripeWebhook(request)) {
   // Verify with your Stripe signing secret
@@ -157,16 +155,17 @@ Verification requires the provider's signing secret, which you configure in your
 
 Quotas limit how many webhook requests your endpoints can capture within a billing period. Limits vary by plan:
 
-| Plan | Requests | Period |
-|------|----------|--------|
-| Guest | 25 | 12 hours |
-| Free | 50 | 24 hours |
-| **Pro** | 100,000 | 30 days |
+| Plan    | Requests | Period   |
+| ------- | -------- | -------- |
+| Guest   | 25       | 12 hours |
+| Free    | 50       | 24 hours |
+| **Pro** | 100,000  | 30 days  |
 
 Quotas are enforced at the receiver level using atomic Redis operations, ensuring accuracy even under high concurrency. When your quota is exhausted, the receiver returns `429 Too Many Requests` to the sender.
 
 <Callout type="tip">
-Free plan periods activate lazily — your 24-hour window starts when you receive your first request, not when you sign up.
+  Free plan periods activate lazily — your 24-hour window starts when you receive your first
+  request, not when you sign up.
 </Callout>
 
 ## API keys

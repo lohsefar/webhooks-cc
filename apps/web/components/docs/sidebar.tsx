@@ -38,7 +38,9 @@ function SidebarContent({
       const next = { ...prev, [id]: !prev[id] };
       try {
         localStorage.setItem(STORAGE_KEY, JSON.stringify(next));
-      } catch {}
+      } catch {
+        // localStorage unavailable
+      }
       return next;
     });
   }, []);
@@ -76,10 +78,7 @@ function SidebarContent({
             >
               {section.title}
               <ChevronDown
-                className={cn(
-                  "h-3.5 w-3.5 transition-transform",
-                  !showItems && "-rotate-90"
-                )}
+                className={cn("h-3.5 w-3.5 transition-transform", !showItems && "-rotate-90")}
               />
             </button>
             {showItems && (
@@ -87,9 +86,7 @@ function SidebarContent({
                 {section.items.map((item) => {
                   const isActive =
                     pathname === item.href ||
-                    (!item.depth &&
-                      item.href !== "/docs" &&
-                      pathname.startsWith(`${item.href}/`));
+                    (!item.depth && item.href !== "/docs" && pathname.startsWith(`${item.href}/`));
 
                   return (
                     <li key={item.href}>

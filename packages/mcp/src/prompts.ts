@@ -90,7 +90,10 @@ export function registerPrompts(server: McpServer): void {
       title: "Compare Webhook Attempts",
       description: "Guide an agent through comparing two webhook deliveries or retries.",
       argsSchema: {
-        endpointSlug: z.string().optional().describe("Endpoint slug to inspect for recent attempts"),
+        endpointSlug: z
+          .string()
+          .optional()
+          .describe("Endpoint slug to inspect for recent attempts"),
         leftRequestId: z.string().optional().describe("First request ID, if already known"),
         rightRequestId: z.string().optional().describe("Second request ID, if already known"),
       },

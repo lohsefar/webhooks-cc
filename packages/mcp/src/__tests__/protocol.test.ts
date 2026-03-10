@@ -131,13 +131,8 @@ describe.skipIf(!API_KEY)("MCP protocol integration tests", () => {
     );
 
     const resourceTemplates = await mcpClient.listResourceTemplates();
-    expect(
-      resourceTemplates.resourceTemplates.map((template) => template.uriTemplate)
-    ).toEqual(
-      expect.arrayContaining([
-        "webhooks://endpoint/{slug}/recent",
-        "webhooks://request/{id}",
-      ])
+    expect(resourceTemplates.resourceTemplates.map((template) => template.uriTemplate)).toEqual(
+      expect.arrayContaining(["webhooks://endpoint/{slug}/recent", "webhooks://request/{id}"])
     );
 
     const endpointsOverview = parseResourceText(
@@ -152,9 +147,9 @@ describe.skipIf(!API_KEY)("MCP protocol integration tests", () => {
       await mcpClient.readResource({ uri: `webhooks://endpoint/${endpoint.slug}/recent` })
     );
     expect(endpointRecent.endpoint.slug).toBe(endpoint.slug);
-    expect(endpointRecent.requests.some((request: { id: string }) => request.id === captured.id)).toBe(
-      true
-    );
+    expect(
+      endpointRecent.requests.some((request: { id: string }) => request.id === captured.id)
+    ).toBe(true);
 
     const requestDetails = parseResourceText(
       await mcpClient.readResource({ uri: `webhooks://request/${captured.id}` })

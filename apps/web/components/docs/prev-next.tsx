@@ -7,13 +7,7 @@ interface NavLink {
   section: string;
 }
 
-export function PrevNextNav({
-  prev,
-  next,
-}: {
-  prev: NavLink | null;
-  next: NavLink | null;
-}) {
+export function PrevNextNav({ prev, next }: { prev: NavLink | null; next: NavLink | null }) {
   if (!prev && !next) return null;
 
   return (

@@ -101,7 +101,4 @@ export type {
   SDKDescription,
   OperationDescription,
 } from "./types";
-export type {
-  WebhookFlowResult,
-  WebhookFlowVerifyOptions,
-} from "./flow";
+export type { WebhookFlowResult, WebhookFlowVerifyOptions } from "./flow";

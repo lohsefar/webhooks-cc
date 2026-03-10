@@ -86,10 +86,10 @@ describe("polar webhook handler", () => {
 
 The SDK generates three headers per the **Standard Webhooks** spec:
 
-| Header | Value |
-|--------|-------|
-| `webhook-id` | Unique message ID (e.g. `msg_a1b2c3...`) |
-| `webhook-timestamp` | Unix timestamp in seconds |
+| Header              | Value                                                    |
+| ------------------- | -------------------------------------------------------- |
+| `webhook-id`        | Unique message ID (e.g. `msg_a1b2c3...`)                 |
+| `webhook-timestamp` | Unix timestamp in seconds                                |
 | `webhook-signature` | `v1,<base64(HMAC-SHA256(secret, msgId.timestamp.body))>` |
 
 Secrets with a `whsec_` prefix are handled automatically. The SDK auto-detects whether the secret is base64-encoded (Svix, Clerk) or raw UTF-8 (Polar.sh) after stripping the prefix.
@@ -157,21 +157,21 @@ Pass a fixed `timestamp` to generate deterministic signatures, useful for snapsh
 const res = await client.sendTo("http://localhost:3000/api/webhooks", {
   provider: "standard-webhooks",
   secret: "dGVzdC1zZWNyZXQ=", // base64("test-secret")
-  timestamp: 1700000000,       // fixed timestamp
+  timestamp: 1700000000, // fixed timestamp
   body: { type: "test.event", data: {} },
 });
 ```
 
 ## Services using Standard Webhooks
 
-| Service | Secret format | Notes |
-|---------|--------------|-------|
-| **Polar.sh** | `whsec_<raw-string>` | Secret is raw UTF-8, not base64 after prefix |
-| **Svix** | `whsec_<base64>` | Spec-compliant base64 after prefix |
-| **Clerk** | `whsec_<base64>` | Spec-compliant |
-| **Resend** | `whsec_<base64>` | Spec-compliant |
-| **Liveblocks** | `whsec_<base64>` | Spec-compliant |
-| **Novu** | `whsec_<base64>` | Spec-compliant |
+| Service        | Secret format        | Notes                                        |
+| -------------- | -------------------- | -------------------------------------------- |
+| **Polar.sh**   | `whsec_<raw-string>` | Secret is raw UTF-8, not base64 after prefix |
+| **Svix**       | `whsec_<base64>`     | Spec-compliant base64 after prefix           |
+| **Clerk**      | `whsec_<base64>`     | Spec-compliant                               |
+| **Resend**     | `whsec_<base64>`     | Spec-compliant                               |
+| **Liveblocks** | `whsec_<base64>`     | Spec-compliant                               |
+| **Novu**       | `whsec_<base64>`     | Spec-compliant                               |
 
 The SDK auto-detects the format. If the part after `whsec_` isn't valid base64, it falls back to raw UTF-8 bytes.
 

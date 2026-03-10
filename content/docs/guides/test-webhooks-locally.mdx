@@ -5,7 +5,8 @@ section: guides
 order: 1
 lastUpdated: 2026-03-10
 schema: howto
-keywords: ["test webhooks locally", "localhost webhook testing", "webhook development", "webhook debugging"]
+keywords:
+  ["test webhooks locally", "localhost webhook testing", "webhook development", "webhook debugging"]
 seo:
   ogTitle: "How to Test Webhooks Locally — webhooks.cc"
   ogDescription: "Step-by-step guide to testing webhooks on localhost with capture, inspection, and replay."
@@ -23,7 +24,8 @@ By the end of this guide, you will be able to:
 - Set up a real-time tunnel that forwards live webhooks to localhost
 
 <Callout type="info">
-You need a webhooks.cc account and an API key from your [account page](/account). The free plan includes 50 requests per day, enough for local development.
+  You need a webhooks.cc account and an API key from your [account page](/account). The free plan
+  includes 50 requests per day, enough for local development.
 </Callout>
 
 ## Prerequisites
@@ -90,10 +92,7 @@ console.log(latest.method, latest.headers, latest.body);
 Replay the captured request to your local server. The replay sends the original method, headers, and body -- your handler processes it as if the provider sent it directly.
 
 ```ts
-const res = await client.requests.replay(
-  latest.id,
-  "http://localhost:3000/api/webhooks"
-);
+const res = await client.requests.replay(latest.id, "http://localhost:3000/api/webhooks");
 console.log(res.status); // 200
 ```
 

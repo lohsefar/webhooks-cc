@@ -1,11 +1,6 @@
 import { describe, it, expect, vi } from "vitest";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
-import {
-  NotFoundError,
-  RateLimitError,
-  type Request,
-  type WebhooksCC,
-} from "@webhooks-cc/sdk";
+import { NotFoundError, RateLimitError, type Request, type WebhooksCC } from "@webhooks-cc/sdk";
 import { registerTools } from "../tools";
 
 const EXPECTED_TOOLS = [
@@ -39,7 +34,9 @@ const EXPECTED_TOOLS = [
 type RegisteredTool = {
   description: string;
   schema: unknown;
-  handler: (args: unknown) => Promise<{ content: Array<{ type: "text"; text: string }>; isError?: boolean }>;
+  handler: (
+    args: unknown
+  ) => Promise<{ content: Array<{ type: "text"; text: string }>; isError?: boolean }>;
 };
 
 function makeRequest(overrides: Partial<Request> = {}): Request {
@@ -88,7 +85,16 @@ function createMockClient(overrides: Partial<WebhooksCC> = {}): WebhooksCC {
     templates: {
       listProviders: vi
         .fn()
-        .mockReturnValue(["stripe", "github", "shopify", "twilio", "slack", "paddle", "linear", "standard-webhooks"]),
+        .mockReturnValue([
+          "stripe",
+          "github",
+          "shopify",
+          "twilio",
+          "slack",
+          "paddle",
+          "linear",
+          "standard-webhooks",
+        ]),
       get: vi.fn((provider: string) => ({ provider, templates: [], secretRequired: true })),
       ...(overrides.templates ?? {}),
     },

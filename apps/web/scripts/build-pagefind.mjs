@@ -1,3 +1,5 @@
+/* eslint-env node */
+/* global URL, Buffer, process */
 import { gunzipSync, gzipSync } from "node:zlib";
 import { readdirSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
 import path from "node:path";

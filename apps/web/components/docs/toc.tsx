@@ -73,13 +73,7 @@ export function TableOfContents({ headings }: { headings: TocItem[] }) {
   );
 }
 
-function MobileToc({
-  headings,
-  activeId,
-}: {
-  headings: TocItem[];
-  activeId: string;
-}) {
+function MobileToc({ headings, activeId }: { headings: TocItem[]; activeId: string }) {
   const [open, setOpen] = useState(false);
 
   if (headings.length < 3) return null;
@@ -92,9 +86,7 @@ function MobileToc({
         className="flex w-full items-center justify-between px-4 py-2.5 text-sm font-bold cursor-pointer"
       >
         On this page
-        <ChevronDown
-          className={cn("h-4 w-4 transition-transform", open && "rotate-180")}
-        />
+        <ChevronDown className={cn("h-4 w-4 transition-transform", open && "rotate-180")} />
       </button>
       {open && (
         <nav className="px-4 pb-3 border-t-2 border-foreground" aria-label="Table of contents">

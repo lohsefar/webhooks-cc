@@ -24,7 +24,9 @@ function getRegisteredHandlers(client: WebhooksCC): Record<string, ToolHandler> 
 
   registerTools(server, client);
 
-  return Object.fromEntries(toolSpy.mock.calls.map((call) => [call[0] as string, call[3] as ToolHandler]));
+  return Object.fromEntries(
+    toolSpy.mock.calls.map((call) => [call[0] as string, call[3] as ToolHandler])
+  );
 }
 
 async function waitForRetainedSearch(fn: () => Promise<boolean>): Promise<void> {
@@ -217,9 +219,9 @@ describe.skipIf(!API_KEY)("MCP integration tests", () => {
       });
     }
 
-    expect(searchResults.some((result: { body?: string }) => result.body?.includes(firstBody.marker))).toBe(
-      true
-    );
+    expect(
+      searchResults.some((result: { body?: string }) => result.body?.includes(firstBody.marker))
+    ).toBe(true);
     expect(countResult.count).toBeGreaterThanOrEqual(1);
 
     const cleared = parseJsonResult(await handlers.clear_requests({ slug: endpoint.slug }));

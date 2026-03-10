@@ -5,7 +5,13 @@ section: guides
 order: 4
 lastUpdated: 2026-03-10
 schema: howto
-keywords: ["test shopify webhooks", "shopify webhook testing", "shopify HMAC verification", "shopify webhook localhost"]
+keywords:
+  [
+    "test shopify webhooks",
+    "shopify webhook testing",
+    "shopify HMAC verification",
+    "shopify webhook localhost",
+  ]
 seo:
   ogTitle: "How to Test Shopify Webhooks — webhooks.cc"
   ogDescription: "Step-by-step guide to testing Shopify webhook handlers with signed payloads and HMAC-SHA256 verification."
@@ -189,12 +195,12 @@ Shopify computes HMAC-SHA256 of the raw JSON body using your webhook secret. The
 
 Shopify also sends additional headers with every webhook delivery:
 
-| Header | Purpose | Example value |
-|--------|---------|---------------|
-| `x-shopify-hmac-sha256` | Base64-encoded HMAC-SHA256 of the body | `XGh5N2tPJ3R5bXB...` |
-| `x-shopify-topic` | The event type | `orders/create`, `products/update` |
-| `x-shopify-shop-domain` | The shop that sent the webhook | `your-store.myshopify.com` |
-| `x-shopify-api-version` | The API version used to generate the payload | `2024-01` |
+| Header                  | Purpose                                      | Example value                      |
+| ----------------------- | -------------------------------------------- | ---------------------------------- |
+| `x-shopify-hmac-sha256` | Base64-encoded HMAC-SHA256 of the body       | `XGh5N2tPJ3R5bXB...`               |
+| `x-shopify-topic`       | The event type                               | `orders/create`, `products/update` |
+| `x-shopify-shop-domain` | The shop that sent the webhook               | `your-store.myshopify.com`         |
+| `x-shopify-api-version` | The API version used to generate the payload | `2024-01`                          |
 
 Your handler should:
 
@@ -213,12 +219,12 @@ Your handler should:
 
 **Available templates:**
 
-| Template | Topic header | Description |
-|----------|-------------|-------------|
-| `orders/create` | `orders/create` | New order placed. Includes line items, customer, pricing, and shipping address. |
-| `orders/paid` | `orders/paid` | Payment confirmed on an order. Financial status set to `paid`. |
-| `products/update` | `products/update` | Product details changed. Includes variants, images, and inventory data. |
-| `app/uninstalled` | `app/uninstalled` | Your app was removed from a store. Includes the shop domain and app ID. |
+| Template          | Topic header      | Description                                                                     |
+| ----------------- | ----------------- | ------------------------------------------------------------------------------- |
+| `orders/create`   | `orders/create`   | New order placed. Includes line items, customer, pricing, and shipping address. |
+| `orders/paid`     | `orders/paid`     | Payment confirmed on an order. Financial status set to `paid`.                  |
+| `products/update` | `products/update` | Product details changed. Includes variants, images, and inventory data.         |
+| `app/uninstalled` | `app/uninstalled` | Your app was removed from a store. Includes the shop domain and app ID.         |
 
 ## Putting it together: a full test suite
 
@@ -230,12 +236,7 @@ const client = new WebhooksCC({ apiKey: process.env.WHK_API_KEY! });
 const WEBHOOK_URL = "http://localhost:3000/api/webhooks/shopify";
 
 describe("Shopify webhook handler", () => {
-  const templates = [
-    "orders/create",
-    "orders/paid",
-    "products/update",
-    "app/uninstalled",
-  ] as const;
+  const templates = ["orders/create", "orders/paid", "products/update", "app/uninstalled"] as const;
 
   for (const template of templates) {
     it(`handles ${template}`, async () => {
@@ -271,9 +272,7 @@ describe("Shopify webhook handler", () => {
         currency: "EUR",
         financial_status: "pending",
         name: "#2001",
-        line_items: [
-          { id: 111222333, title: "Starter Plan", quantity: 1, price: "49.99" },
-        ],
+        line_items: [{ id: 111222333, title: "Starter Plan", quantity: 1, price: "49.99" }],
       },
     });
 

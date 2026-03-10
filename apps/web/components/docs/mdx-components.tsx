@@ -15,11 +15,7 @@ export const mdxComponents: MDXComponents = {
 
   pre: (props: React.ComponentProps<"pre">) => <CodeBlock {...props} />,
 
-  a: ({
-    href,
-    children,
-    ...props
-  }: React.AnchorHTMLAttributes<HTMLAnchorElement>) => {
+  a: ({ href, children, ...props }: React.AnchorHTMLAttributes<HTMLAnchorElement>) => {
     if (href?.startsWith("/") || href?.startsWith("#")) {
       return (
         <Link href={href} className="text-primary hover:underline font-bold" {...props}>
@@ -46,7 +42,10 @@ export const mdxComponents: MDXComponents = {
     </div>
   ),
   th: (props: React.ThHTMLAttributes<HTMLTableCellElement>) => (
-    <th className="text-left font-bold py-2 px-3 border-b-2 border-foreground bg-muted" {...props} />
+    <th
+      className="text-left font-bold py-2 px-3 border-b-2 border-foreground bg-muted"
+      {...props}
+    />
   ),
   td: (props: React.TdHTMLAttributes<HTMLTableCellElement>) => (
     <td className="py-2 px-3 border-b border-foreground/20" {...props} />

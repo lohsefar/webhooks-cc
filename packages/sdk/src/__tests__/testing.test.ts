@@ -99,18 +99,14 @@ describe("testing helpers", () => {
         list: vi
           .fn()
           .mockResolvedValueOnce([])
-          .mockResolvedValueOnce([
-            { ...request, id: "req2", receivedAt: 1002 },
-            request,
-          ]),
+          .mockResolvedValueOnce([{ ...request, id: "req2", receivedAt: 1002 }, request]),
       },
     };
 
-    const promise = captureDuring(
-      client as never,
-      async () => undefined,
-      { count: 2, pollInterval: 10 }
-    );
+    const promise = captureDuring(client as never, async () => undefined, {
+      count: 2,
+      pollInterval: 10,
+    });
 
     await vi.runAllTimersAsync();
 

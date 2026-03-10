@@ -319,7 +319,7 @@ export const getUsageById = internalQuery({
       limit: user.requestLimit,
       remaining: Math.max(0, user.requestLimit - used),
       plan: user.plan,
-      periodEnd: periodActive ? user.periodEnd ?? null : null,
+      periodEnd: periodActive ? (user.periodEnd ?? null) : null,
     };
   },
 });

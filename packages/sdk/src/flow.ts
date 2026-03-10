@@ -37,7 +37,7 @@ type FlowSendStep =
   | { kind: "sendTemplate"; options: SendTemplateOptions };
 
 export type WebhookFlowVerifyOptions =
-  | ({
+  | {
       provider: Exclude<VerifySignatureOptions["provider"], "discord">;
       secret: string;
       /**
@@ -45,7 +45,7 @@ export type WebhookFlowVerifyOptions =
        * For Twilio, the endpoint URL is used automatically when omitted.
        */
       url?: string | ((endpoint: Endpoint, request: Request) => string);
-    })
+    }
   | {
       provider: "discord";
       publicKey: string;
@@ -145,8 +145,8 @@ export class WebhookFlowBuilder {
         const resolvedUrl =
           typeof this.verificationOptions.url === "function"
             ? this.verificationOptions.url(endpoint, request)
-            : this.verificationOptions.url ??
-              (this.verificationOptions.provider === "twilio" ? endpoint.url : undefined);
+            : (this.verificationOptions.url ??
+              (this.verificationOptions.provider === "twilio" ? endpoint.url : undefined));
 
         if (this.verificationOptions.provider === "discord") {
           verification = await verifySignature(request, {
@@ -182,13 +182,17 @@ export class WebhookFlowBuilder {
       if (this.deleteAfterRun && endpoint) {
         try {
           await this.client.endpoints.delete(endpoint.slug);
-        } catch (error) {
-          if (!(error instanceof NotFoundError)) {
-            throw error;
+          if (result) {
+            result.cleanedUp = true;
           }
-        }
-        if (result) {
-          result.cleanedUp = true;
+        } catch (error) {
+          if (error instanceof NotFoundError) {
+            // Endpoint already deleted — treat as cleaned up
+            if (result) {
+              result.cleanedUp = true;
+            }
+          }
+          // Swallow cleanup errors to preserve the original exception
         }
       }
     }

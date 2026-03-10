@@ -74,14 +74,14 @@ const client = new WebhooksCC({
 });
 ```
 
-| Option | Type | Default | Notes |
-| --- | --- | --- | --- |
-| `apiKey` | `string` | required | API key in `whcc_...` format. Often read from `process.env.WHK_API_KEY`. |
-| `baseUrl` | `string` | `https://webhooks.cc` | API base URL |
-| `webhookUrl` | `string` | `https://go.webhooks.cc` | receiver base URL used by `endpoints.send()` |
-| `timeout` | `number` | `30000` | request timeout in milliseconds |
-| `retry` | `RetryOptions` | `1` attempt | retries transient SDK requests |
-| `hooks` | `ClientHooks` | none | lifecycle callbacks for request logging |
+| Option       | Type           | Default                  | Notes                                                                    |
+| ------------ | -------------- | ------------------------ | ------------------------------------------------------------------------ |
+| `apiKey`     | `string`       | required                 | API key in `whcc_...` format. Often read from `process.env.WHK_API_KEY`. |
+| `baseUrl`    | `string`       | `https://webhooks.cc`    | API base URL                                                             |
+| `webhookUrl` | `string`       | `https://go.webhooks.cc` | receiver base URL used by `endpoints.send()`                             |
+| `timeout`    | `number`       | `30000`                  | request timeout in milliseconds                                          |
+| `retry`      | `RetryOptions` | `1` attempt              | retries transient SDK requests                                           |
+| `hooks`      | `ClientHooks`  | none                     | lifecycle callbacks for request logging                                  |
 
 ## API overview
 

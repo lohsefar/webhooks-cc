@@ -5,7 +5,8 @@ section: sdk
 order: 5
 lastUpdated: 2026-03-10
 schema: faq
-keywords: ["webhook signature verification", "HMAC webhook", "verify stripe signature", "webhook security"]
+keywords:
+  ["webhook signature verification", "HMAC webhook", "verify stripe signature", "webhook security"]
 seo:
   ogTitle: "Webhook Signature Verification — webhooks.cc SDK"
   ogDescription: "Verify webhook signatures for 9 providers using the webhooks.cc TypeScript SDK. Supports HMAC-SHA256, HMAC-SHA1, and Ed25519."
@@ -39,17 +40,17 @@ import {
 
 ## Provider reference
 
-| Provider | Header | Algorithm | Secret format |
-|----------|--------|-----------|---------------|
-| Stripe | `stripe-signature` | HMAC-SHA256 | `whsec_...` string |
-| GitHub | `x-hub-signature-256` | HMAC-SHA256 | Hex string |
-| Shopify | `x-shopify-hmac-sha256` | HMAC-SHA256 (base64) | Hex string |
-| Twilio | `x-twilio-signature` | HMAC-SHA1 | Auth token |
-| Slack | `x-slack-signature` + `x-slack-request-timestamp` | HMAC-SHA256 | Signing secret |
-| Paddle | `paddle-signature` (ts + h1) | HMAC-SHA256 | Hex string |
-| Linear | `linear-signature` | HMAC-SHA256 | Hex string |
-| Discord | `x-signature-ed25519` + `x-signature-timestamp` | Ed25519 | Hex public key |
-| Standard Webhooks | `webhook-id` + `webhook-timestamp` + `webhook-signature` | HMAC-SHA256 | `whsec_...` or raw |
+| Provider          | Header                                                   | Algorithm            | Secret format      |
+| ----------------- | -------------------------------------------------------- | -------------------- | ------------------ |
+| Stripe            | `stripe-signature`                                       | HMAC-SHA256          | `whsec_...` string |
+| GitHub            | `x-hub-signature-256`                                    | HMAC-SHA256          | Hex string         |
+| Shopify           | `x-shopify-hmac-sha256`                                  | HMAC-SHA256 (base64) | Hex string         |
+| Twilio            | `x-twilio-signature`                                     | HMAC-SHA1            | Auth token         |
+| Slack             | `x-slack-signature` + `x-slack-request-timestamp`        | HMAC-SHA256          | Signing secret     |
+| Paddle            | `paddle-signature` (ts + h1)                             | HMAC-SHA256          | Hex string         |
+| Linear            | `linear-signature`                                       | HMAC-SHA256          | Hex string         |
+| Discord           | `x-signature-ed25519` + `x-signature-timestamp`          | Ed25519              | Hex public key     |
+| Standard Webhooks | `webhook-id` + `webhook-timestamp` + `webhook-signature` | HMAC-SHA256          | `whsec_...` or raw |
 
 ### Stripe
 
@@ -87,7 +88,8 @@ const result = await verifySignature(request, {
 ### Twilio
 
 <Callout type="warning">
-Twilio verification requires the full signed URL -- the callback URL your endpoint was configured at, not just the request body. Pass it as the `url` option.
+  Twilio verification requires the full signed URL -- the callback URL your endpoint was configured
+  at, not just the request body. Pass it as the `url` option.
 </Callout>
 
 Twilio signs using HMAC-SHA1 over the full callback URL concatenated with sorted form parameters. The signature is base64-encoded and sent in `x-twilio-signature`.
@@ -140,7 +142,8 @@ const result = await verifySignature(request, {
 ### Discord
 
 <Callout type="warning">
-Discord uses Ed25519 public-key verification, not HMAC. Pass `publicKey` instead of `secret`. The key is your Discord application's hex-encoded public key.
+  Discord uses Ed25519 public-key verification, not HMAC. Pass `publicKey` instead of `secret`. The
+  key is your Discord application's hex-encoded public key.
 </Callout>
 
 Discord sends `x-signature-ed25519` (hex-encoded signature) and `x-signature-timestamp`. The SDK verifies using `crypto.subtle.verify` with Ed25519.
@@ -223,7 +226,7 @@ const request = await client.requests.get(requestId);
 const valid = await verifyStripeSignature(
   request.body,
   request.headers["stripe-signature"],
-  process.env.STRIPE_WEBHOOK_SECRET!,
+  process.env.STRIPE_WEBHOOK_SECRET!
 );
 ```
 

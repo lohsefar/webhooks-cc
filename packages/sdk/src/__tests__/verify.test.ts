@@ -153,9 +153,7 @@ describe("signature verification", () => {
     expect(
       await verifyPaddleSignature(built.body, built.headers["paddle-signature"], "paddle_secret")
     ).toBe(true);
-    expect(await verifyPaddleSignature(built.body, "ts=1;h1=invalid", "paddle_secret")).toBe(
-      false
-    );
+    expect(await verifyPaddleSignature(built.body, "ts=1;h1=invalid", "paddle_secret")).toBe(false);
   });
 
   it("verifies Linear signatures", async () => {
@@ -166,11 +164,7 @@ describe("signature verification", () => {
     });
 
     expect(
-      await verifyLinearSignature(
-        built.body,
-        built.headers["linear-signature"],
-        "linear_secret"
-      )
+      await verifyLinearSignature(built.body, built.headers["linear-signature"], "linear_secret")
     ).toBe(true);
 
     await expect(
@@ -185,11 +179,10 @@ describe("signature verification", () => {
   });
 
   it("verifies Discord interaction signatures with an Ed25519 public key", async () => {
-    const keyPair = (await crypto.subtle.generateKey(
-      { name: "Ed25519" },
-      true,
-      ["sign", "verify"]
-    )) as unknown as { publicKey: CryptoKey; privateKey: CryptoKey };
+    const keyPair = (await crypto.subtle.generateKey({ name: "Ed25519" }, true, [
+      "sign",
+      "verify",
+    ])) as unknown as { publicKey: CryptoKey; privateKey: CryptoKey };
     const publicKey = Buffer.from(
       new Uint8Array(await crypto.subtle.exportKey("raw", keyPair.publicKey))
     ).toString("hex");

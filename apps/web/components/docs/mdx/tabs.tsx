@@ -3,15 +3,11 @@
 import { useState, Children, isValidElement, type ReactElement } from "react";
 import { cn } from "@/lib/utils";
 
-export function Tabs({
-  items,
-  children,
-}: {
-  items?: string[];
-  children: React.ReactNode;
-}) {
+export function Tabs({ items, children }: { items?: string[]; children: React.ReactNode }) {
   const [active, setActive] = useState(0);
-  const tabs = Children.toArray(children).filter(isValidElement) as ReactElement<{ label?: string }>[];
+  const tabs = Children.toArray(children).filter(isValidElement) as ReactElement<{
+    label?: string;
+  }>[];
 
   // Derive labels from items prop, or from Tab label props, or fallback to "Tab N"
   const labels = items ?? tabs.map((tab, i) => tab.props.label ?? `Tab ${i + 1}`);
@@ -42,6 +38,6 @@ export function Tabs({
   );
 }
 
-export function Tab({ label, children }: { label?: string; children: React.ReactNode }) {
+export function Tab({ children }: { label?: string; children: React.ReactNode }) {
   return <div>{children}</div>;
 }

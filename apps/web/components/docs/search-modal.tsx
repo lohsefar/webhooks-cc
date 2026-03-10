@@ -18,6 +18,7 @@ export function SearchModal() {
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<SearchResult[]>([]);
   const [activeIndex, setActiveIndex] = useState(0);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const [pagefind, setPagefind] = useState<any>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const debounceRef = useRef<ReturnType<typeof setTimeout>>(undefined);
@@ -179,9 +180,7 @@ export function SearchModal() {
                   type="button"
                   className={cn(
                     "w-full text-left px-4 py-3 cursor-pointer transition-colors",
-                    i === activeIndex
-                      ? "bg-muted border-l-4 border-l-primary"
-                      : "hover:bg-muted/50"
+                    i === activeIndex ? "bg-muted border-l-4 border-l-primary" : "hover:bg-muted/50"
                   )}
                 >
                   <p className="font-bold text-sm">{result.title}</p>

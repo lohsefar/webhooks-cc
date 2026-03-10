@@ -19,13 +19,7 @@ export function Steps({ children }: { children: React.ReactNode }) {
   );
 }
 
-export function Step({
-  title,
-  children,
-}: {
-  title: string;
-  children: React.ReactNode;
-}) {
+export function Step({ title, children }: { title: string; children: React.ReactNode }) {
   return (
     <div>
       <h3 className="font-bold text-lg mb-3 pt-0.5">{title}</h3>

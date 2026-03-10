@@ -5,7 +5,8 @@ section: guides
 order: 5
 lastUpdated: 2026-03-10
 schema: howto
-keywords: ["verify webhook signature", "webhook HMAC", "webhook security", "webhook signature validation"]
+keywords:
+  ["verify webhook signature", "webhook HMAC", "webhook security", "webhook signature validation"]
 seo:
   ogTitle: "How to Verify Webhook Signatures — webhooks.cc"
   ogDescription: "Step-by-step guide to verifying webhook signatures for 9 providers using HMAC-SHA256, HMAC-SHA1, and Ed25519."
@@ -37,7 +38,8 @@ Every HMAC-based webhook signature follows the same four-step process:
 Discord works differently. Instead of a shared secret, Discord uses Ed25519 public-key cryptography. You verify using your application's public key (available in the Discord developer portal), not a shared secret.
 
 <Callout type="warning">
-Always verify signatures before processing webhook payloads. Unverified webhooks can be forged by anyone who knows your endpoint URL.
+  Always verify signatures before processing webhook payloads. Unverified webhooks can be forged by
+  anyone who knows your endpoint URL.
 </Callout>
 
 ## Step-by-step verification
@@ -82,9 +84,9 @@ When you know the provider at build time, use the dedicated function. These acce
 import { verifyStripeSignature } from "@webhooks-cc/sdk";
 
 const valid = await verifyStripeSignature(
-  request.body,                            // raw body string
-  request.headers["stripe-signature"],     // signature header value
-  process.env.STRIPE_WEBHOOK_SECRET!       // your signing secret
+  request.body, // raw body string
+  request.headers["stripe-signature"], // signature header value
+  process.env.STRIPE_WEBHOOK_SECRET! // your signing secret
 );
 
 if (!valid) {
@@ -184,17 +186,17 @@ Secrets with a `whsec_` prefix are handled automatically. The SDK detects whethe
 
 ## Provider reference
 
-| Provider | Header | Algorithm | Notes |
-|----------|--------|-----------|-------|
-| Stripe | `stripe-signature` | HMAC-SHA256 | `t=timestamp,v1=hash` format |
-| GitHub | `x-hub-signature-256` | HMAC-SHA256 | `sha256=hash` hex-encoded |
-| Shopify | `x-shopify-hmac-sha256` | HMAC-SHA256 | Base64-encoded hash |
-| Twilio | `x-twilio-signature` | HMAC-SHA1 | Requires full callback URL |
-| Slack | `x-slack-signature` + `x-slack-request-timestamp` | HMAC-SHA256 | 5-minute timestamp window |
-| Paddle | `paddle-signature` | HMAC-SHA256 | `ts=timestamp;h1=hash` format |
-| Linear | `linear-signature` | HMAC-SHA256 | Hex-encoded, optional `sha256=` prefix |
-| Discord | `x-signature-ed25519` + `x-signature-timestamp` | Ed25519 | Uses public key, not shared secret |
-| Standard Webhooks | `webhook-id` + `webhook-timestamp` + `webhook-signature` | HMAC-SHA256 | Used by Polar, Svix, Clerk, Resend |
+| Provider          | Header                                                   | Algorithm   | Notes                                  |
+| ----------------- | -------------------------------------------------------- | ----------- | -------------------------------------- |
+| Stripe            | `stripe-signature`                                       | HMAC-SHA256 | `t=timestamp,v1=hash` format           |
+| GitHub            | `x-hub-signature-256`                                    | HMAC-SHA256 | `sha256=hash` hex-encoded              |
+| Shopify           | `x-shopify-hmac-sha256`                                  | HMAC-SHA256 | Base64-encoded hash                    |
+| Twilio            | `x-twilio-signature`                                     | HMAC-SHA1   | Requires full callback URL             |
+| Slack             | `x-slack-signature` + `x-slack-request-timestamp`        | HMAC-SHA256 | 5-minute timestamp window              |
+| Paddle            | `paddle-signature`                                       | HMAC-SHA256 | `ts=timestamp;h1=hash` format          |
+| Linear            | `linear-signature`                                       | HMAC-SHA256 | Hex-encoded, optional `sha256=` prefix |
+| Discord           | `x-signature-ed25519` + `x-signature-timestamp`          | Ed25519     | Uses public key, not shared secret     |
+| Standard Webhooks | `webhook-id` + `webhook-timestamp` + `webhook-signature` | HMAC-SHA256 | Used by Polar, Svix, Clerk, Resend     |
 
 ## Verifying captured requests
 
@@ -262,7 +264,9 @@ export async function POST(req: NextRequest) {
 ```
 
 <Callout type="warning">
-Read the request body as raw text before verifying. If your framework parses the body as JSON first, the re-serialized output may differ from the original bytes, causing HMAC verification to fail.
+  Read the request body as raw text before verifying. If your framework parses the body as JSON
+  first, the re-serialized output may differ from the original bytes, causing HMAC verification to
+  fail.
 </Callout>
 
 ## Testing signature verification

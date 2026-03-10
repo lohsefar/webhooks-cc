@@ -7,17 +7,15 @@ const API_KEY = "whcc_testkey123";
 const BASE_URL = "https://test.webhooks.cc";
 const WEBHOOK_URL = "https://go.test.webhooks.cc";
 
-function createClient(
-  opts?: {
-    timeout?: number;
-    webhookUrl?: string;
-    retry?: {
-      maxAttempts?: number;
-      backoffMs?: number;
-      retryOn?: number[];
-    };
-  }
-) {
+function createClient(opts?: {
+  timeout?: number;
+  webhookUrl?: string;
+  retry?: {
+    maxAttempts?: number;
+    backoffMs?: number;
+    retryOn?: number[];
+  };
+}) {
   return new WebhooksCC({
     apiKey: API_KEY,
     baseUrl: BASE_URL,
@@ -1091,11 +1089,11 @@ describe("WebhooksCC", () => {
         throw new Error("Expected cURL export");
       }
       expect(result).toHaveLength(1);
-      expect(result[0]).toContain('curl -X POST');
+      expect(result[0]).toContain("curl -X POST");
       expect(result[0]).toContain('-H "content-type: application/json"');
       expect(result[0]).toContain('-H "x-test: yes"');
       expect(result[0]).not.toContain("authorization");
-      expect(result[0]).toContain('https://go.test.webhooks.cc/w/abc123/webhook?foo=bar');
+      expect(result[0]).toContain("https://go.test.webhooks.cc/w/abc123/webhook?foo=bar");
     });
 
     it("exports captured requests as HAR", async () => {
@@ -1462,9 +1460,7 @@ describe("WebhooksCC", () => {
               periodEnd: null,
             }),
           text: () =>
-            Promise.resolve(
-              '{"used":1,"limit":50,"remaining":49,"plan":"free","periodEnd":null}'
-            ),
+            Promise.resolve('{"used":1,"limit":50,"remaining":49,"plan":"free","periodEnd":null}'),
         });
 
       const promise = createClient({

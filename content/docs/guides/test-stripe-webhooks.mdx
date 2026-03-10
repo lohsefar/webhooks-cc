@@ -5,7 +5,13 @@ section: guides
 order: 2
 lastUpdated: 2026-03-10
 schema: howto
-keywords: ["test stripe webhooks", "stripe webhook testing", "stripe signature verification", "stripe webhook localhost"]
+keywords:
+  [
+    "test stripe webhooks",
+    "stripe webhook testing",
+    "stripe signature verification",
+    "stripe webhook localhost",
+  ]
 seo:
   ogTitle: "How to Test Stripe Webhooks — webhooks.cc"
   ogDescription: "Step-by-step guide to testing Stripe webhook handlers with real signed payloads and signature verification."
@@ -25,7 +31,8 @@ A test workflow that sends signed Stripe webhooks to your local handler, verifie
 ## Prerequisites
 
 <Callout type="info">
-You need a webhooks.cc API key from your [account page](/account) and a Stripe test-mode webhook secret.
+  You need a webhooks.cc API key from your [account page](/account) and a Stripe test-mode webhook
+  secret.
 </Callout>
 
 - **webhooks.cc account** with an API key (`WHK_API_KEY` env var)
@@ -57,14 +64,11 @@ const client = new WebhooksCC({ apiKey: process.env.WHK_API_KEY! });
 
 describe("stripe webhook handler", () => {
   it("handles checkout.session.completed", async () => {
-    const res = await client.sendTo(
-      "http://localhost:3000/api/webhooks/stripe",
-      {
-        provider: "stripe",
-        template: "checkout.session.completed",
-        secret: process.env.STRIPE_WEBHOOK_SECRET!,
-      }
-    );
+    const res = await client.sendTo("http://localhost:3000/api/webhooks/stripe", {
+      provider: "stripe",
+      template: "checkout.session.completed",
+      secret: process.env.STRIPE_WEBHOOK_SECRET!,
+    });
 
     expect(res.status).toBe(200);
   });
@@ -78,30 +82,27 @@ When you need specific field values -- a particular amount, currency, or custome
 
 ```ts
 it("handles payment_intent.succeeded with custom amount", async () => {
-  const res = await client.sendTo(
-    "http://localhost:3000/api/webhooks/stripe",
-    {
-      provider: "stripe",
-      secret: process.env.STRIPE_WEBHOOK_SECRET!,
-      body: {
-        id: "evt_test_payment_success",
-        type: "payment_intent.succeeded",
-        data: {
-          object: {
-            id: "pi_test_456",
-            amount: 4999,
-            currency: "usd",
-            status: "succeeded",
-            payment_method: "pm_card_visa",
-            customer: "cus_test_789",
-          },
+  const res = await client.sendTo("http://localhost:3000/api/webhooks/stripe", {
+    provider: "stripe",
+    secret: process.env.STRIPE_WEBHOOK_SECRET!,
+    body: {
+      id: "evt_test_payment_success",
+      type: "payment_intent.succeeded",
+      data: {
+        object: {
+          id: "pi_test_456",
+          amount: 4999,
+          currency: "usd",
+          status: "succeeded",
+          payment_method: "pm_card_visa",
+          customer: "cus_test_789",
         },
-        created: Math.floor(Date.now() / 1000),
-        livemode: false,
-        api_version: "2024-12-18.acacia",
       },
-    }
-  );
+      created: Math.floor(Date.now() / 1000),
+      livemode: false,
+      api_version: "2024-12-18.acacia",
+    },
+  });
 
   expect(res.status).toBe(200);
 });
@@ -113,22 +114,15 @@ it("handles payment_intent.succeeded with custom amount", async () => {
 Stripe webhook handlers typically route by event type. Test each branch:
 
 ```ts
-const events = [
-  "checkout.session.completed",
-  "payment_intent.succeeded",
-  "invoice.paid",
-] as const;
+const events = ["checkout.session.completed", "payment_intent.succeeded", "invoice.paid"] as const;
 
 for (const event of events) {
   it(`handles ${event}`, async () => {
-    const res = await client.sendTo(
-      "http://localhost:3000/api/webhooks/stripe",
-      {
-        provider: "stripe",
-        template: event,
-        secret: process.env.STRIPE_WEBHOOK_SECRET!,
-      }
-    );
+    const res = await client.sendTo("http://localhost:3000/api/webhooks/stripe", {
+      provider: "stripe",
+      template: event,
+      secret: process.env.STRIPE_WEBHOOK_SECRET!,
+    });
 
     expect(res.status).toBe(200);
   });
@@ -142,18 +136,15 @@ Verify your handler rejects webhooks signed with the wrong secret:
 
 ```ts
 it("rejects invalid stripe signatures", async () => {
-  const res = await client.sendTo(
-    "http://localhost:3000/api/webhooks/stripe",
-    {
-      provider: "stripe",
-      secret: "whsec_wrong_secret_value",
-      body: {
-        id: "evt_test_invalid",
-        type: "checkout.session.completed",
-        data: { object: {} },
-      },
-    }
-  );
+  const res = await client.sendTo("http://localhost:3000/api/webhooks/stripe", {
+    provider: "stripe",
+    secret: "whsec_wrong_secret_value",
+    body: {
+      id: "evt_test_invalid",
+      type: "checkout.session.completed",
+      data: { object: {} },
+    },
+  });
 
   // Your handler should return 400 when signature verification fails
   expect(res.status).toBe(400);
@@ -206,7 +197,7 @@ console.log(result.valid); // true
 
 // Inspect the payload
 const body = JSON.parse(request.body!);
-console.log(body.type);          // "checkout.session.completed"
+console.log(body.type); // "checkout.session.completed"
 console.log(body.data.object.id); // "cs_test_..."
 ```
 
@@ -216,16 +207,16 @@ console.log(body.data.object.id); // "cs_test_..."
 Send the captured event to your local handler. The replay preserves the original headers and body, including the Stripe signature.
 
 ```ts
-const res = await client.requests.replay(
-  request.id,
-  "http://localhost:3000/api/webhooks/stripe"
-);
+const res = await client.requests.replay(request.id, "http://localhost:3000/api/webhooks/stripe");
 
 expect(res.status).toBe(200);
 ```
 
 <Callout type="warning">
-Replayed Stripe webhooks carry the original timestamp in the signature. If your handler enforces Stripe's 5-minute tolerance window on the `t` value, replays of old events will fail signature verification. For testing, either disable the tolerance check or use `sendTo` with a fresh signature instead.
+  Replayed Stripe webhooks carry the original timestamp in the signature. If your handler enforces
+  Stripe's 5-minute tolerance window on the `t` value, replays of old events will fail signature
+  verification. For testing, either disable the tolerance check or use `sendTo` with a fresh
+  signature instead.
 </Callout>
 
 </Step>
@@ -260,9 +251,9 @@ t=1700000000,v1=5257a869e7ecebeda32affa62cdca3fa51cad7e77a0e56ff536d0ce8e108d8bd
 
 Two parts, comma-separated:
 
-| Part | Meaning |
-|------|---------|
-| `t` | Unix timestamp when Stripe generated the signature |
+| Part | Meaning                                                                |
+| ---- | ---------------------------------------------------------------------- |
+| `t`  | Unix timestamp when Stripe generated the signature                     |
 | `v1` | HMAC-SHA256 hash of `{timestamp}.{raw_body}` using your webhook secret |
 
 When the SDK sends a Stripe webhook via `sendTo`, it:
@@ -276,11 +267,11 @@ Your handler calls `stripe.webhooks.constructEvent(rawBody, sigHeader, secret)`,
 
 ## Available Stripe templates
 
-| Template | Event type | Description |
-|----------|-----------|-------------|
-| `payment_intent.succeeded` | `payment_intent.succeeded` | A payment has been successfully processed |
-| `checkout.session.completed` | `checkout.session.completed` | A Checkout Session has been completed |
-| `invoice.paid` | `invoice.paid` | An invoice payment has succeeded |
+| Template                     | Event type                   | Description                               |
+| ---------------------------- | ---------------------------- | ----------------------------------------- |
+| `payment_intent.succeeded`   | `payment_intent.succeeded`   | A payment has been successfully processed |
+| `checkout.session.completed` | `checkout.session.completed` | A Checkout Session has been completed     |
+| `invoice.paid`               | `invoice.paid`               | An invoice payment has succeeded          |
 
 Pass any template name to `sendTo` or `sendTemplate`:
 

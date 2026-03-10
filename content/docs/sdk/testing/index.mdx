@@ -132,9 +132,13 @@ const result = await withEndpoint(client, async (endpoint) => {
 });
 
 // Capture requests during an async action
-const requests = await captureDuring(client, async (endpoint) => {
-  await triggerMultipleWebhooks(endpoint.url);
-}, { count: 3, timeout: "15s" });
+const requests = await captureDuring(
+  client,
+  async (endpoint) => {
+    await triggerMultipleWebhooks(endpoint.url);
+  },
+  { count: 3, timeout: "15s" }
+);
 
 // Structured assertion with diff output
 const result = assertRequest(request, {

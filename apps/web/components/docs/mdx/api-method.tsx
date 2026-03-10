@@ -25,7 +25,12 @@ export function ApiMethod({
     <div className="my-8 border-2 border-foreground bg-card shadow-neo-sm">
       <div className="border-b-2 border-foreground p-4">
         <div className="flex items-center gap-3 mb-1">
-          <span className={cn("px-2 py-0.5 text-xs font-bold uppercase border-2 border-foreground", color)}>
+          <span
+            className={cn(
+              "px-2 py-0.5 text-xs font-bold uppercase border-2 border-foreground",
+              color
+            )}
+          >
             {method}
           </span>
           <code className="font-mono text-sm font-bold">{path}</code>

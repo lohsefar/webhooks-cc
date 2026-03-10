@@ -68,9 +68,7 @@ export function buildCurlExport(endpointUrl: string, requests: Request[]): CurlE
       if (!shouldIncludeHeader(key)) {
         continue;
       }
-      parts.push(
-        `-H "${escapeForShellDoubleQuotes(key)}: ${escapeForShellDoubleQuotes(value)}"`
-      );
+      parts.push(`-H "${escapeForShellDoubleQuotes(key)}: ${escapeForShellDoubleQuotes(value)}"`);
     }
 
     if (request.body) {

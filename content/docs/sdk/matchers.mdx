@@ -53,10 +53,10 @@ matchHeader(name: string, value?: string): (request: Request) => boolean
 
 ```ts
 // Header exists (any value)
-matchHeader("stripe-signature")
+matchHeader("stripe-signature");
 
 // Header exists with exact value
-matchHeader("x-github-event", "push")
+matchHeader("x-github-event", "push");
 ```
 
 ### matchPath
@@ -68,9 +68,9 @@ matchPath(pattern: string): (request: Request) => boolean
 ```
 
 ```ts
-matchPath("/webhooks/*")        // matches /webhooks/stripe, not /webhooks/stripe/events
-matchPath("/webhooks/**")       // matches /webhooks/stripe/events/123
-matchPath("/api/*/webhooks")    // matches /api/v1/webhooks
+matchPath("/webhooks/*"); // matches /webhooks/stripe, not /webhooks/stripe/events
+matchPath("/webhooks/**"); // matches /webhooks/stripe/events/123
+matchPath("/api/*/webhooks"); // matches /api/v1/webhooks
 ```
 
 ### matchQueryParam
@@ -83,10 +83,10 @@ matchQueryParam(key: string, value?: string): (request: Request) => boolean
 
 ```ts
 // Parameter exists (any value)
-matchQueryParam("token")
+matchQueryParam("token");
 
 // Parameter exists with exact value
-matchQueryParam("token", "abc123")
+matchQueryParam("token", "abc123");
 ```
 
 ### matchBodyPath
@@ -98,9 +98,9 @@ matchBodyPath(path: string, value: unknown): (request: Request) => boolean
 ```
 
 ```ts
-matchBodyPath("type", "checkout.session.completed")
-matchBodyPath("data.object.id", "obj_123")
-matchBodyPath("items.0.name", "Widget")
+matchBodyPath("type", "checkout.session.completed");
+matchBodyPath("data.object.id", "obj_123");
+matchBodyPath("items.0.name", "Widget");
 ```
 
 ### matchBodySubset
@@ -115,7 +115,7 @@ matchBodySubset(subset: Record<string, unknown>): (request: Request) => boolean
 matchBodySubset({
   type: "checkout.session.completed",
   data: { object: { status: "complete" } },
-})
+});
 ```
 
 ### matchContentType
@@ -127,7 +127,7 @@ matchContentType(type: string): (request: Request) => boolean
 ```
 
 ```ts
-matchContentType("application/json")
+matchContentType("application/json");
 // matches "application/json; charset=utf-8"
 ```
 
@@ -140,10 +140,7 @@ matchAll(...matchers: Array<(request: Request) => boolean>): (request: Request) 
 ```
 
 ```ts
-matchAll(
-  matchMethod("POST"),
-  matchHeader("content-type", "application/json"),
-)
+matchAll(matchMethod("POST"), matchHeader("content-type", "application/json"));
 ```
 
 ### matchAny
@@ -155,10 +152,7 @@ matchAny(...matchers: Array<(request: Request) => boolean>): (request: Request) 
 ```
 
 ```ts
-matchAny(
-  matchMethod("PUT"),
-  matchMethod("PATCH"),
-)
+matchAny(matchMethod("PUT"), matchMethod("PATCH"));
 ```
 
 ### Combining matchers
@@ -183,10 +177,7 @@ const req = await client.requests.waitFor(slug, {
   timeout: "30s",
   match: matchAll(
     matchMethod("POST"),
-    matchAny(
-      matchBodyPath("type", "invoice.paid"),
-      matchBodyPath("type", "invoice.payment_failed"),
-    ),
+    matchAny(matchBodyPath("type", "invoice.paid"), matchBodyPath("type", "invoice.payment_failed"))
   ),
 });
 ```
@@ -209,16 +200,16 @@ import {
 } from "@webhooks-cc/sdk";
 ```
 
-| Function | Header(s) checked |
-|----------|-------------------|
-| `isStripeWebhook(request)` | `stripe-signature` |
-| `isGitHubWebhook(request)` | `x-github-event` |
-| `isShopifyWebhook(request)` | `x-shopify-hmac-sha256` |
-| `isSlackWebhook(request)` | `x-slack-signature` |
-| `isTwilioWebhook(request)` | `x-twilio-signature` |
-| `isPaddleWebhook(request)` | `paddle-signature` |
-| `isLinearWebhook(request)` | `linear-signature` |
-| `isDiscordWebhook(request)` | `x-signature-ed25519` AND `x-signature-timestamp` |
+| Function                     | Header(s) checked                                            |
+| ---------------------------- | ------------------------------------------------------------ |
+| `isStripeWebhook(request)`   | `stripe-signature`                                           |
+| `isGitHubWebhook(request)`   | `x-github-event`                                             |
+| `isShopifyWebhook(request)`  | `x-shopify-hmac-sha256`                                      |
+| `isSlackWebhook(request)`    | `x-slack-signature`                                          |
+| `isTwilioWebhook(request)`   | `x-twilio-signature`                                         |
+| `isPaddleWebhook(request)`   | `paddle-signature`                                           |
+| `isLinearWebhook(request)`   | `linear-signature`                                           |
+| `isDiscordWebhook(request)`  | `x-signature-ed25519` AND `x-signature-timestamp`            |
 | `isStandardWebhook(request)` | `webhook-id` AND `webhook-timestamp` AND `webhook-signature` |
 
 All header comparisons are case-insensitive. Discord and Standard Webhooks require multiple headers to be present simultaneously.
@@ -244,12 +235,7 @@ if (isStripeWebhook(request)) {
 Four utilities for extracting structured data from captured request bodies.
 
 ```ts
-import {
-  parseJsonBody,
-  parseFormBody,
-  parseBody,
-  extractJsonField,
-} from "@webhooks-cc/sdk";
+import { parseJsonBody, parseFormBody, parseBody, extractJsonField } from "@webhooks-cc/sdk";
 ```
 
 ### parseJsonBody
@@ -278,8 +264,8 @@ parseFormBody(request: Request): Record<string, string | string[]> | undefined
 ```ts
 const form = parseFormBody(request);
 if (form) {
-  console.log(form.email);      // "user@example.com"
-  console.log(form.tags);       // ["a", "b"] if repeated
+  console.log(form.email); // "user@example.com"
+  console.log(form.tags); // ["a", "b"] if repeated
 }
 ```
 

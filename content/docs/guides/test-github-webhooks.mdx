@@ -5,7 +5,13 @@ section: guides
 order: 3
 lastUpdated: 2026-03-10
 schema: howto
-keywords: ["test github webhooks", "github webhook testing", "github webhook localhost", "github signature verification"]
+keywords:
+  [
+    "test github webhooks",
+    "github webhook testing",
+    "github webhook localhost",
+    "github signature verification",
+  ]
 seo:
   ogTitle: "How to Test GitHub Webhooks — webhooks.cc"
   ogDescription: "Step-by-step guide to testing GitHub webhook handlers with signed payloads and signature verification."
@@ -171,11 +177,11 @@ GitHub computes HMAC-SHA256 of the raw request body using your webhook secret. T
 
 GitHub sends three headers with every webhook delivery:
 
-| Header | Purpose | Example value |
-|--------|---------|---------------|
-| `x-hub-signature-256` | HMAC-SHA256 hex digest of the body | `sha256=a1b2c3...` |
-| `x-github-event` | The event type that triggered the delivery | `push`, `pull_request` |
-| `x-github-delivery` | A unique UUID for this delivery | `72d3162e-cc78-11e3-81ab-4c9367dc0958` |
+| Header                | Purpose                                    | Example value                          |
+| --------------------- | ------------------------------------------ | -------------------------------------- |
+| `x-hub-signature-256` | HMAC-SHA256 hex digest of the body         | `sha256=a1b2c3...`                     |
+| `x-github-event`      | The event type that triggered the delivery | `push`, `pull_request`                 |
+| `x-github-delivery`   | A unique UUID for this delivery            | `72d3162e-cc78-11e3-81ab-4c9367dc0958` |
 
 The signature format is `sha256=` followed by 64 hex characters. GitHub uses the raw bytes of the request body -- before any JSON parsing or transformation -- as input to the HMAC function. This is why your handler must read the body as a raw string or buffer before any middleware processes it.
 
@@ -189,11 +195,11 @@ Your handler should follow this sequence:
 
 ## Available GitHub templates
 
-| Template | Event header | Description |
-|----------|-------------|-------------|
-| `push` | `push` | Commit pushed to a branch. Includes ref, commits array, repository, and pusher fields. |
-| `pull_request.opened` | `pull_request` | Pull request opened. Includes PR number, title, head/base branches, and author. |
-| `ping` | `ping` | Sent when a webhook is first configured. Includes the hook configuration and a zen message. Use this to test your handler's initial setup response. |
+| Template              | Event header   | Description                                                                                                                                         |
+| --------------------- | -------------- | --------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `push`                | `push`         | Commit pushed to a branch. Includes ref, commits array, repository, and pusher fields.                                                              |
+| `pull_request.opened` | `pull_request` | Pull request opened. Includes PR number, title, head/base branches, and author.                                                                     |
+| `ping`                | `ping`         | Sent when a webhook is first configured. Includes the hook configuration and a zen message. Use this to test your handler's initial setup response. |
 
 ## Putting it together: a full test suite
 

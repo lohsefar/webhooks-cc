@@ -141,30 +141,30 @@ The MCP server provides three built-in prompt templates that guide agents throug
 
 Use when webhooks are not arriving or are failing. Walks through: checking that the endpoint exists, listing recent requests, sending a test webhook, verifying the signature, and comparing retries.
 
-| Argument | Type | Required | Description |
-|----------|------|----------|-------------|
-| `provider` | `string` | no | Webhook provider (e.g., `stripe`, `github`) |
-| `endpointSlug` | `string` | no | Endpoint to investigate |
-| `targetUrl` | `string` | no | URL where webhooks should be delivered |
+| Argument       | Type     | Required | Description                                 |
+| -------------- | -------- | -------- | ------------------------------------------- |
+| `provider`     | `string` | no       | Webhook provider (e.g., `stripe`, `github`) |
+| `endpointSlug` | `string` | no       | Endpoint to investigate                     |
+| `targetUrl`    | `string` | no       | URL where webhooks should be delivered      |
 
 ### setup_provider_testing
 
 Guided setup for testing webhooks from a specific provider. Lists available templates, creates an endpoint, previews the signed request, sends it, waits for capture, and verifies the signature.
 
-| Argument | Type | Required | Description |
-|----------|------|----------|-------------|
-| `provider` | `string` | yes | Webhook provider to set up |
-| `targetUrl` | `string` | no | URL for replay after capture |
+| Argument    | Type     | Required | Description                  |
+| ----------- | -------- | -------- | ---------------------------- |
+| `provider`  | `string` | yes      | Webhook provider to set up   |
+| `targetUrl` | `string` | no       | URL for replay after capture |
 
 ### compare_webhook_attempts
 
 Compare two webhook deliveries or retries to understand what changed between them. Finds relevant requests, runs `compare_requests`, and explains the differences.
 
-| Argument | Type | Required | Description |
-|----------|------|----------|-------------|
-| `endpointSlug` | `string` | no | Endpoint to search for requests |
-| `leftRequestId` | `string` | no | First request ID to compare |
-| `rightRequestId` | `string` | no | Second request ID to compare |
+| Argument         | Type     | Required | Description                     |
+| ---------------- | -------- | -------- | ------------------------------- |
+| `endpointSlug`   | `string` | no       | Endpoint to search for requests |
+| `leftRequestId`  | `string` | no       | First request ID to compare     |
+| `rightRequestId` | `string` | no       | Second request ID to compare    |
 
 ## Resources
 

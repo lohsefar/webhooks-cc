@@ -1,7 +1,4 @@
-import {
-  McpServer,
-  ResourceTemplate,
-} from "@modelcontextprotocol/sdk/server/mcp.js";
+import { McpServer, ResourceTemplate } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { Request, WebhooksCC } from "@webhooks-cc/sdk";
 
 const ENDPOINTS_RESOURCE_URI = "webhooks://endpoints";

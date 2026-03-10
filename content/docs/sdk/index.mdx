@@ -116,10 +116,7 @@ for await (const request of client.requests.subscribe(endpoint.slug)) {
 ## Replay a captured request
 
 ```ts
-const response = await client.requests.replay(
-  request.id,
-  "http://localhost:3000/webhooks"
-);
+const response = await client.requests.replay(request.id, "http://localhost:3000/webhooks");
 
 console.log(response.status); // 200
 ```

@@ -82,9 +82,7 @@ export async function getDocBySlug(slug: string): Promise<DocPage | null> {
 // Read frontmatter only (for metadata, sitemap, navigation)
 // -------------------------------------------------------------------
 
-export async function getDocFrontmatter(
-  slug: string
-): Promise<DocFrontmatter | null> {
+export async function getDocFrontmatter(slug: string): Promise<DocFrontmatter | null> {
   const doc = await getDocBySlug(slug);
   return doc?.frontmatter ?? null;
 }
