@@ -1,24 +1,24 @@
 "use client";
 
-import { useConvexAuth, useQuery } from "convex/react";
 import { useRouter } from "next/navigation";
 import { useEffect } from "react";
-import { ConvexAuthProvider } from "@/components/providers/convex-auth-provider";
-import { api } from "@convex/_generated/api";
+import {
+  SupabaseAuthProvider,
+  useAuth,
+} from "@/components/providers/supabase-auth-provider";
 import { identifyUser } from "@/lib/analytics";
 
 export function RequireAuth({ children }: { children: React.ReactNode }) {
   return (
-    <ConvexAuthProvider>
+    <SupabaseAuthProvider>
       <RequireAuthInner>{children}</RequireAuthInner>
-    </ConvexAuthProvider>
+    </SupabaseAuthProvider>
   );
 }
 
 function RequireAuthInner({ children }: { children: React.ReactNode }) {
-  const { isAuthenticated, isLoading } = useConvexAuth();
+  const { user, isAuthenticated, isLoading } = useAuth();
   const router = useRouter();
-  const user = useQuery(api.users.current, isAuthenticated ? undefined : "skip");
 
   useEffect(() => {
     if (!isLoading && !isAuthenticated) {
@@ -28,7 +28,9 @@ function RequireAuthInner({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     if (user) {
-      identifyUser(user._id, { email: user.email, plan: user.plan });
+      identifyUser(user.id, {
+        email: user.email ?? undefined,
+      });
     }
   }, [user]);
 

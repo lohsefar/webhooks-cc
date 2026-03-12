@@ -1,9 +1,8 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { useConvexAuth } from "convex/react";
-import { useAuthActions } from "@convex-dev/auth/react";
-import { useRouter } from "next/navigation";
+import { useState } from "react";
+import { createClient } from "@/lib/supabase/client";
+import { useAuth } from "@/components/providers/supabase-auth-provider";
 import { Button } from "@/components/ui/button";
 import { trackSignInStarted } from "@/lib/analytics";
 
@@ -18,25 +17,27 @@ export function OAuthSignInButtons({
   buttonClassName?: string;
   layout?: "vertical" | "horizontal";
 }) {
-  const { isAuthenticated, isLoading } = useConvexAuth();
-  const { signIn } = useAuthActions();
-  const router = useRouter();
-
+  const { isAuthenticated, isLoading } = useAuth();
   const [signingIn, setSigningIn] = useState<Provider | null>(null);
   const [error, setError] = useState<string | null>(null);
-
-  useEffect(() => {
-    if (!isLoading && isAuthenticated) {
-      router.replace(redirectTo);
-    }
-  }, [isAuthenticated, isLoading, redirectTo, router]);
 
   const handleSignIn = async (provider: Provider) => {
     setSigningIn(provider);
     setError(null);
     trackSignInStarted(provider);
+
     try {
-      await signIn(provider, { redirectTo });
+      const supabase = createClient();
+      const { error } = await supabase.auth.signInWithOAuth({
+        provider,
+        options: {
+          redirectTo: `${window.location.origin}/auth/callback?next=${encodeURIComponent(redirectTo)}`,
+        },
+      });
+      if (error) {
+        setError("Sign in failed. Please try again.");
+        setSigningIn(null);
+      }
     } catch {
       setError("Sign in failed. Please try again.");
       setSigningIn(null);
