@@ -22,12 +22,16 @@ const publicEnvSchema = z.object({
   NEXT_PUBLIC_SENTRY_DSN: z.string().optional(),
   NEXT_PUBLIC_POSTHOG_KEY: z.string().optional(),
   NEXT_PUBLIC_POSTHOG_HOST: z.string().url().optional(),
+  NEXT_PUBLIC_SUPABASE_URL: z.string().url(),
+  NEXT_PUBLIC_SUPABASE_ANON_KEY: z.string().min(1),
 });
 
 const serverEnvSchema = z.object({
   CONVEX_SITE_URL: z.string().url(),
   CAPTURE_SHARED_SECRET: z.string().min(1),
   SENTRY_DSN: z.string().optional(),
+  SUPABASE_URL: z.string().url(),
+  SUPABASE_SERVICE_ROLE_KEY: z.string().min(1),
 });
 
 /** Validated public env vars (available in both server and client). */
@@ -41,6 +45,8 @@ export function publicEnv() {
       NEXT_PUBLIC_SENTRY_DSN: process.env.NEXT_PUBLIC_SENTRY_DSN,
       NEXT_PUBLIC_POSTHOG_KEY: process.env.NEXT_PUBLIC_POSTHOG_KEY,
       NEXT_PUBLIC_POSTHOG_HOST: process.env.NEXT_PUBLIC_POSTHOG_HOST,
+      NEXT_PUBLIC_SUPABASE_URL: process.env.NEXT_PUBLIC_SUPABASE_URL,
+      NEXT_PUBLIC_SUPABASE_ANON_KEY: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
     });
   }
   return _publicEnv;
@@ -57,6 +63,8 @@ export function serverEnv() {
       CONVEX_SITE_URL: process.env.CONVEX_SITE_URL,
       CAPTURE_SHARED_SECRET: process.env.CAPTURE_SHARED_SECRET,
       SENTRY_DSN: process.env.SENTRY_DSN,
+      SUPABASE_URL: process.env.SUPABASE_URL,
+      SUPABASE_SERVICE_ROLE_KEY: process.env.SUPABASE_SERVICE_ROLE_KEY,
     });
   }
   return _serverEnv;
