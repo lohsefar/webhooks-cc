@@ -68,7 +68,7 @@ Companion execution plan for the next slice:
 - **Phase 1 is complete in dev**. Supabase auth is live, GitHub OAuth works in the dev app, and the auth closeout/env cleanup landed.
 - **The original Phase 2 control-plane slice is complete**. API key validation, device auth, endpoint CRUD, usage reads, and `/cli/verify` no longer depend on Convex.
 - **Request data migration is mostly complete on the web/API side**. `/api/endpoints/[slug]/requests`, `/api/requests/[id]`, `/api/search/requests`, `/api/search/requests/count`, the dashboard request list/detail path, and the dashboard endpoint management UI now use Supabase-backed routes and helpers.
-- **Public content reads are now Supabase-backed**. The blog index/post pages, blog preview, `feed.xml`, `sitemap-index.xml`, and `sitemaps/blog.xml` no longer query Convex.
+- **Blog reads and admin writes are now split onto Supabase-backed web routes/helpers**. The blog index/post pages, blog preview, `feed.xml`, `sitemap-index.xml`, `sitemaps/blog.xml`, and the web app's `/api/blog` admin endpoints no longer depend on Convex storage.
 - **Receiver bridge work is in place for dev**. The branch includes Supabase-backed internal receiver control-plane routes plus receiver config support so endpoint creation, request capture, and quota enforcement can be exercised against the Supabase path in development before the full receiver rewrite.
 - **Live dev validation completed**:
   - GitHub OAuth login works end-to-end.
@@ -118,7 +118,7 @@ Companion execution plan for the next slice:
 
 **Goal**: all read/write operations for endpoints, requests, users, and blog posts use Supabase.
 
-**Status**: in progress. Endpoint CRUD, usage reads, request list/detail, request search, device auth, the main dashboard request-management path, and the public blog/feed/sitemap reads are migrated. Remaining Convex-backed pages and the leftover Phase 2a cleanup items are still pending.
+**Status**: in progress. Endpoint CRUD, usage reads, request list/detail, request search, device auth, the main dashboard request-management path, and the blog read/admin API surface are migrated. Remaining Convex-backed pages and the leftover Phase 2a cleanup items are still pending.
 
 **Deliverables**:
 - [ ] Replace `ConvexProvider`/`ConvexAuthProvider` in app layout with Supabase context (if needed)
@@ -135,6 +135,7 @@ Companion execution plan for the next slice:
   - `[x] /api/search/requests` and `/api/search/requests/count`
   - `[x] /api/auth/device-*` (device code, authorize, poll, claim)
   - `[x] /api/health`
+  - `[x] /api/blog` and `/api/blog/[slug]` (blog admin API, `BLOG_API_SECRET` authenticated)
 - [x] Blog post queries use Supabase client (published posts public via RLS)
 - [x] Validate API route response shapes match what SDK/CLI expect (compare against SDK types)
 

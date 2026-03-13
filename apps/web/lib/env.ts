@@ -29,6 +29,7 @@ const publicEnvSchema = z.object({
 const serverEnvSchema = z.object({
   CONVEX_SITE_URL: z.string().url(),
   CAPTURE_SHARED_SECRET: z.string().min(1),
+  BLOG_API_SECRET: z.string().min(1).optional(),
   SENTRY_DSN: z.string().optional(),
   SUPABASE_URL: z.string().url(),
   SUPABASE_SERVICE_ROLE_KEY: z.string().min(1),
@@ -62,6 +63,7 @@ export function serverEnv() {
     _serverEnv = serverEnvSchema.parse({
       CONVEX_SITE_URL: process.env.CONVEX_SITE_URL,
       CAPTURE_SHARED_SECRET: process.env.CAPTURE_SHARED_SECRET,
+      BLOG_API_SECRET: process.env.BLOG_API_SECRET,
       SENTRY_DSN: process.env.SENTRY_DSN,
       SUPABASE_URL: process.env.SUPABASE_URL,
       SUPABASE_SERVICE_ROLE_KEY: process.env.SUPABASE_SERVICE_ROLE_KEY,
