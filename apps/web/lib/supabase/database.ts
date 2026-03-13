@@ -212,7 +212,47 @@ export interface Database {
       };
     };
     Views: Record<string, never>;
-    Functions: Record<string, never>;
+    Functions: {
+      search_requests: {
+        Args: {
+          p_user_id: string;
+          p_plan?: "free" | "pro" | null;
+          p_slug?: string | null;
+          p_method?: string | null;
+          p_q?: string | null;
+          p_from_ms?: number | null;
+          p_to_ms?: number | null;
+          p_limit?: number | null;
+          p_offset?: number | null;
+          p_order?: string | null;
+        };
+        Returns: Array<{
+          id: string;
+          slug: string;
+          method: string;
+          path: string;
+          headers: Json;
+          body: string | null;
+          query_params: Json;
+          content_type: string | null;
+          ip: string;
+          size: number;
+          received_at: number;
+        }>;
+      };
+      search_requests_count: {
+        Args: {
+          p_user_id: string;
+          p_plan?: "free" | "pro" | null;
+          p_slug?: string | null;
+          p_method?: string | null;
+          p_q?: string | null;
+          p_from_ms?: number | null;
+          p_to_ms?: number | null;
+        };
+        Returns: number;
+      };
+    };
     Enums: Record<string, never>;
     CompositeTypes: Record<string, never>;
   };

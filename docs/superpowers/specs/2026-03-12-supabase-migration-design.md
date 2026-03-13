@@ -67,7 +67,7 @@ Companion execution plan for the next slice:
 
 - **Phase 1 is complete in dev**. Supabase auth is live, GitHub OAuth works in the dev app, and the auth closeout/env cleanup landed.
 - **The original Phase 2 control-plane slice is complete**. API key validation, device auth, endpoint CRUD, usage reads, and `/cli/verify` no longer depend on Convex.
-- **Request data migration is partially complete**. `/api/endpoints/[slug]/requests`, `/api/requests/[id]`, the dashboard request list/detail path, and the dashboard endpoint management UI now use Supabase-backed routes and helpers.
+- **Request data migration is mostly complete on the web/API side**. `/api/endpoints/[slug]/requests`, `/api/requests/[id]`, `/api/search/requests`, `/api/search/requests/count`, the dashboard request list/detail path, and the dashboard endpoint management UI now use Supabase-backed routes and helpers.
 - **Receiver bridge work is in place for dev**. The branch includes Supabase-backed internal receiver control-plane routes plus receiver config support so endpoint creation, request capture, and quota enforcement can be exercised against the Supabase path in development before the full receiver rewrite.
 - **Live dev validation completed**:
   - GitHub OAuth login works end-to-end.
@@ -75,9 +75,8 @@ Companion execution plan for the next slice:
   - Endpoint creation works.
   - Webhook capture works.
   - Usage/quota enforcement works.
-  - Search works from the dashboard, but it is still backed by ClickHouse in the receiver today.
+  - Retained request search now runs on Postgres/Supabase in integration tests.
 - **Still pending before the data layer phase can close**:
-  - Rewrite `/api/search/requests` and `/api/search/requests/count` to Postgres/Supabase.
   - Migrate blog/feed/sitemap reads.
   - Finish remaining Convex-backed pages and account/billing UI.
   - Migrate realtime/SSE.
@@ -118,21 +117,21 @@ Companion execution plan for the next slice:
 
 **Goal**: all read/write operations for endpoints, requests, users, and blog posts use Supabase.
 
-**Status**: in progress. Endpoint CRUD, usage reads, request list/detail, device auth, and the main dashboard request-management path are migrated. Search, public content reads, and remaining Convex-backed pages are still pending.
+**Status**: in progress. Endpoint CRUD, usage reads, request list/detail, request search, device auth, and the main dashboard request-management path are migrated. Public content reads and remaining Convex-backed pages are still pending.
 
 **Deliverables**:
 - [ ] Replace `ConvexProvider`/`ConvexAuthProvider` in app layout with Supabase context (if needed)
 - [x] Rewrite endpoint CRUD (list, create, get, update, delete) using Supabase client
 - [ ] Add rate limiting for endpoint creation (Postgres-based or in-memory token bucket) — per-user (10/10min) and anonymous (20/10min)
 - [x] Rewrite request listing/detail using Supabase client
-- [ ] Rewrite request search (replace ClickHouse-backed `/api/search/requests` and `/api/search/requests/count` with Postgres queries)
+- [x] Rewrite request search (replace ClickHouse-backed `/api/search/requests` and `/api/search/requests/count` with Postgres queries)
 - [x] Rewrite user profile/usage queries
 - [ ] Rewrite API routes under `app/api/` to use Supabase service role client:
   - `[x] /api/endpoints` (CRUD + PATCH)
   - `[x] /api/endpoints/[slug]/requests`
   - `[x] /api/requests/[id]`
   - `[x] /api/usage`
-  - `[ ] /api/search/requests` and `/api/search/requests/count`
+  - `[x] /api/search/requests` and `/api/search/requests/count`
   - `[x] /api/auth/device-*` (device code, authorize, poll, claim)
   - `/api/health`
 - [ ] Blog post queries use Supabase client (published posts public via RLS)
@@ -142,7 +141,7 @@ Companion execution plan for the next slice:
 - [x] Integration: CRUD operations on endpoints (create, list, get, update, delete)
 - [ ] Integration: endpoint creation rate limiting enforced
 - [x] Integration: request listing with pagination, filtering by endpoint
-- [ ] Integration: request search returns correct results
+- [x] Integration: request search returns correct results
 - [ ] Integration: RLS enforced — user A cannot see user B's endpoints/requests
 - [ ] Integration: ephemeral endpoints visible to unauthenticated users
 - [x] Integration: API key validation (hash lookup, expiry check)

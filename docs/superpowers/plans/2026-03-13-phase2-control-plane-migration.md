@@ -99,15 +99,15 @@ The branch has already moved past the original control-plane boundary:
 - dashboard endpoint management and request views no longer rely on Convex hooks
 - receiver-facing internal control-plane routes exist so the dev receiver can exercise Supabase-backed capture flows
 
-That means the next active migration slice is no longer "start dashboard/request work" in general. It is specifically to finish the remaining data-layer gap: **request search on Postgres/Supabase instead of ClickHouse**.
+That follow-on work has now landed too: request list/detail, usage reads in the dashboard, and request search are all Supabase-backed on this branch.
 
 ## Next Phase After This One
 
 Once this phase lands, the next phase is **dashboard and request data migration**:
 
 - [x] request list/detail reads
-- [ ] request search
+- [x] request search
 - [x] usage reads in the dashboard
 - public read-only blog/feed/sitemap queries
 
-The receiver rewrite still stays after that phase so we do not mix hot-path ingestion risk with the remaining web/API migration work.
+The next active gaps on the web side are the remaining Convex-backed pages/components plus public read-only blog/feed/sitemap queries. The receiver rewrite still stays after that work so we do not mix hot-path ingestion risk with the remaining web/API migration work.
