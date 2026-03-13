@@ -63,6 +63,26 @@ Companion execution plan for the next slice:
 
 - `docs/superpowers/plans/2026-03-13-phase2-control-plane-migration.md`
 
+## Current Status (updated 2026-03-13)
+
+- **Phase 1 is complete in dev**. Supabase auth is live, GitHub OAuth works in the dev app, and the auth closeout/env cleanup landed.
+- **The original Phase 2 control-plane slice is complete**. API key validation, device auth, endpoint CRUD, usage reads, and `/cli/verify` no longer depend on Convex.
+- **Request data migration is partially complete**. `/api/endpoints/[slug]/requests`, `/api/requests/[id]`, the dashboard request list/detail path, and the dashboard endpoint management UI now use Supabase-backed routes and helpers.
+- **Receiver bridge work is in place for dev**. The branch includes Supabase-backed internal receiver control-plane routes plus receiver config support so endpoint creation, request capture, and quota enforcement can be exercised against the Supabase path in development before the full receiver rewrite.
+- **Live dev validation completed**:
+  - GitHub OAuth login works end-to-end.
+  - Dashboard loads without Convex hooks.
+  - Endpoint creation works.
+  - Webhook capture works.
+  - Usage/quota enforcement works.
+  - Search works from the dashboard, but it is still backed by ClickHouse in the receiver today.
+- **Still pending before the data layer phase can close**:
+  - Rewrite `/api/search/requests` and `/api/search/requests/count` to Postgres/Supabase.
+  - Migrate blog/feed/sitemap reads.
+  - Finish remaining Convex-backed pages and account/billing UI.
+  - Migrate realtime/SSE.
+  - Rewrite the receiver hot path and remove Redis/ClickHouse entirely.
+
 ---
 
 ## Phase 1: Auth Migration
@@ -70,27 +90,27 @@ Companion execution plan for the next slice:
 **Goal**: users can log in with GitHub/Google via Supabase Auth, session persists across pages.
 
 **Deliverables**:
-- [ ] Add `@supabase/supabase-js` and `@supabase/ssr` packages
-- [ ] Create `lib/supabase/client.ts` (browser client, anon key)
-- [ ] Create `lib/supabase/server.ts` (server client, cookie-based sessions)
-- [ ] Create `lib/supabase/admin.ts` (service role client, bypasses RLS)
-- [ ] Replace `convexAuthNextjsMiddleware` with Supabase SSR middleware
-- [ ] Update CSP middleware `connect-src` to include Supabase domains (replace `*.convex.cloud`/`*.convex.site`)
-- [ ] Rewire login page OAuth buttons to `supabase.auth.signInWithOAuth`
-- [ ] Rewire logout to `supabase.auth.signOut`
-- [ ] Verify `handle_new_user` trigger creates `public.users` row on first login
-- [ ] Account page shows correct user info from Supabase
-- [ ] Auth providers display (`getAuthProviders`) rewired to query `auth.identities` via service role
+- [x] Add `@supabase/supabase-js` and `@supabase/ssr` packages
+- [x] Create `lib/supabase/client.ts` (browser client, anon key)
+- [x] Create `lib/supabase/server.ts` (server client, cookie-based sessions)
+- [x] Create `lib/supabase/admin.ts` (service role client, bypasses RLS)
+- [x] Replace `convexAuthNextjsMiddleware` with Supabase SSR middleware
+- [x] Update CSP middleware `connect-src` to include Supabase domains (replace `*.convex.cloud`/`*.convex.site`)
+- [x] Rewire login page OAuth buttons to `supabase.auth.signInWithOAuth`
+- [x] Rewire logout to `supabase.auth.signOut`
+- [x] Verify `handle_new_user` trigger creates `public.users` row on first login
+- [x] Account page shows correct user info from Supabase
+- [x] Auth providers display (`getAuthProviders`) rewired to query `auth.identities` via service role
 
 **Tests**:
-- [ ] Integration: sign up creates `public.users` row with correct email/name/image
-- [ ] Integration: `auth.uid()` matches `public.users.id` after login
-- [ ] Integration: auth providers query returns correct linked providers
-- [ ] Playwright e2e: GitHub OAuth login flow → redirects to dashboard
-- [ ] Playwright e2e: logout → redirects to login page
-- [ ] Playwright e2e: refresh page → session persists (no re-login)
+- [x] Integration: sign up creates `public.users` row with correct email/name/image
+- [x] Integration: `auth.uid()` matches `public.users.id` after login
+- [x] Integration: auth providers query returns correct linked providers
+- [x] Playwright e2e: GitHub OAuth login flow → redirects to dashboard
+- [x] Playwright e2e: logout → redirects to login page
+- [x] Playwright e2e: refresh page → session persists (no re-login)
 
-**Completion**: all tests pass, commit and mark phase complete.
+**Completion**: complete in dev on 2026-03-13.
 
 ---
 
@@ -98,35 +118,37 @@ Companion execution plan for the next slice:
 
 **Goal**: all read/write operations for endpoints, requests, users, and blog posts use Supabase.
 
+**Status**: in progress. Endpoint CRUD, usage reads, request list/detail, device auth, and the main dashboard request-management path are migrated. Search, public content reads, and remaining Convex-backed pages are still pending.
+
 **Deliverables**:
 - [ ] Replace `ConvexProvider`/`ConvexAuthProvider` in app layout with Supabase context (if needed)
-- [ ] Rewrite endpoint CRUD (list, create, get, update, delete) using Supabase client
+- [x] Rewrite endpoint CRUD (list, create, get, update, delete) using Supabase client
 - [ ] Add rate limiting for endpoint creation (Postgres-based or in-memory token bucket) — per-user (10/10min) and anonymous (20/10min)
-- [ ] Rewrite request listing/detail using Supabase client
+- [x] Rewrite request listing/detail using Supabase client
 - [ ] Rewrite request search (replace ClickHouse-backed `/api/search/requests` and `/api/search/requests/count` with Postgres queries)
-- [ ] Rewrite user profile/usage queries
+- [x] Rewrite user profile/usage queries
 - [ ] Rewrite API routes under `app/api/` to use Supabase service role client:
-  - `/api/endpoints` (CRUD + PATCH)
-  - `/api/endpoints/[slug]/requests`
-  - `/api/requests/[id]`
-  - `/api/usage`
-  - `/api/search/requests` and `/api/search/requests/count`
-  - `/api/auth/device-*` (3 routes)
+  - `[x] /api/endpoints` (CRUD + PATCH)
+  - `[x] /api/endpoints/[slug]/requests`
+  - `[x] /api/requests/[id]`
+  - `[x] /api/usage`
+  - `[ ] /api/search/requests` and `/api/search/requests/count`
+  - `[x] /api/auth/device-*` (device code, authorize, poll, claim)
   - `/api/health`
 - [ ] Blog post queries use Supabase client (published posts public via RLS)
-- [ ] Validate API route response shapes match what SDK/CLI expect (compare against SDK types)
+- [x] Validate API route response shapes match what SDK/CLI expect (compare against SDK types)
 
 **Tests**:
-- [ ] Integration: CRUD operations on endpoints (create, list, get, update, delete)
+- [x] Integration: CRUD operations on endpoints (create, list, get, update, delete)
 - [ ] Integration: endpoint creation rate limiting enforced
-- [ ] Integration: request listing with pagination, filtering by endpoint
+- [x] Integration: request listing with pagination, filtering by endpoint
 - [ ] Integration: request search returns correct results
 - [ ] Integration: RLS enforced — user A cannot see user B's endpoints/requests
 - [ ] Integration: ephemeral endpoints visible to unauthenticated users
-- [ ] Integration: API key validation (hash lookup, expiry check)
-- [ ] Integration: device auth flow (create code, authorize, poll, claim)
-- [ ] Integration: usage API returns correct used/remaining/limit
-- [ ] Playwright e2e: create endpoint → appears in dashboard
+- [x] Integration: API key validation (hash lookup, expiry check)
+- [x] Integration: device auth flow (create code, authorize, poll, claim)
+- [x] Integration: usage API returns correct used/remaining/limit
+- [x] Playwright/manual dev: create endpoint → appears in dashboard
 - [ ] Playwright e2e: delete endpoint → disappears from dashboard
 - [ ] Playwright e2e: view request detail page
 

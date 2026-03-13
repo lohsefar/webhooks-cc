@@ -2,6 +2,8 @@
 
 **Goal:** move the first Convex-backed product APIs to Supabase so the CLI, SDK, and web app can start using Supabase for auth-adjacent operations without touching the receiver yet.
 
+**Status:** complete on this branch. The control-plane slice landed, was integration-tested against the dev Supabase instance, and has already been exercised live in the dev app.
+
 **Why this phase comes next:** Phase 1 proved Supabase Auth works. The fastest way to keep momentum is to migrate the control plane first: API key validation, device auth, endpoint CRUD, and usage reads. These are lower risk than the request ingestion path and unlock the next dashboard and CLI slices.
 
 **Non-negotiables:**
@@ -65,19 +67,47 @@
 
 ## Definition of Done
 
-- Device auth no longer depends on Convex
-- Endpoint CRUD API routes no longer depend on Convex
-- `apps/web/lib/api-auth.ts` validates API keys against Supabase
-- Existing CLI and SDK endpoint flows keep the same external API shapes
-- The next phase can focus on request data and dashboard reads instead of auth/control-plane cleanup
+- [x] Device auth no longer depends on Convex
+- [x] Endpoint CRUD API routes no longer depend on Convex
+- [x] `apps/web/lib/api-auth.ts` validates API keys against Supabase
+- [x] Existing CLI and SDK endpoint flows keep the same external API shapes
+- [x] The next phase can focus on request data and dashboard reads instead of auth/control-plane cleanup
+
+## What Landed
+
+- `supabase/migrations/00002_additional_functions.sql`
+- Supabase-backed API key validation and shared auth helpers
+- Supabase-backed device auth routes and `/cli/verify`
+- Supabase-backed endpoint CRUD routes
+- Supabase-backed usage route
+
+## Verification Completed
+
+- `pnpm exec tsc --noEmit` in `apps/web`
+- `pnpm vitest run tests/integration/supabase-auth.test.ts tests/integration/supabase-control-plane.test.ts tests/integration/supabase-device-auth.test.ts`
+- Live dev validation:
+  - GitHub OAuth login works
+  - endpoint creation works
+  - request capture works
+  - usage limit enforcement works
+
+## Follow-on Work Already Landed After This Phase
+
+The branch has already moved past the original control-plane boundary:
+
+- request list/detail routes are Supabase-backed
+- dashboard endpoint management and request views no longer rely on Convex hooks
+- receiver-facing internal control-plane routes exist so the dev receiver can exercise Supabase-backed capture flows
+
+That means the next active migration slice is no longer "start dashboard/request work" in general. It is specifically to finish the remaining data-layer gap: **request search on Postgres/Supabase instead of ClickHouse**.
 
 ## Next Phase After This One
 
 Once this phase lands, the next phase is **dashboard and request data migration**:
 
-- request list/detail reads
-- request search
-- usage reads in the dashboard
+- [x] request list/detail reads
+- [ ] request search
+- [x] usage reads in the dashboard
 - public read-only blog/feed/sitemap queries
 
-The receiver rewrite stays after that phase so we do not mix ingestion risk with basic API migration.
+The receiver rewrite still stays after that phase so we do not mix hot-path ingestion risk with the remaining web/API migration work.
