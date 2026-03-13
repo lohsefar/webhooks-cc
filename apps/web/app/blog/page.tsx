@@ -2,8 +2,7 @@ import Link from "next/link";
 import { ArrowRight, CalendarDays, Clock3 } from "lucide-react";
 import { createPageMetadata } from "@/lib/seo";
 import { JsonLd, breadcrumbSchema } from "@/lib/schemas";
-import { getConvexClient } from "@/lib/convex-client";
-import { api } from "@convex/_generated/api";
+import { listPublishedBlogPosts } from "@/lib/supabase/blog-posts";
 
 export const dynamic = "force-dynamic";
 
@@ -24,8 +23,7 @@ function formatBlogDate(timestamp: number): string {
 }
 
 export default async function BlogIndexPage() {
-  const convex = getConvexClient();
-  const posts = await convex.query(api.blogPosts.listPublished);
+  const posts = await listPublishedBlogPosts();
 
   if (posts.length === 0) {
     return (

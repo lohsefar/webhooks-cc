@@ -1,12 +1,14 @@
 import { cache } from "react";
 import { notFound } from "next/navigation";
 import type { Metadata } from "next";
-import { getConvexClient } from "@/lib/convex-client";
-import { api } from "@convex/_generated/api";
 import { compileBlogMDX } from "@/lib/blog-mdx";
 import { createDynamicBlogPostMetadata } from "@/lib/seo";
 import { BlogPostShell, type BlogPostData } from "@/components/blog/blog-post-shell";
 import { extractHowToSteps } from "@/lib/mdx-schema-extract";
+import {
+  getPublishedBlogPostBySlug,
+  listPublishedBlogPosts,
+} from "@/lib/supabase/blog-posts";
 
 export const dynamic = "force-dynamic";
 
@@ -15,8 +17,7 @@ interface PageProps {
 }
 
 const getPost = cache(async (slug: string) => {
-  const convex = getConvexClient();
-  return await convex.query(api.blogPosts.getPublishedBySlug, { slug });
+  return await getPublishedBlogPostBySlug(slug);
 });
 
 export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
@@ -33,7 +34,7 @@ export default async function BlogPostPage({ params }: PageProps) {
 
   const [{ content, headings }, allPosts] = await Promise.all([
     compileBlogMDX(post.content),
-    getConvexClient().query(api.blogPosts.listPublished),
+    listPublishedBlogPosts(),
   ]);
 
   const relatedPosts = allPosts

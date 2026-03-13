@@ -25,7 +25,7 @@ export const PUBLIC_SITEMAP_PAGES: readonly SitemapPageDefinition[] = [
   { path: "/compare/webhook-site", changeFrequency: "monthly", priority: 0.6 },
   { path: "/compare/ngrok", changeFrequency: "monthly", priority: 0.6 },
   { path: "/compare/beeceptor", changeFrequency: "monthly", priority: 0.6 },
-  // Blog pages are dynamically generated from Convex in sitemaps/blog.xml
+  // Blog pages are dynamically generated from Supabase in sitemaps/blog.xml
   { path: "/installation", changeFrequency: "monthly", priority: 0.8 },
   { path: "/support", changeFrequency: "monthly", priority: 0.6 },
   { path: "/privacy", changeFrequency: "yearly", priority: 0.3 },

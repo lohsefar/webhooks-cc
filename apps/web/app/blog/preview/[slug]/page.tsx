@@ -1,9 +1,8 @@
 import { notFound } from "next/navigation";
 import type { Metadata } from "next";
-import { getConvexClient } from "@/lib/convex-client";
-import { api } from "@convex/_generated/api";
 import { compileBlogMDX } from "@/lib/blog-mdx";
 import { BlogPostShell, type BlogPostData } from "@/components/blog/blog-post-shell";
+import { getDraftBlogPostBySlug } from "@/lib/supabase/blog-posts";
 
 export const dynamic = "force-dynamic";
 
@@ -19,8 +18,7 @@ export async function generateMetadata(): Promise<Metadata> {
 
 export default async function BlogPreviewPage({ params }: PageProps) {
   const { slug } = await params;
-  const convex = getConvexClient();
-  const post = await convex.query(api.blogPosts.getDraftBySlug, { slug });
+  const post = await getDraftBlogPostBySlug(slug);
 
   if (!post) notFound();
 
