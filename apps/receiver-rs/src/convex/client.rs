@@ -9,7 +9,7 @@ use crate::redis::RedisState;
 const HTTP_TIMEOUT: Duration = Duration::from_secs(30);
 const MAX_RESPONSE_SIZE: usize = 1024 * 1024; // 1MB
 
-/// Convex HTTP client with circuit breaker.
+/// Control-plane HTTP client with circuit breaker.
 #[derive(Clone)]
 pub struct ConvexClient {
     http: Client,
@@ -32,7 +32,7 @@ impl ConvexClient {
 
         Self {
             http,
-            base_url: config.convex_site_url.clone(),
+            base_url: config.control_plane_url.clone(),
             secret: config.capture_shared_secret.clone(),
             circuit,
             redis,

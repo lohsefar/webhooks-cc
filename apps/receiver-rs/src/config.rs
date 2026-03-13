@@ -3,7 +3,7 @@ use std::env;
 
 #[derive(Clone)]
 pub struct Config {
-    pub convex_site_url: String,
+    pub control_plane_url: String,
     pub capture_shared_secret: String,
     pub redis_host: String,
     pub redis_port: u16,
@@ -28,7 +28,7 @@ pub struct Config {
 impl std::fmt::Debug for Config {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("Config")
-            .field("convex_site_url", &self.convex_site_url)
+            .field("control_plane_url", &self.control_plane_url)
             .field("capture_shared_secret", &"[REDACTED]")
             .field("redis_host", &self.redis_host)
             .field("redis_port", &self.redis_port)
@@ -68,7 +68,9 @@ fn parse_env_or<T: std::str::FromStr>(name: &str, default: T) -> T {
 
 impl Config {
     pub fn from_env() -> Self {
-        let convex_site_url = env::var("CONVEX_SITE_URL").expect("CONVEX_SITE_URL is required");
+        let control_plane_url = env::var("RECEIVER_CONTROL_PLANE_URL")
+            .or_else(|_| env::var("CONVEX_SITE_URL"))
+            .expect("RECEIVER_CONTROL_PLANE_URL or CONVEX_SITE_URL is required");
         let capture_shared_secret =
             env::var("CAPTURE_SHARED_SECRET").expect("CAPTURE_SHARED_SECRET is required");
 
@@ -114,7 +116,7 @@ impl Config {
         assert!(batch_max_size > 0, "BATCH_MAX_SIZE must be > 0");
 
         Self {
-            convex_site_url,
+            control_plane_url,
             capture_shared_secret,
             redis_host,
             redis_port,

@@ -75,7 +75,9 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ sl
       slug,
       name: body.name as string | undefined,
       mockResponse:
-        body.mockResponse === undefined ? undefined : (body.mockResponse as Record<string, unknown> | null),
+        body.mockResponse === undefined
+          ? undefined
+          : (body.mockResponse as Record<string, unknown> | null),
     });
 
     if (!endpoint) {

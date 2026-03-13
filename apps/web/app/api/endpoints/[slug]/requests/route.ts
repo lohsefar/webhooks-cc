@@ -60,8 +60,8 @@ export async function DELETE(request: Request, { params }: { params: Promise<{ s
 
   try {
     const data = await clearRequestsForEndpointByUser({
-      userId: auth.userId,
       slug,
+      userId: auth.userId,
       before,
     });
 
