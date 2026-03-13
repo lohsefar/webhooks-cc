@@ -4,10 +4,14 @@
  * not eagerly bundled into every page that imports analytics helpers.
  */
 
+let cached: typeof import("posthog-js").default | null = null;
+
 async function getPostHog() {
   if (typeof window === "undefined") return null;
+  if (cached) return cached;
   try {
     const { default: posthog } = await import("posthog-js");
+    cached = posthog;
     return posthog;
   } catch {
     return null;

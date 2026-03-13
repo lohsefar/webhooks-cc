@@ -21,6 +21,8 @@ import { useAuthActions } from "@convex-dev/auth/react";
 import { useState, useEffect, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { UpgradeButton } from "@/components/billing/upgrade-button";
+import { PastDueBanner } from "@/components/billing/past-due-banner";
+import { trackUpgradeCompleted, trackAccountDeleted, resetUser } from "@/lib/analytics";
 
 const ApiKeyDialog = dynamic(() =>
   import("@/components/account/api-key-dialog").then((m) => ({ default: m.ApiKeyDialog })),
@@ -30,8 +32,6 @@ const ManageSubscriptionDialog = dynamic(() =>
   import("@/components/billing/manage-subscription-dialog").then((m) => ({ default: m.ManageSubscriptionDialog })),
   { ssr: false }
 );
-import { PastDueBanner } from "@/components/billing/past-due-banner";
-import { trackUpgradeCompleted, trackAccountDeleted, resetUser } from "@/lib/analytics";
 
 function UsageResetCountdown({ periodEnd }: { periodEnd: number }) {
   const [timeRemaining, setTimeRemaining] = useState<string>("");

@@ -58,6 +58,8 @@ interface DashboardState {
 
   // Bulk reset when endpoint changes
   resetForEndpoint: () => void;
+  // Full reset (for unmount / navigation away)
+  reset: () => void;
 }
 
 export const useDashboardStore = create<DashboardState>((set) => ({
@@ -117,6 +119,28 @@ export const useDashboardStore = create<DashboardState>((set) => ({
     set({
       selectedId: null,
       selectedDetail: null,
+      mobileDetail: false,
+      newCount: 0,
+      methodFilter: "ALL",
+      searchInput: "",
+      debouncedSearch: "",
+      olderRequests: [],
+      searchResults: [],
+      hasMore: false,
+      hasLoadedOlderPage: false,
+      retainedTotalCount: null,
+      loadingMore: false,
+      searchLoading: false,
+      searchError: false,
+    }),
+
+  reset: () =>
+    set({
+      selectedId: null,
+      selectedDetail: null,
+      mobileDetail: false,
+      liveMode: true,
+      sortNewest: true,
       newCount: 0,
       methodFilter: "ALL",
       searchInput: "",
