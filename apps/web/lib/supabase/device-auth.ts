@@ -149,16 +149,22 @@ export async function authorizeDeviceCodeForUser(
     throw userError;
   }
 
-  const { error: updateError } = await admin
+  const { data: updatedCode, error: updateError } = await admin
     .from("device_codes")
     .update({
       status: "authorized",
       user_id: userId,
     })
-    .eq("id", code.id);
+    .eq("id", code.id)
+    .eq("status", "pending")
+    .select("id")
+    .maybeSingle();
 
   if (updateError) {
     throw updateError;
+  }
+  if (!updatedCode) {
+    throw new Error("Code already used");
   }
 
   return {
@@ -197,6 +203,22 @@ export async function claimDeviceCode(deviceCode: string): Promise<ClaimedDevice
     throw new Error(`Maximum of ${MAX_KEYS_PER_USER} API keys allowed per user`);
   }
 
+  const { data: consumedCode, error: consumeError } = await admin
+    .from("device_codes")
+    .delete()
+    .eq("id", code.id)
+    .eq("status", "authorized")
+    .eq("user_id", code.user_id)
+    .select("id")
+    .maybeSingle();
+
+  if (consumeError) {
+    throw consumeError;
+  }
+  if (!consumedCode) {
+    throw new Error("Invalid or already claimed code");
+  }
+
   const rawKey = generateApiKey();
   const { error: insertError } = await admin.from("api_keys").insert({
     user_id: code.user_id,
@@ -218,11 +240,6 @@ export async function claimDeviceCode(deviceCode: string): Promise<ClaimedDevice
 
   if (userError) {
     throw userError;
-  }
-
-  const { error: deleteError } = await admin.from("device_codes").delete().eq("id", code.id);
-  if (deleteError) {
-    throw deleteError;
   }
 
   return {

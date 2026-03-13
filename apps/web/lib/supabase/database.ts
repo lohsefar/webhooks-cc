@@ -115,9 +115,48 @@ export interface Database {
         Relationships: [];
       };
       requests: {
-        Row: Record<string, Json | null>;
-        Insert: Record<string, Json | null>;
-        Update: Record<string, Json | null>;
+        Row: {
+          id: string;
+          endpoint_id: string;
+          user_id: string | null;
+          method: string;
+          path: string;
+          headers: Json;
+          body: string | null;
+          query_params: Json;
+          content_type: string | null;
+          ip: string;
+          size: number;
+          received_at: string;
+        };
+        Insert: {
+          id?: string;
+          endpoint_id: string;
+          user_id?: string | null;
+          method: string;
+          path: string;
+          headers?: Json;
+          body?: string | null;
+          query_params?: Json;
+          content_type?: string | null;
+          ip: string;
+          size?: number;
+          received_at?: string;
+        };
+        Update: {
+          id?: string;
+          endpoint_id?: string;
+          user_id?: string | null;
+          method?: string;
+          path?: string;
+          headers?: Json;
+          body?: string | null;
+          query_params?: Json;
+          content_type?: string | null;
+          ip?: string;
+          size?: number;
+          received_at?: string;
+        };
         Relationships: [];
       };
       users: {

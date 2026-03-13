@@ -84,6 +84,11 @@ describe("Supabase Control Plane Integration", () => {
       name: "Control Plane Endpoint",
       isEphemeral: true,
       expiresAt: Date.now() + 60 * 60 * 1000,
+      mockResponse: {
+        status: 201,
+        body: "created",
+        headers: { "x-created": "true" },
+      },
     });
 
     expect(created.id).toBeTruthy();
@@ -92,6 +97,19 @@ describe("Supabase Control Plane Integration", () => {
     expect(created.isEphemeral).toBe(true);
     expect(created.expiresAt).toBeGreaterThan(Date.now());
     expect(created.url).toContain(`/w/${created.slug}`);
+
+    const { data: createdEndpointRow, error: createdEndpointError } = await admin
+      .from("endpoints")
+      .select("mock_response")
+      .eq("id", created.id)
+      .single();
+
+    expect(createdEndpointError).toBeNull();
+    expect(createdEndpointRow?.mock_response).toEqual({
+      status: 201,
+      body: "created",
+      headers: { "x-created": "true" },
+    });
 
     const fetched = await getEndpointBySlugForUser(testUserId, created.slug);
     expect(fetched?.id).toBe(created.id);
@@ -126,11 +144,33 @@ describe("Supabase Control Plane Integration", () => {
     const listed = await listEndpointsForUser(testUserId);
     expect(listed.some((endpoint) => endpoint.id === created.id)).toBe(true);
 
+    const { error: requestInsertError } = await admin.from("requests").insert({
+      endpoint_id: created.id,
+      user_id: testUserId,
+      method: "POST",
+      path: "/cleanup-me",
+      headers: {},
+      query_params: {},
+      ip: "127.0.0.1",
+      size: 0,
+      received_at: new Date().toISOString(),
+    });
+
+    expect(requestInsertError).toBeNull();
+
     const deleted = await deleteEndpointBySlugForUser(testUserId, created.slug);
     expect(deleted).toBe(true);
 
     const missing = await getEndpointBySlugForUser(testUserId, created.slug);
     expect(missing).toBeNull();
+
+    const { data: orphanedRequests, error: orphanedError } = await admin
+      .from("requests")
+      .select("id")
+      .eq("endpoint_id", created.id);
+
+    expect(orphanedError).toBeNull();
+    expect(orphanedRequests).toEqual([]);
   });
 
   it("returns usage in the SDK/CLI response shape", async () => {

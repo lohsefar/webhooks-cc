@@ -29,6 +29,7 @@ export async function POST(request: Request) {
       error instanceof Error &&
       (error.message.includes("expired") ||
         error.message.includes("Invalid") ||
+        error.message.includes("already claimed") ||
         error.message.includes("not yet authorized") ||
         error.message.includes("not properly authorized") ||
         error.message.includes("Maximum of"))

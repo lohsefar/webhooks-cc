@@ -13,6 +13,7 @@ type SelectedEndpointRow = Pick<
   EndpointRow,
   "id" | "user_id" | "slug" | "name" | "is_ephemeral" | "expires_at" | "created_at"
 >;
+type OwnedEndpointRow = Pick<EndpointRow, "id" | "slug" | "user_id">;
 
 export interface EndpointRecord {
   id: string;
@@ -29,6 +30,7 @@ interface CreateEndpointInput {
   name?: string;
   isEphemeral?: boolean;
   expiresAt?: number;
+  mockResponse?: Record<string, unknown>;
 }
 
 interface UpdateEndpointInput {
@@ -83,6 +85,23 @@ async function generateUniqueSlug(): Promise<string> {
   }
 
   throw new Error("Failed to generate unique slug");
+}
+
+async function findOwnedEndpoint(userId: string, slug: string): Promise<OwnedEndpointRow | null> {
+  const admin = createAdminClient();
+  const { data, error } = await admin
+    .from("endpoints")
+    .select("id, slug, user_id")
+    .eq("user_id", userId)
+    .eq("slug", slug)
+    .returns<OwnedEndpointRow>()
+    .maybeSingle();
+
+  if (error) {
+    throw error;
+  }
+
+  return data;
 }
 
 async function enforceEphemeralCapacity(): Promise<void> {
@@ -145,6 +164,7 @@ export async function createEndpointForUser({
   name,
   isEphemeral = false,
   expiresAt,
+  mockResponse,
 }: CreateEndpointInput): Promise<EndpointRecord> {
   const admin = createAdminClient();
   const slug = await generateUniqueSlug();
@@ -165,6 +185,7 @@ export async function createEndpointForUser({
     user_id: userId,
     slug,
     name: name ?? null,
+    mock_response: (mockResponse as Json | undefined) ?? null,
     is_ephemeral: ephemeral,
     expires_at: expiresAtIso,
   };
@@ -220,11 +241,25 @@ export async function deleteEndpointBySlugForUser(
   slug: string
 ): Promise<boolean> {
   const admin = createAdminClient();
+  const endpoint = await findOwnedEndpoint(userId, slug);
+
+  if (!endpoint) {
+    return false;
+  }
+
+  const { error: requestDeleteError } = await admin
+    .from("requests")
+    .delete()
+    .eq("endpoint_id", endpoint.id);
+
+  if (requestDeleteError) {
+    throw requestDeleteError;
+  }
+
   const { data, error } = await admin
     .from("endpoints")
     .delete()
-    .eq("user_id", userId)
-    .eq("slug", slug)
+    .eq("id", endpoint.id)
     .select("id")
     .maybeSingle();
 

@@ -74,6 +74,8 @@ export async function POST(request: Request) {
       name,
       isEphemeral,
       expiresAt,
+      mockResponse:
+        body.mockResponse === undefined ? undefined : (body.mockResponse as Record<string, unknown>),
     });
 
     return Response.json(created);
