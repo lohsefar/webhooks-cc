@@ -69,6 +69,7 @@ export default function DashboardPage() {
                 loadingMore={state.loadingMore}
                 searchLoading={state.searchLoading}
                 searchError={state.searchError}
+                onPrefetch={state.handlePrefetchDetail}
               />
             </div>
             <div className="flex-1 overflow-hidden">
@@ -119,6 +120,7 @@ export default function DashboardPage() {
                 loadingMore={state.loadingMore}
                 searchLoading={state.searchLoading}
                 searchError={state.searchError}
+                onPrefetch={state.handlePrefetchDetail}
               />
             )}
           </div>

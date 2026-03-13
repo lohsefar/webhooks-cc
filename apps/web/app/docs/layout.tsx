@@ -1,7 +1,12 @@
+import dynamic from "next/dynamic";
 import { DocsSidebar } from "@/components/docs/sidebar";
 import { DocsBreadcrumbs } from "@/components/docs/breadcrumbs";
-import { SearchModal } from "@/components/docs/search-modal";
 import { FloatingNavbar } from "@/components/nav/floating-navbar";
+
+const SearchModal = dynamic(() =>
+  import("@/components/docs/search-modal").then((m) => ({ default: m.SearchModal })),
+  { ssr: false }
+);
 import { BackButton } from "@/components/nav/back-button";
 
 export default function DocsLayout({ children }: { children: React.ReactNode }) {

@@ -5,7 +5,7 @@ import { api } from "@convex/_generated/api";
 import { Id } from "@convex/_generated/dataModel";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { ApiKeyDialog } from "@/components/account/api-key-dialog";
+import dynamic from "next/dynamic";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -21,7 +21,15 @@ import { useAuthActions } from "@convex-dev/auth/react";
 import { useState, useEffect, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { UpgradeButton } from "@/components/billing/upgrade-button";
-import { ManageSubscriptionDialog } from "@/components/billing/manage-subscription-dialog";
+
+const ApiKeyDialog = dynamic(() =>
+  import("@/components/account/api-key-dialog").then((m) => ({ default: m.ApiKeyDialog })),
+  { ssr: false }
+);
+const ManageSubscriptionDialog = dynamic(() =>
+  import("@/components/billing/manage-subscription-dialog").then((m) => ({ default: m.ManageSubscriptionDialog })),
+  { ssr: false }
+);
 import { PastDueBanner } from "@/components/billing/past-due-banner";
 import { trackUpgradeCompleted, trackAccountDeleted, resetUser } from "@/lib/analytics";
 

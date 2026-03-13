@@ -2,8 +2,13 @@
 
 import { useState, useRef, useEffect } from "react";
 import { cn } from "@/lib/utils";
+import dynamic from "next/dynamic";
 import { Copy, Check } from "lucide-react";
-import { ReplayDialog } from "./replay-dialog";
+
+const ReplayDialog = dynamic(() =>
+  import("./replay-dialog").then((m) => ({ default: m.ReplayDialog })),
+  { ssr: false }
+);
 import { copyToClipboard } from "@/lib/clipboard";
 import { formatBytes } from "@/types/request";
 import type { Request, ClickHouseRequest } from "@/types/request";

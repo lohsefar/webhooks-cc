@@ -1,9 +1,10 @@
 "use client";
 
-import { useState, useEffect, useRef, useCallback, useMemo } from "react";
+import { useEffect, useRef, useCallback, useMemo } from "react";
 import { useQuery } from "convex/react";
 import { useAuthToken } from "@convex-dev/auth/react";
 import { useSearchParams } from "next/navigation";
+import { useShallow } from "zustand/shallow";
 import { api } from "@convex/_generated/api";
 import type { Id } from "@convex/_generated/dataModel";
 import type { DisplayableRequest } from "@/components/dashboard/request-detail";
@@ -13,89 +14,115 @@ import {
   computeShowHasMore,
   incrementRetainedCount,
 } from "@/lib/dashboard-count";
+import { useDashboardStore } from "@/lib/dashboard-store";
 
 const CLICKHOUSE_PAGE_SIZE = 50;
 
 export function useDashboardState() {
+  // ── Zustand slices ──────────────────────────────────────────────
+  const store = useDashboardStore(
+    useShallow((s) => ({
+      selectedId: s.selectedId,
+      setSelectedId: s.setSelectedId,
+      select: s.select,
+      mobileDetail: s.mobileDetail,
+      setMobileDetail: s.setMobileDetail,
+      liveMode: s.liveMode,
+      toggleLiveMode: s.toggleLiveMode,
+      sortNewest: s.sortNewest,
+      toggleSort: s.toggleSort,
+      newCount: s.newCount,
+      setNewCount: s.setNewCount,
+      methodFilter: s.methodFilter,
+      setMethodFilter: s.setMethodFilter,
+      searchInput: s.searchInput,
+      setSearchInput: s.setSearchInput,
+      debouncedSearch: s.debouncedSearch,
+      setDebouncedSearch: s.setDebouncedSearch,
+      olderRequests: s.olderRequests,
+      setOlderRequests: s.setOlderRequests,
+      searchResults: s.searchResults,
+      setSearchResults: s.setSearchResults,
+      hasMore: s.hasMore,
+      setHasMore: s.setHasMore,
+      hasLoadedOlderPage: s.hasLoadedOlderPage,
+      setHasLoadedOlderPage: s.setHasLoadedOlderPage,
+      retainedTotalCount: s.retainedTotalCount,
+      setRetainedTotalCount: s.setRetainedTotalCount,
+      loadingMore: s.loadingMore,
+      setLoadingMore: s.setLoadingMore,
+      searchLoading: s.searchLoading,
+      setSearchLoading: s.setSearchLoading,
+      searchError: s.searchError,
+      setSearchError: s.setSearchError,
+      selectedDetail: s.selectedDetail,
+      setSelectedDetail: s.setSelectedDetail,
+      resetForEndpoint: s.resetForEndpoint,
+    }))
+  );
+
+  // ── Convex queries (must be React hooks) ────────────────────────
   const endpoints = useQuery(api.endpoints.list);
   const searchParams = useSearchParams();
   const endpointSlug = searchParams.get("endpoint");
 
   const currentEndpoint = endpoints?.find((ep) => ep.slug === endpointSlug) ?? endpoints?.[0];
 
-  // Lightweight summaries for the sidebar (no body/headers/ip)
   const summaries = useQuery(
     api.requests.listSummaries,
     currentEndpoint ? { endpointId: currentEndpoint._id, limit: 50 } : "skip"
   );
 
-  // Selected item ID — can be a Convex _id (string) or a ClickHouse synthetic id
-  const [selectedId, setSelectedId] = useState<string | null>(null);
-  const [liveMode, setLiveMode] = useState(true);
-  const [sortNewest, setSortNewest] = useState(true);
-  const [mobileDetail, setMobileDetail] = useState(false);
-  const prevTopSummaryId = useRef<string | null>(null);
-  const [newCount, setNewCount] = useState(0);
-  const [methodFilter, setMethodFilter] = useState<string>("ALL");
-  const [searchInput, setSearchInput] = useState("");
-  const [debouncedSearch, setDebouncedSearch] = useState("");
-
-  // ClickHouse state
-  const [olderRequests, setOlderRequests] = useState<ClickHouseRequest[]>([]);
-  const [searchResults, setSearchResults] = useState<ClickHouseRequest[]>([]);
-  const [hasMore, setHasMore] = useState(false);
-  const [hasLoadedOlderPage, setHasLoadedOlderPage] = useState(false);
-  const [retainedTotalCount, setRetainedTotalCount] = useState<number | null>(null);
-  const [loadingMore, setLoadingMore] = useState(false);
-  const [searchLoading, setSearchLoading] = useState(false);
-  const [searchError, setSearchError] = useState(false);
-  const retainedCountRequestSeq = useRef(0);
-
-  // Map of ClickHouse request details by id for quick lookup
-  const clickHouseDetailMap = useRef(new Map<string, ClickHouseRequest>());
-
-  // Debounce search
-  const searchDebounceRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
-  useEffect(() => {
-    if (searchInput === "") {
-      setDebouncedSearch("");
-      return;
-    }
-    searchDebounceRef.current = setTimeout(() => setDebouncedSearch(searchInput), 400);
-    return () => clearTimeout(searchDebounceRef.current);
-  }, [searchInput]);
-
-  // Detail for selected request — prefer ClickHouse, Convex as fallback
-  const isConvexId = selectedId != null && !selectedId.includes(":");
-  const [selectedDetail, setSelectedDetail] = useState<ClickHouseRequest | null>(null);
-
-  // Convex fallback for very new requests not yet flushed to ClickHouse
+  const isConvexId = store.selectedId != null && !store.selectedId.includes(":");
   const selectedRequest = useQuery(
     api.requests.get,
-    isConvexId && !selectedDetail ? { id: selectedId as Id<"requests"> } : "skip"
+    isConvexId && !store.selectedDetail
+      ? { id: store.selectedId as Id<"requests"> }
+      : "skip"
   );
 
-  // Clear stale selectedId when request doesn't exist in either source
-  useEffect(() => {
-    if (selectedRequest === null && !selectedDetail && selectedId && isConvexId) {
-      setSelectedId(null);
-    }
-  }, [selectedRequest, selectedDetail, selectedId, isConvexId]);
-
-  // Build the displayable request for the detail panel
-  const displayRequest = useMemo((): DisplayableRequest | undefined => {
-    if (!selectedId) return undefined;
-    if (selectedDetail) return selectedDetail;
-    if (isConvexId) return selectedRequest ?? undefined;
-    return undefined;
-  }, [selectedId, selectedDetail, isConvexId, selectedRequest]);
-
-  // Auth token for calling the search API route
+  // ── Auth token ──────────────────────────────────────────────────
   const authToken = useAuthToken();
 
-  // ClickHouse search helper
+  // ── Debounce search ─────────────────────────────────────────────
+  const searchDebounceRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  useEffect(() => {
+    if (store.searchInput === "") {
+      store.setDebouncedSearch("");
+      return;
+    }
+    searchDebounceRef.current = setTimeout(
+      () => store.setDebouncedSearch(store.searchInput),
+      400
+    );
+    return () => clearTimeout(searchDebounceRef.current);
+  }, [store.searchInput, store.setDebouncedSearch]);
+
+  // ── Clear stale selection ───────────────────────────────────────
+  useEffect(() => {
+    if (
+      selectedRequest === null &&
+      !store.selectedDetail &&
+      store.selectedId &&
+      isConvexId
+    ) {
+      store.setSelectedId(null);
+    }
+  }, [selectedRequest, store.selectedDetail, store.selectedId, isConvexId, store.setSelectedId]);
+
+  // ── Displayable request ─────────────────────────────────────────
+  const displayRequest = useMemo((): DisplayableRequest | undefined => {
+    if (!store.selectedId) return undefined;
+    if (store.selectedDetail) return store.selectedDetail;
+    if (isConvexId) return selectedRequest ?? undefined;
+    return undefined;
+  }, [store.selectedId, store.selectedDetail, isConvexId, selectedRequest]);
+
+  // ── ClickHouse helpers ──────────────────────────────────────────
   const fetchFromClickHouse = useCallback(
-    async (params: Record<string, string>): Promise<{ data: ClickHouseRequest[]; ok: boolean }> => {
+    async (
+      params: Record<string, string>
+    ): Promise<{ data: ClickHouseRequest[]; ok: boolean }> => {
       if (!authToken) return { data: [], ok: false };
       try {
         const url = new URL("/api/search/requests", window.location.origin);
@@ -129,7 +156,9 @@ export function useDashboardState() {
   );
 
   const fetchCountFromClickHouse = useCallback(
-    async (params: Record<string, string>): Promise<{ count: number | null; ok: boolean }> => {
+    async (
+      params: Record<string, string>
+    ): Promise<{ count: number | null; ok: boolean }> => {
       if (!authToken) return { count: null, ok: false };
       try {
         const url = new URL("/api/search/requests/count", window.location.origin);
@@ -158,7 +187,9 @@ export function useDashboardState() {
     [authToken]
   );
 
-  // Store ClickHouse results in the detail map (capped at 500 entries)
+  // ── Detail cache ────────────────────────────────────────────────
+  const clickHouseDetailMap = useRef(new Map<string, ClickHouseRequest>());
+
   const storeClickHouseResults = useCallback((results: ClickHouseRequest[]) => {
     const map = clickHouseDetailMap.current;
     for (const r of results) {
@@ -174,7 +205,7 @@ export function useDashboardState() {
     }
   }, []);
 
-  // Pre-fetch first page from ClickHouse and map Convex IDs to details
+  // ── Pre-fetch first ClickHouse page ─────────────────────────────
   const prefetchedSlug = useRef<string | null>(null);
   useEffect(() => {
     if (!currentEndpoint || !summaries?.length || !authToken) return;
@@ -183,61 +214,56 @@ export function useDashboardState() {
     const slugToFetch = currentEndpoint.slug;
     let cancelled = false;
 
-    fetchFromClickHouse({
-      slug: slugToFetch,
-      limit: "50",
-      order: "desc",
-    }).then(({ data: results }) => {
-      if (cancelled) return;
-      prefetchedSlug.current = slugToFetch;
-      storeClickHouseResults(results);
-      const consumed = new Set<string>();
-      for (const summary of summaries) {
-        const match = results.find(
-          (r) =>
-            !consumed.has(r.id) &&
-            r.method === summary.method &&
-            Math.abs(r.receivedAt - summary.receivedAt) < 2
-        );
-        if (match) {
-          consumed.add(match.id);
-          clickHouseDetailMap.current.set(summary._id, match);
+    fetchFromClickHouse({ slug: slugToFetch, limit: "50", order: "desc" }).then(
+      ({ data: results }) => {
+        if (cancelled) return;
+        prefetchedSlug.current = slugToFetch;
+        storeClickHouseResults(results);
+        const consumed = new Set<string>();
+        for (const summary of summaries) {
+          const match = results.find(
+            (r) =>
+              !consumed.has(r.id) &&
+              r.method === summary.method &&
+              Math.abs(r.receivedAt - summary.receivedAt) < 2
+          );
+          if (match) {
+            consumed.add(match.id);
+            clickHouseDetailMap.current.set(summary._id, match);
+          }
         }
       }
-    });
+    );
 
     return () => {
       cancelled = true;
     };
   }, [currentEndpoint, summaries, authToken, fetchFromClickHouse, storeClickHouseResults]);
 
-  // Fetch detail from ClickHouse when selection changes
+  // ── Fetch detail on selection change ────────────────────────────
   useEffect(() => {
-    if (!selectedId) {
-      setSelectedDetail(null);
+    if (!store.selectedId) {
+      store.setSelectedDetail(null);
       return;
     }
 
-    const cached = clickHouseDetailMap.current.get(selectedId);
+    const cached = clickHouseDetailMap.current.get(store.selectedId);
     if (cached) {
-      setSelectedDetail(cached);
+      store.setSelectedDetail(cached);
       return;
     }
 
-    setSelectedDetail(null);
-
-    if (!currentEndpoint) {
-      return;
-    }
+    store.setSelectedDetail(null);
+    if (!currentEndpoint) return;
 
     let receivedAt: number | undefined;
     if (isConvexId && summaries) {
-      const summary = summaries.find((s) => s._id === selectedId);
+      const summary = summaries.find((s) => s._id === store.selectedId);
       if (summary) receivedAt = summary.receivedAt;
     }
 
     if (isConvexId && receivedAt == null) {
-      setSelectedDetail(null);
+      store.setSelectedDetail(null);
       return;
     }
 
@@ -256,21 +282,25 @@ export function useDashboardState() {
       if (cancelled) return;
       storeClickHouseResults(results);
       if (receivedAt != null && results.length > 0) {
-        const summaryMethod = summaries?.find((s) => s._id === selectedId)?.method;
+        const summaryMethod = summaries?.find(
+          (s) => s._id === store.selectedId
+        )?.method;
         const candidates = summaryMethod
           ? results.filter((r) => r.method === summaryMethod)
           : results;
         const pool = candidates.length > 0 ? candidates : results;
         const match = pool.reduce((best, r) =>
-          Math.abs(r.receivedAt - receivedAt!) < Math.abs(best.receivedAt - receivedAt!) ? r : best
+          Math.abs(r.receivedAt - receivedAt!) < Math.abs(best.receivedAt - receivedAt!)
+            ? r
+            : best
         );
-        clickHouseDetailMap.current.set(selectedId, match);
-        setSelectedDetail(match);
+        clickHouseDetailMap.current.set(store.selectedId!, match);
+        store.setSelectedDetail(match);
       } else if (results.length > 0) {
-        const match = results.find((r) => r.id === selectedId);
-        if (match) setSelectedDetail(match);
+        const match = results.find((r) => r.id === store.selectedId);
+        if (match) store.setSelectedDetail(match);
       } else {
-        setSelectedDetail(null);
+        store.setSelectedDetail(null);
       }
     });
 
@@ -278,31 +308,34 @@ export function useDashboardState() {
       cancelled = true;
     };
   }, [
-    selectedId,
+    store.selectedId,
     isConvexId,
     currentEndpoint,
     summaries,
     fetchFromClickHouse,
     storeClickHouseResults,
+    store.setSelectedDetail,
   ]);
 
-  // Clear paginated results when filter changes
-  const prevMethodFilter = useRef(methodFilter);
+  // ── Clear paginated results on filter change ────────────────────
+  const prevMethodFilter = useRef(store.methodFilter);
   useEffect(() => {
-    if (prevMethodFilter.current !== methodFilter) {
-      prevMethodFilter.current = methodFilter;
-      setOlderRequests([]);
-      setHasMore(false);
-      setHasLoadedOlderPage(false);
+    if (prevMethodFilter.current !== store.methodFilter) {
+      prevMethodFilter.current = store.methodFilter;
+      store.setOlderRequests([]);
+      store.setHasMore(false);
+      store.setHasLoadedOlderPage(false);
     }
-  }, [methodFilter]);
+  }, [store.methodFilter, store.setOlderRequests, store.setHasMore, store.setHasLoadedOlderPage]);
 
-  // Handle Load More
+  // ── Load More ───────────────────────────────────────────────────
   const handleLoadMore = useCallback(async () => {
+    const { loadingMore, olderRequests, methodFilter } = useDashboardStore.getState();
     if (!currentEndpoint || loadingMore) return;
-    setLoadingMore(true);
+    useDashboardStore.getState().setLoadingMore(true);
 
-    const currentOldest = olderRequests.length > 0 ? olderRequests[olderRequests.length - 1] : null;
+    const currentOldest =
+      olderRequests.length > 0 ? olderRequests[olderRequests.length - 1] : null;
     const oldestFromSummaries =
       summaries && summaries.length > 0 ? summaries[summaries.length - 1] : null;
 
@@ -323,102 +356,107 @@ export function useDashboardState() {
     try {
       const { data: results } = await fetchFromClickHouse(params);
       storeClickHouseResults(results);
-      setOlderRequests((prev) => [...prev, ...results]);
-      setHasMore(results.length >= CLICKHOUSE_PAGE_SIZE);
-      setHasLoadedOlderPage(true);
+      const s = useDashboardStore.getState();
+      s.setOlderRequests((prev) => [...prev, ...results]);
+      s.setHasMore(results.length >= CLICKHOUSE_PAGE_SIZE);
+      s.setHasLoadedOlderPage(true);
     } catch (err) {
       console.error("Load more failed:", err);
     } finally {
-      setLoadingMore(false);
+      useDashboardStore.getState().setLoadingMore(false);
     }
-  }, [
-    currentEndpoint,
-    loadingMore,
-    olderRequests,
-    summaries,
-    methodFilter,
-    fetchFromClickHouse,
-    storeClickHouseResults,
-  ]);
+  }, [currentEndpoint, summaries, fetchFromClickHouse, storeClickHouseResults]);
 
-  // Handle search via ClickHouse
+  // ── Search via ClickHouse ───────────────────────────────────────
   useEffect(() => {
-    if (!debouncedSearch || !currentEndpoint) {
-      setSearchResults([]);
-      setSearchError(false);
-      setSearchLoading(false);
+    if (!store.debouncedSearch || !currentEndpoint) {
+      store.setSearchResults([]);
+      store.setSearchError(false);
+      store.setSearchLoading(false);
       return;
     }
 
     let cancelled = false;
-    setSearchLoading(true);
-    setSearchError(false);
+    store.setSearchLoading(true);
+    store.setSearchError(false);
 
     const params: Record<string, string> = {
       slug: currentEndpoint.slug,
-      q: debouncedSearch,
+      q: store.debouncedSearch,
       limit: String(CLICKHOUSE_PAGE_SIZE),
       order: "desc",
     };
-    if (methodFilter !== "ALL") params.method = methodFilter;
+    if (store.methodFilter !== "ALL") params.method = store.methodFilter;
 
     fetchFromClickHouse(params)
       .then(({ data: results, ok }) => {
         if (cancelled) return;
         if (!ok) {
-          setSearchError(true);
-          setSearchResults([]);
+          useDashboardStore.getState().setSearchError(true);
+          useDashboardStore.getState().setSearchResults([]);
         } else {
           storeClickHouseResults(results);
-          setSearchResults(results);
+          useDashboardStore.getState().setSearchResults(results);
         }
       })
       .finally(() => {
-        if (!cancelled) setSearchLoading(false);
+        if (!cancelled) useDashboardStore.getState().setSearchLoading(false);
       });
 
     return () => {
       cancelled = true;
     };
-  }, [debouncedSearch, currentEndpoint, methodFilter, fetchFromClickHouse, storeClickHouseResults]);
+  }, [
+    store.debouncedSearch,
+    currentEndpoint,
+    store.methodFilter,
+    fetchFromClickHouse,
+    storeClickHouseResults,
+    store.setSearchResults,
+    store.setSearchError,
+    store.setSearchLoading,
+  ]);
 
+  // ── Retained count ──────────────────────────────────────────────
   const currentSlug = currentEndpoint?.slug;
+  const retainedCountRequestSeq = useRef(0);
 
   const refreshRetainedCount = useCallback(async () => {
     if (!currentSlug) return;
     const requestSeq = ++retainedCountRequestSeq.current;
+    const { methodFilter, debouncedSearch } = useDashboardStore.getState();
     const params = buildRetainedCountParams(currentSlug, methodFilter, debouncedSearch);
 
     const { count, ok } = await fetchCountFromClickHouse(params);
     if (requestSeq !== retainedCountRequestSeq.current) return;
     if (ok && count != null) {
-      setRetainedTotalCount(count);
+      useDashboardStore.getState().setRetainedTotalCount(count);
     }
-  }, [currentSlug, methodFilter, debouncedSearch, fetchCountFromClickHouse]);
+  }, [currentSlug, fetchCountFromClickHouse]);
 
-  // ClickHouse-backed retained count
   useEffect(() => {
     if (!currentSlug || !authToken) {
       retainedCountRequestSeq.current++;
-      setRetainedTotalCount(null);
+      store.setRetainedTotalCount(null);
       return;
     }
     void refreshRetainedCount();
-  }, [currentSlug, authToken, methodFilter, debouncedSearch, refreshRetainedCount]);
+  }, [
+    currentSlug,
+    authToken,
+    store.methodFilter,
+    store.debouncedSearch,
+    refreshRetainedCount,
+    store.setRetainedTotalCount,
+  ]);
 
-  // Re-sync count when the tab becomes active again
+  // Re-sync count on tab focus
   useEffect(() => {
     if (!currentSlug || !authToken) return;
-
-    const onFocus = () => {
-      void refreshRetainedCount();
-    };
+    const onFocus = () => void refreshRetainedCount();
     const onVisibilityChange = () => {
-      if (document.visibilityState === "visible") {
-        void refreshRetainedCount();
-      }
+      if (document.visibilityState === "visible") void refreshRetainedCount();
     };
-
     window.addEventListener("focus", onFocus);
     document.addEventListener("visibilitychange", onVisibilityChange);
     return () => {
@@ -427,10 +465,10 @@ export function useDashboardState() {
     };
   }, [currentSlug, authToken, refreshRetainedCount]);
 
-  // Compose the list to display
+  // ── Displayed items ─────────────────────────────────────────────
   const displayedItems = useMemo((): AnyRequestSummary[] => {
-    if (debouncedSearch) {
-      return searchResults.map(
+    if (store.debouncedSearch) {
+      return store.searchResults.map(
         (r): ClickHouseSummary => ({
           id: r.id,
           method: r.method,
@@ -440,25 +478,24 @@ export function useDashboardState() {
     }
 
     const convexSummaries: AnyRequestSummary[] = summaries
-      ? methodFilter === "ALL"
+      ? store.methodFilter === "ALL"
         ? summaries
-        : summaries.filter((r) => r.method === methodFilter)
+        : summaries.filter((r) => r.method === store.methodFilter)
       : [];
 
     const oldestConvex =
-      summaries && summaries.length > 0 ? summaries[summaries.length - 1].receivedAt : -Infinity;
-    const olderSummaries: ClickHouseSummary[] = olderRequests
+      summaries && summaries.length > 0
+        ? summaries[summaries.length - 1].receivedAt
+        : -Infinity;
+    const olderSummaries: ClickHouseSummary[] = store.olderRequests
       .filter((r) => r.receivedAt < oldestConvex)
-      .map((r) => ({
-        id: r.id,
-        method: r.method,
-        receivedAt: r.receivedAt,
-      }));
+      .map((r) => ({ id: r.id, method: r.method, receivedAt: r.receivedAt }));
 
     return [...convexSummaries, ...olderSummaries];
-  }, [summaries, olderRequests, searchResults, debouncedSearch, methodFilter]);
+  }, [summaries, store.olderRequests, store.searchResults, store.debouncedSearch, store.methodFilter]);
 
-  // Track incoming requests for live mode
+  // ── Live mode tracking ──────────────────────────────────────────
+  const prevTopSummaryId = useRef<string | null>(null);
   useEffect(() => {
     if (!summaries || summaries.length === 0) {
       prevTopSummaryId.current = null;
@@ -473,10 +510,12 @@ export function useDashboardState() {
       const arrived = previousIdx >= 0 ? previousIdx : 1;
 
       if (arrived > 0) {
+        const { liveMode, debouncedSearch, methodFilter } =
+          useDashboardStore.getState();
         if (liveMode) {
-          setSelectedId(topId);
+          useDashboardStore.getState().setSelectedId(topId);
         } else {
-          setNewCount((prev) => prev + arrived);
+          useDashboardStore.getState().setNewCount((prev) => prev + arrived);
         }
 
         if (!debouncedSearch) {
@@ -486,7 +525,9 @@ export function useDashboardState() {
               ? arrived
               : newRows.filter((r) => r.method === methodFilter).length;
           if (matchedCount > 0) {
-            setRetainedTotalCount((prev) => incrementRetainedCount(prev, matchedCount));
+            useDashboardStore
+              .getState()
+              .setRetainedTotalCount((prev) => incrementRetainedCount(prev, matchedCount));
           }
         }
 
@@ -497,56 +538,37 @@ export function useDashboardState() {
     }
 
     prevTopSummaryId.current = topId;
-  }, [summaries, liveMode, methodFilter, debouncedSearch, refreshRetainedCount]);
+  }, [summaries, refreshRetainedCount]);
 
-  // Auto-select first request when requests load and nothing is selected
+  // ── Auto-select first request ───────────────────────────────────
   useEffect(() => {
-    if (summaries && summaries.length > 0 && !selectedId) {
-      setSelectedId(summaries[0]._id);
+    if (summaries && summaries.length > 0 && !useDashboardStore.getState().selectedId) {
+      store.setSelectedId(summaries[0]._id);
     }
-  }, [summaries, selectedId]);
+  }, [summaries, store.setSelectedId]);
 
-  // Reset state when endpoint changes
+  // ── Reset on endpoint change ────────────────────────────────────
   const currentEndpointId = currentEndpoint?._id;
   useEffect(() => {
-    setSelectedId(null);
-    setSelectedDetail(null);
-    setNewCount(0);
-    prevTopSummaryId.current = null;
-    setMethodFilter("ALL");
-    setSearchInput("");
-    setDebouncedSearch("");
-    setOlderRequests([]);
-    setSearchResults([]);
-    setHasMore(false);
-    setHasLoadedOlderPage(false);
-    setRetainedTotalCount(null);
-    setLoadingMore(false);
-    setSearchLoading(false);
-    setSearchError(false);
+    store.resetForEndpoint();
     clickHouseDetailMap.current.clear();
     prefetchedSlug.current = null;
-  }, [currentEndpointId]);
+  }, [currentEndpointId, store.resetForEndpoint]);
 
-  const handleSelect = useCallback((id: string) => {
-    setSelectedId(id);
-    setMobileDetail(true);
-  }, []);
-
-  const handleToggleLiveMode = useCallback(() => setLiveMode((prev) => !prev), []);
-  const handleToggleSort = useCallback(() => setSortNewest((prev) => !prev), []);
-
+  // ── Jump to new ─────────────────────────────────────────────────
   const handleJumpToNew = useCallback(() => {
     if (summaries && summaries.length > 0) {
-      setSelectedId(summaries[0]._id);
-      setNewCount(0);
+      const s = useDashboardStore.getState();
+      s.setSelectedId(summaries[0]._id);
+      s.setNewCount(0);
     }
   }, [summaries]);
 
-  // Export helpers
+  // ── Export helpers ──────────────────────────────────────────────
   const handleExportJson = useCallback(async () => {
     if (!currentEndpoint) return;
     const { exportToJson, downloadFile } = await import("@/lib/export");
+    const { methodFilter, debouncedSearch } = useDashboardStore.getState();
     const params: Record<string, string> = {
       slug: currentEndpoint.slug,
       limit: "200",
@@ -564,11 +586,12 @@ export function useDashboardState() {
     if (results.length >= 200) {
       alert("Exported first 200 requests. Use search filters to narrow the export.");
     }
-  }, [currentEndpoint, methodFilter, debouncedSearch, fetchFromClickHouse]);
+  }, [currentEndpoint, fetchFromClickHouse]);
 
   const handleExportCsv = useCallback(async () => {
     if (!currentEndpoint) return;
     const { exportToCsv, downloadFile } = await import("@/lib/export");
+    const { methodFilter, debouncedSearch } = useDashboardStore.getState();
     const params: Record<string, string> = {
       slug: currentEndpoint.slug,
       limit: "200",
@@ -586,17 +609,78 @@ export function useDashboardState() {
     if (results.length >= 200) {
       alert("Exported first 200 requests. Use search filters to narrow the export.");
     }
-  }, [currentEndpoint, methodFilter, debouncedSearch, fetchFromClickHouse]);
+  }, [currentEndpoint, fetchFromClickHouse]);
 
+  // ── Hover prefetch ──────────────────────────────────────────────
+  const prefetchInflight = useRef(new Set<string>());
+  const handlePrefetchDetail = useCallback(
+    (id: string) => {
+      // Already cached or already fetching
+      if (clickHouseDetailMap.current.has(id) || prefetchInflight.current.has(id)) return;
+      if (!currentEndpoint) return;
+
+      prefetchInflight.current.add(id);
+
+      // Try to find receivedAt from summaries for Convex IDs
+      const isConvex = !id.includes(":");
+      let receivedAt: number | undefined;
+      if (isConvex && summaries) {
+        const summary = summaries.find((s) => s._id === id);
+        if (summary) receivedAt = summary.receivedAt;
+      }
+
+      if (isConvex && receivedAt == null) {
+        prefetchInflight.current.delete(id);
+        return;
+      }
+
+      const params: Record<string, string> = {
+        slug: currentEndpoint.slug,
+        limit: "10",
+        order: "desc",
+      };
+      if (receivedAt != null) {
+        params.from = String(receivedAt);
+        params.to = String(receivedAt);
+      }
+
+      fetchFromClickHouse(params)
+        .then(({ data: results }) => {
+          storeClickHouseResults(results);
+          if (receivedAt != null && results.length > 0) {
+            const summaryMethod = summaries?.find((s) => s._id === id)?.method;
+            const candidates = summaryMethod
+              ? results.filter((r) => r.method === summaryMethod)
+              : results;
+            const pool = candidates.length > 0 ? candidates : results;
+            const match = pool.reduce((best, r) =>
+              Math.abs(r.receivedAt - receivedAt!) < Math.abs(best.receivedAt - receivedAt!)
+                ? r
+                : best
+            );
+            clickHouseDetailMap.current.set(id, match);
+          } else if (results.length > 0) {
+            const match = results.find((r) => r.id === id);
+            if (match) clickHouseDetailMap.current.set(id, match);
+          }
+        })
+        .finally(() => {
+          prefetchInflight.current.delete(id);
+        });
+    },
+    [currentEndpoint, summaries, fetchFromClickHouse, storeClickHouseResults]
+  );
+
+  // ── Computed values ─────────────────────────────────────────────
   const hasRequests = summaries && summaries.length > 0;
   const loadedCount = displayedItems.length;
   const initialCanLoadMore = (summaries?.length ?? 0) >= CLICKHOUSE_PAGE_SIZE;
   const showHasMore = computeShowHasMore({
-    searchQuery: debouncedSearch,
-    hasMoreFromPagination: hasMore,
-    retainedTotalCount,
+    searchQuery: store.debouncedSearch,
+    hasMoreFromPagination: store.hasMore,
+    retainedTotalCount: store.retainedTotalCount,
     loadedCount,
-    hasLoadedOlderPage,
+    hasLoadedOlderPage: store.hasLoadedOlderPage,
     initialCanLoadMore,
   });
 
@@ -610,35 +694,38 @@ export function useDashboardState() {
     hasRequests,
 
     // Selection
-    selectedId,
-    handleSelect,
-    mobileDetail,
-    setMobileDetail,
+    selectedId: store.selectedId,
+    handleSelect: store.select,
+    mobileDetail: store.mobileDetail,
+    setMobileDetail: store.setMobileDetail,
 
     // Controls
-    liveMode,
-    handleToggleLiveMode,
-    sortNewest,
-    handleToggleSort,
-    newCount,
+    liveMode: store.liveMode,
+    handleToggleLiveMode: store.toggleLiveMode,
+    sortNewest: store.sortNewest,
+    handleToggleSort: store.toggleSort,
+    newCount: store.newCount,
     handleJumpToNew,
-    methodFilter,
-    setMethodFilter,
-    searchInput,
-    setSearchInput,
-    retainedTotalCount,
+    methodFilter: store.methodFilter,
+    setMethodFilter: store.setMethodFilter,
+    searchInput: store.searchInput,
+    setSearchInput: store.setSearchInput,
+    retainedTotalCount: store.retainedTotalCount,
 
     // Pagination
     handleLoadMore,
     showHasMore,
-    loadingMore,
+    loadingMore: store.loadingMore,
 
     // Search
-    searchLoading,
-    searchError,
+    searchLoading: store.searchLoading,
+    searchError: store.searchError,
 
     // Export
     handleExportJson,
     handleExportCsv,
+
+    // Hover prefetch
+    handlePrefetchDetail,
   };
 }

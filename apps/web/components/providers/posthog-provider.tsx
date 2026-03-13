@@ -16,10 +16,7 @@ export function PostHogProvider({ children }: { children: React.ReactNode }) {
         ui_host: "https://eu.posthog.com",
         persistence: "localStorage",
         capture_pageleave: true,
-        autocapture: {
-          dom_event_allowlist: ["click"],
-          element_allowlist: ["a", "button"],
-        },
+        autocapture: false,
         defaults: "2026-01-30",
         loaded: (ph) => {
           if (process.env.NODE_ENV === "development") ph.debug();
