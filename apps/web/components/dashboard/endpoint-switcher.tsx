@@ -1,9 +1,13 @@
 "use client";
 
-import { useQuery } from "convex/react";
+import { useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { api } from "@convex/_generated/api";
-import { Doc } from "@convex/_generated/dataModel";
+import { useAuth } from "@/components/providers/supabase-auth-provider";
+import {
+  fetchDashboardEndpoints,
+  subscribeDashboardEndpointsChanged,
+  type DashboardEndpoint,
+} from "@/lib/dashboard-api";
 import {
   Select,
   SelectContent,
@@ -13,10 +17,45 @@ import {
 } from "@/components/ui/select";
 
 export function EndpointSwitcher() {
-  const endpoints = useQuery(api.endpoints.list);
+  const { session } = useAuth();
+  const [endpoints, setEndpoints] = useState<DashboardEndpoint[] | null>(null);
   const router = useRouter();
   const searchParams = useSearchParams();
   const currentSlug = searchParams.get("endpoint");
+
+  useEffect(() => {
+    const accessToken = session?.access_token;
+    if (!accessToken) {
+      setEndpoints(null);
+      return;
+    }
+
+    let cancelled = false;
+
+    const load = async () => {
+      try {
+        const nextEndpoints = await fetchDashboardEndpoints(accessToken);
+        if (!cancelled) {
+          setEndpoints(nextEndpoints);
+        }
+      } catch (error) {
+        console.error("Failed to load endpoints for switcher:", error);
+        if (!cancelled) {
+          setEndpoints([]);
+        }
+      }
+    };
+
+    void load();
+    const unsubscribe = subscribeDashboardEndpointsChanged(() => {
+      void load();
+    });
+
+    return () => {
+      cancelled = true;
+      unsubscribe();
+    };
+  }, [session?.access_token]);
 
   if (!endpoints || endpoints.length === 0) {
     return null;
@@ -32,8 +71,8 @@ export function EndpointSwitcher() {
         <SelectValue placeholder="Select endpoint" />
       </SelectTrigger>
       <SelectContent>
-        {endpoints.map((endpoint: Doc<"endpoints">) => (
-          <SelectItem key={endpoint._id} value={endpoint.slug}>
+        {endpoints.map((endpoint) => (
+          <SelectItem key={endpoint.id} value={endpoint.slug}>
             {endpoint.name || endpoint.slug}
           </SelectItem>
         ))}

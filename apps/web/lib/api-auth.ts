@@ -1,10 +1,11 @@
 /**
- * @fileoverview API authentication helpers for CLI-facing API routes.
+ * @fileoverview API authentication helpers for bearer-authenticated API routes.
  *
- * Validates API keys against Supabase and keeps a helper for the remaining
+ * Validates API keys and Supabase session tokens against Supabase and keeps a helper for the remaining
  * Convex-backed /cli/* routes during the migration transition.
  */
 import { serverEnv } from "./env";
+import { createAdminClient } from "./supabase/admin";
 import { validateApiKeyWithMetadata } from "./supabase/api-keys";
 
 export type UserPlan = "free" | "pro";
@@ -12,6 +13,35 @@ export type UserPlan = "free" | "pro";
 export interface ApiKeyValidation {
   userId: string;
   plan?: UserPlan;
+}
+
+async function validateSupabaseSessionWithPlan(
+  accessToken: string
+): Promise<ApiKeyValidation | null> {
+  const admin = createAdminClient();
+  const {
+    data: { user },
+    error: authError,
+  } = await admin.auth.getUser(accessToken);
+
+  if (authError || !user) {
+    return null;
+  }
+
+  const { data: userRow, error: userError } = await admin
+    .from("users")
+    .select("plan")
+    .eq("id", user.id)
+    .maybeSingle<{ plan: UserPlan }>();
+
+  if (userError) {
+    throw userError;
+  }
+
+  return {
+    userId: user.id,
+    plan: userRow?.plan,
+  };
 }
 
 /** Extract Bearer token from Authorization header */
@@ -31,18 +61,29 @@ function getSharedSecret(): string {
 
 /** Validate an API key via Convex HTTP action. Returns userId or null. */
 export async function validateApiKey(apiKey: string): Promise<string | null> {
-  const result = await validateApiKeyWithPlan(apiKey);
+  const result = await validateBearerTokenWithPlan(apiKey);
   return result?.userId ?? null;
 }
 
-/** Validate API key and return userId plus plan when available. */
-export async function validateApiKeyWithPlan(apiKey: string): Promise<ApiKeyValidation | null> {
+/** Validate a bearer token (API key or Supabase session) and return userId plus plan. */
+export async function validateBearerTokenWithPlan(
+  token: string
+): Promise<ApiKeyValidation | null> {
   try {
-    return await validateApiKeyWithMetadata(apiKey);
+    if (token.startsWith("whcc_")) {
+      return await validateApiKeyWithMetadata(token);
+    }
+
+    return await validateSupabaseSessionWithPlan(token);
   } catch {
-    console.error("Failed to validate API key against Supabase");
+    console.error("Failed to validate bearer token against Supabase");
     return null;
   }
+}
+
+/** Backwards-compatible alias for API-key consumers. */
+export async function validateApiKeyWithPlan(apiKey: string): Promise<ApiKeyValidation | null> {
+  return validateBearerTokenWithPlan(apiKey);
 }
 
 /** Call a /cli/* Convex HTTP action with shared secret authentication. */
@@ -144,7 +185,7 @@ export function formatRequest(doc: Record<string, unknown>): Record<string, unkn
 }
 
 /**
- * Authenticate a request using Bearer token API key.
+ * Authenticate a request using a Bearer API key or Supabase session token.
  * Returns { success: true, userId } on success, or { success: false, response } on failure.
  */
 export type AuthResult = { success: true; userId: string } | { success: false; response: Response };
@@ -165,7 +206,7 @@ export async function authenticateRequest(request: Request): Promise<AuthResult>
   if (!userId) {
     return {
       success: false,
-      response: new Response(JSON.stringify({ error: "Invalid API key" }), {
+      response: new Response(JSON.stringify({ error: "Invalid token" }), {
         status: 401,
         headers: { "Content-Type": "application/json" },
       }),

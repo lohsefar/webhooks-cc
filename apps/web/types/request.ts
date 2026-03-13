@@ -1,9 +1,7 @@
-import { Id } from "@convex/_generated/dataModel";
-
 export interface Request {
-  _id: Id<"requests">;
+  _id: string;
   _creationTime: number;
-  endpointId: Id<"endpoints">;
+  endpointId: string;
   method: HttpMethod | string; // HttpMethod for known methods, string for custom methods
   path: string;
   headers: Record<string, string>;
@@ -16,7 +14,7 @@ export interface Request {
 }
 
 export interface RequestSummary {
-  _id: Id<"requests">;
+  _id: string;
   _creationTime: number;
   method: HttpMethod | string;
   receivedAt: number;

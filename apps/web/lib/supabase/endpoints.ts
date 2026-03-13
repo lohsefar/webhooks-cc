@@ -11,7 +11,7 @@ type EndpointInsert = Database["public"]["Tables"]["endpoints"]["Insert"];
 type EndpointUpdate = Database["public"]["Tables"]["endpoints"]["Update"];
 type SelectedEndpointRow = Pick<
   EndpointRow,
-  "id" | "user_id" | "slug" | "name" | "is_ephemeral" | "expires_at" | "created_at"
+  "id" | "user_id" | "slug" | "name" | "mock_response" | "is_ephemeral" | "expires_at" | "created_at"
 >;
 type OwnedEndpointRow = Pick<EndpointRow, "id" | "slug" | "user_id">;
 
@@ -20,6 +20,11 @@ export interface EndpointRecord {
   slug: string;
   name?: string;
   url?: string;
+  mockResponse?: {
+    status: number;
+    body: string;
+    headers: Record<string, string>;
+  };
   isEphemeral?: boolean;
   expiresAt?: number;
   createdAt: number;
@@ -52,12 +57,35 @@ function parseMillis(timestamp: string | null): number | undefined {
   return Number.isFinite(value) ? value : undefined;
 }
 
+function normalizeMockHeaders(value: unknown): Record<string, string> {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    return {};
+  }
+
+  return Object.fromEntries(
+    Object.entries(value).filter(([, item]) => typeof item === "string")
+  ) as Record<string, string>;
+}
+
 function normalizeEndpoint(row: SelectedEndpointRow): EndpointRecord {
+  const mockResponse =
+    row.mock_response && typeof row.mock_response === "object" && !Array.isArray(row.mock_response)
+      ? row.mock_response
+      : null;
+
   return {
     id: row.id,
     slug: row.slug,
     name: row.name ?? undefined,
     url: webhookUrl(row.slug),
+    mockResponse:
+      mockResponse && typeof mockResponse.status === "number"
+        ? {
+            status: mockResponse.status,
+            body: typeof mockResponse.body === "string" ? mockResponse.body : "",
+            headers: normalizeMockHeaders(mockResponse.headers),
+          }
+        : undefined,
     isEphemeral: row.is_ephemeral || undefined,
     expiresAt: parseMillis(row.expires_at),
     createdAt: parseMillis(row.created_at) ?? Date.now(),
@@ -127,7 +155,7 @@ export async function listEndpointsForUser(userId: string): Promise<EndpointReco
   const admin = createAdminClient();
   const { data, error } = await admin
     .from("endpoints")
-    .select("id, user_id, slug, name, is_ephemeral, expires_at, created_at")
+    .select("id, user_id, slug, name, mock_response, is_ephemeral, expires_at, created_at")
     .eq("user_id", userId)
     .order("created_at", { ascending: false })
     .returns<SelectedEndpointRow[]>();
@@ -146,7 +174,7 @@ export async function getEndpointBySlugForUser(
   const admin = createAdminClient();
   const { data, error } = await admin
     .from("endpoints")
-    .select("id, user_id, slug, name, is_ephemeral, expires_at, created_at")
+    .select("id, user_id, slug, name, mock_response, is_ephemeral, expires_at, created_at")
     .eq("user_id", userId)
     .eq("slug", slug)
     .returns<SelectedEndpointRow>()
@@ -193,7 +221,7 @@ export async function createEndpointForUser({
   const { data, error } = await admin
     .from("endpoints")
     .insert(insert)
-    .select("id, user_id, slug, name, is_ephemeral, expires_at, created_at")
+    .select("id, user_id, slug, name, mock_response, is_ephemeral, expires_at, created_at")
     .returns<SelectedEndpointRow>()
     .single();
 
@@ -225,7 +253,7 @@ export async function updateEndpointBySlugForUser({
     .update(updates)
     .eq("user_id", userId)
     .eq("slug", slug)
-    .select("id, user_id, slug, name, is_ephemeral, expires_at, created_at")
+    .select("id, user_id, slug, name, mock_response, is_ephemeral, expires_at, created_at")
     .returns<SelectedEndpointRow>()
     .maybeSingle();
 

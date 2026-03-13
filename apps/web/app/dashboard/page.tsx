@@ -1,12 +1,9 @@
 "use client";
 
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
-import { useQuery } from "convex/react";
-import { useAuthToken } from "@convex-dev/auth/react";
 import { useSearchParams } from "next/navigation";
 import Link from "next/link";
-import { api } from "@convex/_generated/api";
-import type { Id } from "@convex/_generated/dataModel";
+import { useAuth } from "@/components/providers/supabase-auth-provider";
 import { UrlBar } from "@/components/dashboard/url-bar";
 import { RequestList } from "@/components/dashboard/request-list";
 import { RequestDetail, RequestDetailEmpty } from "@/components/dashboard/request-detail";
@@ -18,29 +15,36 @@ import { WEBHOOK_BASE_URL } from "@/lib/constants";
 import { copyToClipboard } from "@/lib/clipboard";
 import { exportToJson, exportToCsv, downloadFile } from "@/lib/export";
 import {
+  fetchDashboardEndpoints,
+  fetchDashboardRequests,
+  fetchDashboardSearch,
+  fetchDashboardSearchCount,
+  subscribeDashboardEndpointsChanged,
+  type DashboardEndpoint,
+} from "@/lib/dashboard-api";
+import {
   buildRetainedCountParams,
   computeShowHasMore,
   incrementRetainedCount,
 } from "@/lib/dashboard-count";
-import type { ClickHouseRequest, ClickHouseSummary, AnyRequestSummary } from "@/types/request";
+import type { ClickHouseRequest, ClickHouseSummary, AnyRequestSummary, Request } from "@/types/request";
 
 const CLICKHOUSE_PAGE_SIZE = 50;
 
 export default function DashboardPage() {
-  const endpoints = useQuery(api.endpoints.list);
+  const { session, isLoading: authLoading } = useAuth();
+  const accessToken = session?.access_token ?? null;
+  const [endpoints, setEndpoints] = useState<DashboardEndpoint[] | undefined>(undefined);
+  const [recentRequests, setRecentRequests] = useState<Request[]>([]);
   const searchParams = useSearchParams();
   const endpointSlug = searchParams.get("endpoint");
 
   const currentEndpoint = endpoints?.find((ep) => ep.slug === endpointSlug) ?? endpoints?.[0];
 
-  // Lightweight summaries for the sidebar (no body/headers/ip)
-  const summaries = useQuery(
-    api.requests.listSummaries,
-    currentEndpoint ? { endpointId: currentEndpoint._id, limit: 50 } : "skip"
-  );
-
-  // Selected item ID — can be a Convex _id (string) or a ClickHouse synthetic id
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [selectedClickHouseDetail, setSelectedClickHouseDetail] = useState<ClickHouseRequest | null>(
+    null
+  );
   const [liveMode, setLiveMode] = useState(true);
   const [sortNewest, setSortNewest] = useState(true);
   const [mobileDetail, setMobileDetail] = useState(false);
@@ -61,10 +65,8 @@ export default function DashboardPage() {
   const [searchError, setSearchError] = useState(false);
   const retainedCountRequestSeq = useRef(0);
 
-  // Map of ClickHouse request details by id for quick lookup
   const clickHouseDetailMap = useRef(new Map<string, ClickHouseRequest>());
 
-  // Debounce search
   const searchDebounceRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   useEffect(() => {
     if (searchInput === "") {
@@ -75,104 +77,99 @@ export default function DashboardPage() {
     return () => clearTimeout(searchDebounceRef.current);
   }, [searchInput]);
 
-  // Detail for selected request — prefer ClickHouse, Convex as fallback
-  const isConvexId = selectedId != null && !selectedId.includes(":");
-  const [selectedDetail, setSelectedDetail] = useState<ClickHouseRequest | null>(null);
+  const loadEndpoints = useCallback(async () => {
+    if (!accessToken) return;
 
-  // Convex fallback for very new requests not yet flushed to ClickHouse
-  const selectedRequest = useQuery(
-    api.requests.get,
-    isConvexId && !selectedDetail ? { id: selectedId as Id<"requests"> } : "skip"
+    try {
+      const nextEndpoints = await fetchDashboardEndpoints(accessToken);
+      setEndpoints(nextEndpoints);
+    } catch (error) {
+      console.error("Failed to load dashboard endpoints:", error);
+      setEndpoints([]);
+    }
+  }, [accessToken]);
+
+  useEffect(() => {
+    if (!accessToken) {
+      return;
+    }
+
+    void loadEndpoints();
+    const unsubscribe = subscribeDashboardEndpointsChanged(() => {
+      void loadEndpoints();
+    });
+
+    return unsubscribe;
+  }, [accessToken, loadEndpoints]);
+
+  useEffect(() => {
+    if (!accessToken || !currentEndpoint) {
+      setRecentRequests([]);
+      return;
+    }
+
+    let cancelled = false;
+
+    const load = async () => {
+      try {
+        const nextRequests = await fetchDashboardRequests(accessToken, currentEndpoint.slug, 50);
+        if (!cancelled) {
+          setRecentRequests(nextRequests);
+        }
+      } catch (error) {
+        console.error("Failed to load dashboard requests:", error);
+        if (!cancelled) {
+          setRecentRequests([]);
+        }
+      }
+    };
+
+    void load();
+    const interval = window.setInterval(() => {
+      void load();
+    }, 2500);
+
+    return () => {
+      cancelled = true;
+      window.clearInterval(interval);
+    };
+  }, [accessToken, currentEndpoint?.slug]);
+
+  const selectedRecentRequest = useMemo(
+    () => recentRequests.find((request) => request._id === selectedId),
+    [recentRequests, selectedId]
   );
 
-  // Clear stale selectedId when request doesn't exist in either source
-  useEffect(() => {
-    if (selectedRequest === null && !selectedDetail && selectedId && isConvexId) {
-      setSelectedId(null);
-    }
-  }, [selectedRequest, selectedDetail, selectedId, isConvexId]);
+  const displayRequest = selectedRecentRequest ?? selectedClickHouseDetail ?? undefined;
 
-  // Build the displayable request for the detail panel
-  const displayRequest = useMemo((): DisplayableRequest | undefined => {
-    if (!selectedId) return undefined;
-    // Prefer ClickHouse detail (snappier)
-    if (selectedDetail) return selectedDetail;
-    // Convex fallback for very new requests
-    if (isConvexId) return selectedRequest ?? undefined;
-    return undefined;
-  }, [selectedId, selectedDetail, isConvexId, selectedRequest]);
-
-  // Auth token for calling the search API route
-  const authToken = useAuthToken();
-
-  // ClickHouse search helper — calls Next.js API route (which proxies to receiver)
-  // Returns { data, ok } to distinguish errors from empty results.
   const fetchFromClickHouse = useCallback(
     async (params: Record<string, string>): Promise<{ data: ClickHouseRequest[]; ok: boolean }> => {
-      if (!authToken) return { data: [], ok: false };
+      if (!accessToken) return { data: [], ok: false };
       try {
-        const url = new URL("/api/search/requests", window.location.origin);
-        for (const [key, value] of Object.entries(params)) {
-          url.searchParams.set(key, value);
-        }
-        const resp = await fetch(url.toString(), {
-          headers: { Authorization: `Bearer ${authToken}` },
-        });
-        if (!resp.ok) return { data: [], ok: false };
-        const results: unknown = await resp.json();
-        if (!Array.isArray(results)) return { data: [], ok: false };
-        // Minimal shape validation: first element must have expected fields
-        if (results.length > 0) {
-          const first = results[0] as Record<string, unknown>;
-          if (
-            typeof first.id !== "string" ||
-            typeof first.method !== "string" ||
-            typeof first.receivedAt !== "number"
-          ) {
-            console.error("ClickHouse response shape mismatch:", first);
-            return { data: [], ok: false };
-          }
-        }
-        return { data: results as ClickHouseRequest[], ok: true };
+        const results = await fetchDashboardSearch(accessToken, params);
+        return { data: results, ok: true };
       } catch (err) {
         console.error("ClickHouse search failed:", err);
         return { data: [], ok: false };
       }
     },
-    [authToken]
+    [accessToken]
   );
 
   const fetchCountFromClickHouse = useCallback(
     async (params: Record<string, string>): Promise<{ count: number | null; ok: boolean }> => {
-      if (!authToken) return { count: null, ok: false };
+      if (!accessToken) return { count: null, ok: false };
       try {
-        const url = new URL("/api/search/requests/count", window.location.origin);
-        for (const [key, value] of Object.entries(params)) {
-          url.searchParams.set(key, value);
-        }
-        const resp = await fetch(url.toString(), {
-          headers: { Authorization: `Bearer ${authToken}` },
-        });
-        if (!resp.ok) return { count: null, ok: false };
-        const data: unknown = await resp.json();
-        if (
-          typeof data !== "object" ||
-          data === null ||
-          !("count" in data) ||
-          typeof (data as { count: unknown }).count !== "number"
-        ) {
-          return { count: null, ok: false };
-        }
-        return { count: (data as { count: number }).count, ok: true };
+        const count = await fetchDashboardSearchCount(accessToken, params);
+        return { count, ok: true };
       } catch (err) {
         console.error("ClickHouse count failed:", err);
         return { count: null, ok: false };
       }
     },
-    [authToken]
+    [accessToken]
   );
 
-  // Store ClickHouse results in the detail map (capped at 500 entries)
   const storeClickHouseResults = useCallback((results: ClickHouseRequest[]) => {
     const map = clickHouseDetailMap.current;
     for (const r of results) {
@@ -189,130 +186,18 @@ export default function DashboardPage() {
     }
   }, []);
 
-  // Pre-fetch first page from ClickHouse and map Convex IDs to details
-  const prefetchedSlug = useRef<string | null>(null);
-  useEffect(() => {
-    if (!currentEndpoint || !summaries?.length || !authToken) return;
-    // Only pre-fetch once per endpoint
-    if (prefetchedSlug.current === currentEndpoint.slug) return;
-
-    const slugToFetch = currentEndpoint.slug;
-    let cancelled = false;
-
-    fetchFromClickHouse({
-      slug: slugToFetch,
-      limit: "50",
-      order: "desc",
-    }).then(({ data: results }) => {
-      if (cancelled) return;
-      // Mark as prefetched only after success
-      prefetchedSlug.current = slugToFetch;
-      storeClickHouseResults(results);
-      // Map Convex _ids to ClickHouse details by matching receivedAt + method.
-      // Track consumed matches to prevent the same ClickHouse result
-      // being mapped to multiple Convex IDs.
-      const consumed = new Set<string>();
-      for (const summary of summaries) {
-        const match = results.find(
-          (r) =>
-            !consumed.has(r.id) &&
-            r.method === summary.method &&
-            Math.abs(r.receivedAt - summary.receivedAt) < 2
-        );
-        if (match) {
-          consumed.add(match.id);
-          clickHouseDetailMap.current.set(summary._id, match);
-        }
-      }
-    });
-
-    return () => {
-      cancelled = true;
-    };
-  }, [currentEndpoint, summaries, authToken, fetchFromClickHouse, storeClickHouseResults]);
-
-  // Fetch detail from ClickHouse when selection changes
   useEffect(() => {
     if (!selectedId) {
-      setSelectedDetail(null);
+      setSelectedClickHouseDetail(null);
       return;
     }
-
-    // Check cache first (instant)
-    const cached = clickHouseDetailMap.current.get(selectedId);
-    if (cached) {
-      setSelectedDetail(cached);
+    if (selectedRecentRequest) {
+      setSelectedClickHouseDetail(null);
       return;
     }
+    setSelectedClickHouseDetail(clickHouseDetailMap.current.get(selectedId) ?? null);
+  }, [selectedId, selectedRecentRequest]);
 
-    // Not in cache — clear stale detail and fetch from ClickHouse
-    setSelectedDetail(null);
-
-    if (!currentEndpoint) {
-      return;
-    }
-
-    // For Convex IDs, find the receivedAt from summaries to query ClickHouse
-    let receivedAt: number | undefined;
-    if (isConvexId && summaries) {
-      const summary = summaries.find((s) => s._id === selectedId);
-      if (summary) receivedAt = summary.receivedAt;
-    }
-
-    if (isConvexId && receivedAt == null) {
-      // Very new request, no timestamp yet — let Convex fallback handle it
-      setSelectedDetail(null);
-      return;
-    }
-
-    let cancelled = false;
-    const params: Record<string, string> = {
-      slug: currentEndpoint.slug,
-      limit: "10",
-      order: "desc",
-    };
-    if (receivedAt != null) {
-      params.from = String(receivedAt);
-      params.to = String(receivedAt);
-    }
-
-    fetchFromClickHouse(params).then(({ data: results }) => {
-      if (cancelled) return;
-      storeClickHouseResults(results);
-      if (receivedAt != null && results.length > 0) {
-        // Match by closest timestamp + method from summary
-        const summaryMethod = summaries?.find((s) => s._id === selectedId)?.method;
-        const candidates = summaryMethod
-          ? results.filter((r) => r.method === summaryMethod)
-          : results;
-        const pool = candidates.length > 0 ? candidates : results;
-        const match = pool.reduce((best, r) =>
-          Math.abs(r.receivedAt - receivedAt!) < Math.abs(best.receivedAt - receivedAt!) ? r : best
-        );
-        clickHouseDetailMap.current.set(selectedId, match);
-        setSelectedDetail(match);
-      } else if (results.length > 0) {
-        // ClickHouse ID — should already be in results
-        const match = results.find((r) => r.id === selectedId);
-        if (match) setSelectedDetail(match);
-      } else {
-        setSelectedDetail(null);
-      }
-    });
-
-    return () => {
-      cancelled = true;
-    };
-  }, [
-    selectedId,
-    isConvexId,
-    currentEndpoint,
-    summaries,
-    fetchFromClickHouse,
-    storeClickHouseResults,
-  ]);
-
-  // Clear paginated results when filter changes (avoid stale items from previous filter)
   const prevMethodFilter = useRef(methodFilter);
   useEffect(() => {
     if (prevMethodFilter.current !== methodFilter) {
@@ -323,21 +208,15 @@ export default function DashboardPage() {
     }
   }, [methodFilter]);
 
-  // Handle Load More
   const handleLoadMore = useCallback(async () => {
     if (!currentEndpoint || loadingMore) return;
     setLoadingMore(true);
 
-    // Get the oldest timestamp from current items for cursor-based pagination
     const currentOldest = olderRequests.length > 0 ? olderRequests[olderRequests.length - 1] : null;
-    const oldestFromSummaries =
-      summaries && summaries.length > 0 ? summaries[summaries.length - 1] : null;
+    const oldestRecentRequest =
+      recentRequests.length > 0 ? recentRequests[recentRequests.length - 1] : null;
 
-    const toTimestamp = currentOldest
-      ? currentOldest.receivedAt
-      : oldestFromSummaries
-        ? oldestFromSummaries.receivedAt
-        : undefined;
+    const toTimestamp = currentOldest?.receivedAt ?? oldestRecentRequest?.receivedAt;
 
     const params: Record<string, string> = {
       slug: currentEndpoint.slug,
@@ -362,13 +241,12 @@ export default function DashboardPage() {
     currentEndpoint,
     loadingMore,
     olderRequests,
-    summaries,
+    recentRequests,
     methodFilter,
     fetchFromClickHouse,
     storeClickHouseResults,
   ]);
 
-  // Handle search via ClickHouse
   useEffect(() => {
     if (!debouncedSearch || !currentEndpoint) {
       setSearchResults([]);
@@ -423,19 +301,17 @@ export default function DashboardPage() {
     }
   }, [currentSlug, methodFilter, debouncedSearch, fetchCountFromClickHouse]);
 
-  // ClickHouse-backed retained count (event-driven, no background polling).
   useEffect(() => {
-    if (!currentSlug || !authToken) {
+    if (!currentSlug || !accessToken) {
       retainedCountRequestSeq.current++;
       setRetainedTotalCount(null);
       return;
     }
     void refreshRetainedCount();
-  }, [currentSlug, authToken, methodFilter, debouncedSearch, refreshRetainedCount]);
+  }, [currentSlug, accessToken, methodFilter, debouncedSearch, refreshRetainedCount]);
 
-  // Re-sync count when the tab becomes active again.
   useEffect(() => {
-    if (!currentSlug || !authToken) return;
+    if (!currentSlug || !accessToken) return;
 
     const onFocus = () => {
       void refreshRetainedCount();
@@ -452,11 +328,9 @@ export default function DashboardPage() {
       window.removeEventListener("focus", onFocus);
       document.removeEventListener("visibilitychange", onVisibilityChange);
     };
-  }, [currentSlug, authToken, refreshRetainedCount]);
+  }, [currentSlug, accessToken, refreshRetainedCount]);
 
-  // Compose the list to display
   const displayedItems = useMemo((): AnyRequestSummary[] => {
-    // Search mode: show ClickHouse search results as summaries
     if (debouncedSearch) {
       return searchResults.map(
         (r): ClickHouseSummary => ({
@@ -467,41 +341,39 @@ export default function DashboardPage() {
       );
     }
 
-    // Normal mode: Convex summaries + older ClickHouse items
-    const convexSummaries: AnyRequestSummary[] = summaries
-      ? methodFilter === "ALL"
-        ? summaries
-        : summaries.filter((r) => r.method === methodFilter)
-      : [];
+    const recentSummaries: AnyRequestSummary[] = recentRequests
+      .filter((request) => methodFilter === "ALL" || request.method === methodFilter)
+      .map((request) => ({
+        _id: request._id,
+        _creationTime: request._creationTime,
+        method: request.method,
+        receivedAt: request.receivedAt,
+      }));
 
-    // Deduplicate: exclude ClickHouse items whose receivedAt overlaps with Convex window.
-    // Use unfiltered summaries for the boundary so a method filter that excludes all
-    // Convex items doesn't collapse oldestConvex to -Infinity and drop everything.
-    const oldestConvex =
-      summaries && summaries.length > 0 ? summaries[summaries.length - 1].receivedAt : -Infinity;
+    const oldestRecent =
+      recentRequests.length > 0 ? recentRequests[recentRequests.length - 1].receivedAt : -Infinity;
     const olderSummaries: ClickHouseSummary[] = olderRequests
-      .filter((r) => r.receivedAt < oldestConvex)
+      .filter((r) => r.receivedAt < oldestRecent)
       .map((r) => ({
         id: r.id,
         method: r.method,
         receivedAt: r.receivedAt,
       }));
 
-    return [...convexSummaries, ...olderSummaries];
-  }, [summaries, olderRequests, searchResults, debouncedSearch, methodFilter]);
+    return [...recentSummaries, ...olderSummaries];
+  }, [recentRequests, olderRequests, searchResults, debouncedSearch, methodFilter]);
 
-  // Track incoming requests for live mode
   useEffect(() => {
-    if (!summaries || summaries.length === 0) {
+    if (recentRequests.length === 0) {
       prevTopSummaryId.current = null;
       return;
     }
 
-    const topId = summaries[0]._id;
+    const topId = recentRequests[0]._id;
     const previousTopId = prevTopSummaryId.current;
 
     if (previousTopId && topId !== previousTopId) {
-      const previousIdx = summaries.findIndex((s) => s._id === previousTopId);
+      const previousIdx = recentRequests.findIndex((request) => request._id === previousTopId);
       const arrived = previousIdx >= 0 ? previousIdx : 1;
 
       if (arrived > 0) {
@@ -513,7 +385,7 @@ export default function DashboardPage() {
 
         // Keep ClickHouse count feeling "live" between polling ticks.
         if (!debouncedSearch) {
-          const newRows = summaries.slice(0, arrived);
+          const newRows = recentRequests.slice(0, arrived);
           const matchedCount =
             methodFilter === "ALL"
               ? arrived
@@ -532,20 +404,18 @@ export default function DashboardPage() {
     }
 
     prevTopSummaryId.current = topId;
-  }, [summaries, liveMode, methodFilter, debouncedSearch, refreshRetainedCount]);
+  }, [recentRequests, liveMode, methodFilter, debouncedSearch, refreshRetainedCount]);
 
-  // Auto-select first request when requests load and nothing is selected
   useEffect(() => {
-    if (summaries && summaries.length > 0 && !selectedId) {
-      setSelectedId(summaries[0]._id);
+    if (recentRequests.length > 0 && !selectedId) {
+      setSelectedId(recentRequests[0]._id);
     }
-  }, [summaries, selectedId]);
+  }, [recentRequests, selectedId]);
 
-  // Reset state when endpoint changes
-  const currentEndpointId = currentEndpoint?._id;
+  const currentEndpointId = currentEndpoint?.id;
   useEffect(() => {
     setSelectedId(null);
-    setSelectedDetail(null);
+    setSelectedClickHouseDetail(null);
     setNewCount(0);
     prevTopSummaryId.current = null;
     setMethodFilter("ALL");
@@ -560,7 +430,6 @@ export default function DashboardPage() {
     setSearchLoading(false);
     setSearchError(false);
     clickHouseDetailMap.current.clear();
-    prefetchedSlug.current = null;
   }, [currentEndpointId]);
 
   const handleSelect = useCallback((id: string) => {
@@ -572,13 +441,12 @@ export default function DashboardPage() {
   const handleToggleSort = useCallback(() => setSortNewest((prev) => !prev), []);
 
   const handleJumpToNew = useCallback(() => {
-    if (summaries && summaries.length > 0) {
-      setSelectedId(summaries[0]._id);
+    if (recentRequests.length > 0) {
+      setSelectedId(recentRequests[0]._id);
       setNewCount(0);
     }
-  }, [summaries]);
+  }, [recentRequests]);
 
-  // Export helpers — fetch from ClickHouse for full data
   const handleExportJson = useCallback(async () => {
     if (!currentEndpoint) return;
     const params: Record<string, string> = {
@@ -621,7 +489,7 @@ export default function DashboardPage() {
     }
   }, [currentEndpoint, methodFilter, debouncedSearch, fetchFromClickHouse]);
 
-  if (endpoints === undefined) {
+  if (authLoading || endpoints === undefined) {
     return <DashboardSkeleton />;
   }
 
@@ -631,9 +499,9 @@ export default function DashboardPage() {
 
   if (!currentEndpoint) return null;
 
-  const hasRequests = summaries && summaries.length > 0;
+  const hasRequests = recentRequests.length > 0;
   const loadedCount = displayedItems.length;
-  const initialCanLoadMore = (summaries?.length ?? 0) >= CLICKHOUSE_PAGE_SIZE;
+  const initialCanLoadMore = recentRequests.length >= CLICKHOUSE_PAGE_SIZE;
   const showHasMore = computeShowHasMore({
     searchQuery: debouncedSearch,
     hasMoreFromPagination: hasMore,
@@ -644,10 +512,10 @@ export default function DashboardPage() {
   });
 
   return (
-    <ErrorBoundary resetKey={currentEndpoint._id}>
+    <ErrorBoundary resetKey={currentEndpoint.id}>
       {/* URL Bar */}
       <UrlBar
-        endpointId={currentEndpoint._id}
+        endpointId={currentEndpoint.id}
         endpointName={currentEndpoint.name || currentEndpoint.slug}
         slug={currentEndpoint.slug}
         mockResponse={currentEndpoint.mockResponse}
