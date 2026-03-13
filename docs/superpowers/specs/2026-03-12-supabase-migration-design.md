@@ -4,13 +4,14 @@ Migrate webhooks.cc from Convex (cloud) to self-hosted Supabase (Postgres) for l
 
 ## Decisions
 
-- **Clean swap**: build everything against Supabase dev, test fully, then cut over prod in one go
+- **Staged dev cutover**: migrate one vertical slice at a time in dev, verify it, then move to the next slice. Production still gets a final cutover only after the Supabase path is complete.
 - **No Redis**: receiver writes directly to Postgres (Strategy A, no batching)
 - **No ClickHouse**: Postgres handles search and request listing; remove all ClickHouse code
 - **No partitioning**: single `requests` table, cleanup via scheduled DELETE
 - **Outside-in migration order**: auth first, receiver last
 - **RLS on all tables**: defense-in-depth, receiver uses service role to bypass
 - **Comprehensive testing**: unit, integration, and Playwright e2e tests per phase
+- **No new Redis work during migration**: Redis is legacy infrastructure until the receiver rewrite lands. Do not add new Redis-based features or transitional systems.
 - **No dedup**: the 2-second Redis dedup for Cloudflare edge retries is intentionally dropped — Postgres UNIQUE constraints or application-level idempotency can be added later if duplicate delivery becomes a problem in practice
 - **No FK on `requests.endpoint_id`**: intentional — avoids FK lookup overhead on every INSERT in the hot path. Orphaned requests from deleted endpoints are cleaned up by the retention cron.
 - **Fresh start for prod data**: existing Convex users re-register. API keys invalidated. Blog posts migrated via a one-time script. This is acceptable given the current low user count.
@@ -47,6 +48,20 @@ Key design choices:
 - Playwright e2e tests run against local Next.js dev server connected to the same Supabase instance
 - Receiver integration tests run against the same Supabase Postgres
 - CI: tests run against the same dev Supabase (not Docker-based); prod uses a separate clean instance
+
+## Execution Strategy (revised 2026-03-13)
+
+The migration will proceed in narrow vertical slices instead of a single broad pass.
+
+1. **Close out Phase 1** — Treat auth as functionally complete in dev once the auth tests pass and the remaining work is documentation and cleanup, not new auth behavior.
+2. **Start with the control plane** — Migrate API key validation, device auth, endpoint CRUD, and usage APIs before touching request search, dashboard realtime, or the receiver.
+3. **Keep the next slice small** — The first post-auth phase must not include request search, billing, receiver ingestion, or general Convex cleanup. Those are separate phases.
+4. **Preserve the end state** — The final architecture remains Supabase/Postgres without Redis or ClickHouse, but those removals happen when the receiver and request path are migrated, not before.
+5. **Use contract checks** — For API routes used by the CLI, SDK, and MCP, preserve current request/response shapes while swapping the backend implementation.
+
+Companion execution plan for the next slice:
+
+- `docs/superpowers/plans/2026-03-13-phase2-control-plane-migration.md`
 
 ---
 
