@@ -30,6 +30,7 @@ interface RequestListProps {
   loadingMore?: boolean;
   searchLoading?: boolean;
   searchError?: boolean;
+  onPrefetch?: (id: string) => void;
 }
 
 const METHODS = ["ALL", "GET", "POST", "PUT", "PATCH", "DELETE"] as const;
@@ -54,6 +55,7 @@ export function RequestList({
   loadingMore,
   searchLoading,
   searchError,
+  onPrefetch,
 }: RequestListProps) {
   const sorted = sortNewest ? requests : [...requests].reverse();
   const displayCount = totalCount ?? requests.length;
@@ -158,6 +160,7 @@ export function RequestList({
                 <button
                   key={id}
                   onClick={() => onSelect(id)}
+                  onMouseEnter={() => onPrefetch?.(id)}
                   className={cn(
                     "w-full flex items-center gap-3 px-3 py-2.5 text-left cursor-pointer transition-colors border-b border-foreground/10",
                     selectedId === id

@@ -1,12 +1,20 @@
 "use client";
 
 import { useState } from "react";
+import dynamic from "next/dynamic";
 import { Copy, Check } from "lucide-react";
 import { Id } from "@convex/_generated/dataModel";
-import { EndpointSettingsDialog } from "./endpoint-settings-dialog";
-import { SendWebhookDialog } from "./send-webhook-dialog";
 import { copyToClipboard } from "@/lib/clipboard";
 import { WEBHOOK_BASE_URL } from "@/lib/constants";
+
+const EndpointSettingsDialog = dynamic(() =>
+  import("./endpoint-settings-dialog").then((m) => ({ default: m.EndpointSettingsDialog })),
+  { ssr: false }
+);
+const SendWebhookDialog = dynamic(() =>
+  import("./send-webhook-dialog").then((m) => ({ default: m.SendWebhookDialog })),
+  { ssr: false }
+);
 
 interface UrlBarProps {
   endpointId: Id<"endpoints">;

@@ -1,80 +1,81 @@
-import posthog from "posthog-js";
-
 /**
  * Track custom analytics events via PostHog.
- * All calls are safe to make even if PostHog is not initialized — they no-op.
+ * Uses dynamic import so posthog-js is only loaded when an event fires,
+ * not eagerly bundled into every page that imports analytics helpers.
  */
 
-function capture(event: string, properties?: Record<string, unknown>) {
-  if (typeof window === "undefined") return;
+let cached: typeof import("posthog-js").default | null = null;
+
+async function getPostHog() {
+  if (typeof window === "undefined") return null;
+  if (cached) return cached;
   try {
-    posthog.capture(event, properties);
+    const { default: posthog } = await import("posthog-js");
+    cached = posthog;
+    return posthog;
   } catch {
-    // PostHog not initialized — silently ignore
+    return null;
   }
+}
+
+async function capture(event: string, properties?: Record<string, unknown>) {
+  const posthog = await getPostHog();
+  posthog?.capture(event, properties);
 }
 
 // ── Landing page ────────────────────────────────────────────────
 export function trackCTAClick(cta: "register" | "try_live" | "docs" | "faq") {
-  capture("landing_cta_clicked", { cta });
+  void capture("landing_cta_clicked", { cta });
 }
 
 // ── Auth ────────────────────────────────────────────────────────
 export function trackSignInStarted(provider: "github" | "google") {
-  capture("sign_in_started", { provider });
+  void capture("sign_in_started", { provider });
 }
 
 // ── Dashboard ───────────────────────────────────────────────────
 export function trackEndpointCreated() {
-  capture("endpoint_created");
+  void capture("endpoint_created");
 }
 
 // ── Billing / Upgrade ───────────────────────────────────────────
 export function trackUpgradeClicked() {
-  capture("upgrade_clicked");
+  void capture("upgrade_clicked");
 }
 
 export function trackUpgradeCompleted() {
-  capture("upgrade_completed");
+  void capture("upgrade_completed");
 }
 
 export function trackSubscriptionCancelled() {
-  capture("subscription_cancelled");
+  void capture("subscription_cancelled");
 }
 
 export function trackSubscriptionReactivated() {
-  capture("subscription_reactivated");
+  void capture("subscription_reactivated");
 }
 
 // ── Quota ───────────────────────────────────────────────────────
 export function trackQuotaWarningShown(plan: string, usagePercent: number) {
-  capture("quota_warning_shown", { plan, usage_percent: Math.round(usagePercent) });
+  void capture("quota_warning_shown", { plan, usage_percent: Math.round(usagePercent) });
 }
 
 // ── Account ─────────────────────────────────────────────────────
 export function trackApiKeyCreated() {
-  capture("api_key_created");
+  void capture("api_key_created");
 }
 
 export function trackAccountDeleted() {
-  capture("account_deleted");
+  void capture("account_deleted");
 }
 
 // ── Identify (after login) ──────────────────────────────────────
-export function identifyUser(userId: string, properties?: Record<string, unknown>) {
-  if (typeof window === "undefined") return;
-  try {
-    posthog.identify(userId, properties);
-  } catch {
-    // PostHog not initialized
-  }
+export async function identifyUser(userId: string, properties?: Record<string, unknown>) {
+  const posthog = await getPostHog();
+  posthog?.identify(userId, properties);
 }
 
-export function resetUser() {
-  if (typeof window === "undefined") return;
-  try {
-    posthog.reset();
-  } catch {
-    // PostHog not initialized
-  }
+export async function resetUser() {
+  const posthog = await getPostHog();
+  posthog?.reset();
 }

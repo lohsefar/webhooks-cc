@@ -2,14 +2,19 @@
 
 import { useState, useRef, useEffect } from "react";
 import { cn } from "@/lib/utils";
+import dynamic from "next/dynamic";
 import { Copy, Check } from "lucide-react";
-import { ReplayDialog } from "./replay-dialog";
 import { copyToClipboard } from "@/lib/clipboard";
 import { formatBytes } from "@/types/request";
 import type { Request, ClickHouseRequest } from "@/types/request";
 import { WEBHOOK_BASE_URL, SKIP_HEADERS_FOR_CURL } from "@/lib/constants";
 import { detectFormat, formatBody, getFormatLabel } from "@/lib/format";
 import { getHighlightLanguage, highlightBody } from "@/lib/highlight";
+
+const ReplayDialog = dynamic(() =>
+  import("./replay-dialog").then((m) => ({ default: m.ReplayDialog })),
+  { ssr: false }
+);
 
 /** Any request shape that has the fields needed for display. */
 export type DisplayableRequest = Request | ClickHouseRequest;

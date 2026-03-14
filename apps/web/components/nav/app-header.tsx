@@ -4,10 +4,15 @@ import Link from "next/link";
 import { useAuthActions } from "@convex-dev/auth/react";
 import { Button } from "@/components/ui/button";
 import { ThemeToggle } from "@/components/ui/theme-toggle";
+import dynamic from "next/dynamic";
 import { EndpointSwitcher } from "@/components/dashboard/endpoint-switcher";
-import { NewEndpointDialog } from "@/components/dashboard/new-endpoint-dialog";
 import { ArrowLeft } from "lucide-react";
 import { resetUser } from "@/lib/analytics";
+
+const NewEndpointDialog = dynamic(() =>
+  import("@/components/dashboard/new-endpoint-dialog").then((m) => ({ default: m.NewEndpointDialog })),
+  { ssr: false }
+);
 
 interface AppHeaderProps {
   showEndpointSwitcher?: boolean;
