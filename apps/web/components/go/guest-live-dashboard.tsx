@@ -15,13 +15,11 @@ import {
   createGuestDashboardEndpoint,
   fetchGuestDashboardEndpoint,
   fetchGuestDashboardRequests,
+  normalizeGuestEndpoint,
   type GuestEndpointRecord,
 } from "@/lib/go-dashboard";
 import { parseStoredDemoEndpoint } from "@/lib/go-demo-storage";
-import {
-  subscribeToEndpointRequestInserts,
-  subscribeToEndpointRow,
-} from "@/lib/supabase/realtime";
+import { subscribeToEndpointRow } from "@/lib/supabase/realtime";
 import type { Request, RequestSummary } from "@/types/request";
 import { ArrowRight, Bot, Check, Circle, Copy, Eye, Plus, Send, Terminal } from "lucide-react";
 
@@ -153,6 +151,7 @@ function GuestLiveDashboardInner() {
   const [timeRemaining, setTimeRemaining] = useState<string | null>(null);
   const [isCreating, setIsCreating] = useState(false);
   const [createError, setCreateError] = useState<string | null>(null);
+  const [endpointLoadError, setEndpointLoadError] = useState<string | null>(null);
   const [storageReady, setStorageReady] = useState(false);
 
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -192,6 +191,7 @@ function GuestLiveDashboardInner() {
     setSearchInput("");
     setDebouncedSearch("");
     setCreateError(nextError);
+    setEndpointLoadError(null);
     prevRequestCount.current = 0;
     if (typeof window !== "undefined") {
       localStorage.removeItem(DEMO_ENDPOINT_STORAGE_KEY);
@@ -202,6 +202,7 @@ function GuestLiveDashboardInner() {
     try {
       const nextEndpoint = await fetchGuestDashboardEndpoint(slug);
       setEndpoint(nextEndpoint);
+      setEndpointLoadError(null);
 
       if (typeof window !== "undefined" && nextEndpoint?.expiresAt) {
         setExpiresAt(nextEndpoint.expiresAt);
@@ -212,7 +213,7 @@ function GuestLiveDashboardInner() {
       }
     } catch (error) {
       console.error("Failed to load guest endpoint:", error);
-      setEndpoint(null);
+      setEndpointLoadError("Could not refresh your test endpoint. Please try again.");
     }
   }, []);
 
@@ -299,23 +300,31 @@ function GuestLiveDashboardInner() {
       return;
     }
 
-    const unsubscribeRequests = subscribeToEndpointRequestInserts(endpoint.id, () => {
-      void refreshRequests(endpoint.id);
-    });
     const unsubscribeEndpoint = subscribeToEndpointRow(endpoint.id, (row) => {
       if (!row) {
         clearDemoEndpoint("Your test endpoint expired. Create a new one.");
         return;
       }
 
-      void refreshEndpoint(endpointSlug);
+      const nextEndpoint = normalizeGuestEndpoint(row);
+      setEndpoint(nextEndpoint);
+      setEndpointLoadError(null);
+
+      if (typeof window !== "undefined" && nextEndpoint.expiresAt) {
+        setExpiresAt(nextEndpoint.expiresAt);
+        localStorage.setItem(
+          DEMO_ENDPOINT_STORAGE_KEY,
+          JSON.stringify({ slug: nextEndpoint.slug, expiresAt: nextEndpoint.expiresAt })
+        );
+      }
+
+      void refreshRequests(row.id);
     });
 
     return () => {
-      unsubscribeRequests();
       unsubscribeEndpoint();
     };
-  }, [clearDemoEndpoint, endpoint?.id, endpointSlug, refreshEndpoint, refreshRequests]);
+  }, [clearDemoEndpoint, endpoint?.id, endpointSlug, refreshRequests]);
 
   useEffect(() => {
     if (!endpoint?.id || !endpointSlug) return;
@@ -423,6 +432,7 @@ function GuestLiveDashboardInner() {
   const handleCreateEndpoint = async () => {
     setIsCreating(true);
     setCreateError(null);
+    setEndpointLoadError(null);
 
     try {
       const result = await createGuestDashboardEndpoint();
@@ -503,7 +513,27 @@ function GuestLiveDashboardInner() {
       <div className="h-screen flex flex-col overflow-hidden">
         <GoHeader isAuthenticated={isAuthenticated} isLoading={isLoading} />
         <div className="flex-1 flex items-center justify-center p-8">
-          <p className="text-muted-foreground animate-pulse">Loading test endpoint...</p>
+          {endpointLoadError ? (
+            <div className="neo-card neo-card-static max-w-md w-full text-center space-y-4">
+              <div className="space-y-2">
+                <h2 className="text-xl font-bold">Couldn&apos;t load your test endpoint</h2>
+                <p className="text-sm text-muted-foreground">{endpointLoadError}</p>
+              </div>
+              <div className="flex items-center justify-center gap-3">
+                <button
+                  onClick={() => endpointSlug && void refreshEndpoint(endpointSlug)}
+                  className="neo-btn-primary"
+                >
+                  Retry
+                </button>
+                <button onClick={() => clearDemoEndpoint()} className="neo-btn-outline">
+                  Start over
+                </button>
+              </div>
+            </div>
+          ) : (
+            <p className="text-muted-foreground animate-pulse">Loading test endpoint...</p>
+          )}
         </div>
       </div>
     );

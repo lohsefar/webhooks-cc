@@ -31,7 +31,9 @@ function asStringRecord(value: Json): Record<string, string> {
   ) as Record<string, string>;
 }
 
-function normalizeGuestEndpoint(row: Pick<EndpointRow, "id" | "slug" | "is_ephemeral" | "expires_at" | "request_count">): GuestEndpointRecord {
+export function normalizeGuestEndpoint(
+  row: Pick<EndpointRow, "id" | "slug" | "is_ephemeral" | "expires_at" | "request_count">
+): GuestEndpointRecord {
   return {
     id: row.id,
     slug: row.slug,
