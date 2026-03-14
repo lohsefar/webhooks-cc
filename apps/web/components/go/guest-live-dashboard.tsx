@@ -202,10 +202,18 @@ function GuestLiveDashboardInner() {
   const refreshEndpoint = useCallback(async (slug: string) => {
     try {
       const nextEndpoint = await fetchGuestDashboardEndpoint(slug);
+      if (!nextEndpoint) {
+        setEndpoint(null);
+        setEndpointLoadError(
+          "Could not restore your test endpoint yet. It may still be syncing, so try again."
+        );
+        return;
+      }
+
       setEndpoint(nextEndpoint);
       setEndpointLoadError(null);
 
-      if (typeof window !== "undefined" && nextEndpoint?.expiresAt) {
+      if (typeof window !== "undefined" && nextEndpoint.expiresAt) {
         setExpiresAt(nextEndpoint.expiresAt);
         localStorage.setItem(
           DEMO_ENDPOINT_STORAGE_KEY,
@@ -289,12 +297,6 @@ function GuestLiveDashboardInner() {
     const interval = setInterval(updateTimer, 1000);
     return () => clearInterval(interval);
   }, [clearDemoEndpoint, expiresAt]);
-
-  useEffect(() => {
-    if (!endpointSlug || endpoint !== null) return;
-
-    clearDemoEndpoint("Your test endpoint expired. Create a new one.");
-  }, [clearDemoEndpoint, endpoint, endpointSlug]);
 
   useEffect(() => {
     if (!endpoint?.id || !endpointSlug) {
@@ -566,7 +568,27 @@ function GuestLiveDashboardInner() {
       <div className="h-screen flex flex-col overflow-hidden">
         <GoHeader isAuthenticated={isAuthenticated} isLoading={isLoading} />
         <div className="flex-1 flex items-center justify-center p-8">
-          <p className="text-muted-foreground animate-pulse">Loading test endpoint...</p>
+          {endpointLoadError ? (
+            <div className="neo-card neo-card-static max-w-md w-full text-center space-y-4">
+              <div className="space-y-2">
+                <h2 className="text-xl font-bold">Couldn&apos;t restore your test endpoint</h2>
+                <p className="text-sm text-muted-foreground">{endpointLoadError}</p>
+              </div>
+              <div className="flex items-center justify-center gap-3">
+                <button
+                  onClick={() => endpointSlug && void refreshEndpoint(endpointSlug)}
+                  className="neo-btn-primary"
+                >
+                  Retry
+                </button>
+                <button onClick={() => clearDemoEndpoint()} className="neo-btn-outline">
+                  Start over
+                </button>
+              </div>
+            </div>
+          ) : (
+            <p className="text-muted-foreground animate-pulse">Loading test endpoint...</p>
+          )}
         </div>
       </div>
     );
