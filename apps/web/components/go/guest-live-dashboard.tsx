@@ -17,6 +17,7 @@ import {
   fetchGuestDashboardRequests,
   type GuestEndpointRecord,
 } from "@/lib/go-dashboard";
+import { parseStoredDemoEndpoint } from "@/lib/go-demo-storage";
 import {
   subscribeToEndpointRequestInserts,
   subscribeToEndpointRow,
@@ -26,7 +27,7 @@ import { ArrowRight, Bot, Check, Circle, Copy, Eye, Plus, Send, Terminal } from 
 
 const REQUEST_LIMIT = 25;
 // Local fallback so refreshes immediately after create still restore the slug.
-// This is overwritten with the authoritative `endpoint.expiresAt` once Convex returns it.
+// This is overwritten with the authoritative `endpoint.expiresAt` once the endpoint read completes.
 const EXPIRY_MS = 12 * 60 * 60 * 1000;
 const COPY_FEEDBACK_MS = 2000;
 const SEND_FEEDBACK_MS = 3000;
@@ -165,7 +166,7 @@ function GuestLiveDashboardInner() {
 
   const prevRequestCount = useRef(0);
 
-  // Debounce search to avoid rapid Convex subscription churn
+  // Debounce search to avoid unnecessary filtering work while typing
   const searchDebounceRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   useEffect(() => {
     if (searchInput === "") {
@@ -228,31 +229,22 @@ function GuestLiveDashboardInner() {
   useEffect(() => {
     if (typeof window === "undefined") return;
 
-    const stored = localStorage.getItem(DEMO_ENDPOINT_STORAGE_KEY);
-    if (!stored) return;
-
     try {
-      const parsed = JSON.parse(stored);
-      const slug = parsed?.slug;
-      const storedExpiry = parsed?.expiresAt;
+      const storedValue = localStorage.getItem(DEMO_ENDPOINT_STORAGE_KEY);
+      const storedEndpoint = parseStoredDemoEndpoint(storedValue);
 
-      if (typeof slug !== "string" || typeof storedExpiry !== "number") {
-        localStorage.removeItem(DEMO_ENDPOINT_STORAGE_KEY);
+      if (!storedEndpoint) {
+        if (storedValue) {
+          localStorage.removeItem(DEMO_ENDPOINT_STORAGE_KEY);
+        }
         return;
       }
 
-      if (storedExpiry <= Date.now()) {
-        localStorage.removeItem(DEMO_ENDPOINT_STORAGE_KEY);
-        return;
-      }
-
-      setEndpointSlug(slug);
-      setExpiresAt(storedExpiry);
-    } catch {
-      localStorage.removeItem(DEMO_ENDPOINT_STORAGE_KEY);
+      setEndpointSlug(storedEndpoint.slug);
+      setExpiresAt(storedEndpoint.expiresAt);
+    } finally {
+      setStorageReady(true);
     }
-
-    setStorageReady(true);
   }, []);
 
   useEffect(() => {
@@ -283,6 +275,7 @@ function GuestLiveDashboardInner() {
     const updateTimer = () => {
       const remaining = expiresAt - Date.now();
       if (remaining <= 0) {
+        localStorage.removeItem(DEMO_ENDPOINT_STORAGE_KEY);
         clearDemoEndpoint();
         return;
       }
