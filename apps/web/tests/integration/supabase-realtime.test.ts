@@ -50,6 +50,10 @@ async function waitForSubscribed(channel: RealtimeChannel): Promise<void> {
       }
     });
   });
+
+  // Give the server a brief moment to finish wiring the Postgres change feed
+  // after the channel reports SUBSCRIBED. This avoids a race on fast updates.
+  await new Promise((resolve) => setTimeout(resolve, 100));
 }
 
 describe("Supabase Realtime Integration", () => {

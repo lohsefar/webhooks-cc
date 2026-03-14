@@ -24,6 +24,7 @@ import type { Request, RequestSummary } from "@/types/request";
 import { ArrowRight, Bot, Check, Circle, Copy, Eye, Plus, Send, Terminal } from "lucide-react";
 
 const REQUEST_LIMIT = 25;
+const BACKGROUND_SYNC_INTERVAL_MS = 2000;
 // Local fallback so refreshes immediately after create still restore the slug.
 // This is overwritten with the authoritative `endpoint.expiresAt` once the endpoint read completes.
 const EXPIRY_MS = 12 * 60 * 60 * 1000;
@@ -344,6 +345,27 @@ function GuestLiveDashboardInner() {
     return () => {
       window.removeEventListener("focus", onFocus);
       document.removeEventListener("visibilitychange", onVisibilityChange);
+    };
+  }, [endpoint?.id, endpointSlug, refreshEndpoint, refreshRequests]);
+
+  useEffect(() => {
+    if (!endpoint?.id || !endpointSlug) {
+      return;
+    }
+
+    const interval = window.setInterval(() => {
+      // Browsers can deprioritize guest realtime delivery when the page is blurred.
+      // Keep the guest dashboard fresh with a lightweight fallback sync until focus returns.
+      if (document.visibilityState === "visible" && document.hasFocus()) {
+        return;
+      }
+
+      void refreshEndpoint(endpointSlug);
+      void refreshRequests(endpoint.id);
+    }, BACKGROUND_SYNC_INTERVAL_MS);
+
+    return () => {
+      window.clearInterval(interval);
     };
   }, [endpoint?.id, endpointSlug, refreshEndpoint, refreshRequests]);
 
