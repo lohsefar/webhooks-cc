@@ -72,6 +72,7 @@ Companion execution plan for the next slice:
 - **Phase 2b is complete in dev on the web/API side**. Polar checkout, cancel, resubscribe, webhook handling, and account deletion now run through Supabase-backed web routes/helpers, and the account page billing UI no longer depends on Convex.
 - **Billing period resets now run on Supabase**. A `pg_cron` job calls `process_billing_period_resets()` every minute in dev, replacing the old Convex billing reset cron behavior.
 - **Phase 3 is mostly complete on the web/API path in dev**. The account page now updates live from the `users` row, the main dashboard request list/count updates from Supabase Realtime, and `/api/stream/[slug]` now bridges Supabase Realtime to SSE instead of Convex.
+- **The guest `/go` live dashboard is now on Supabase too**. Guest endpoint creation, anonymous ephemeral reads, live request updates, and the guest endpoint creation rate limit no longer depend on Convex.
 - **Receiver bridge work is in place for dev**. The branch includes Supabase-backed internal receiver control-plane routes plus receiver config support so endpoint creation, request capture, and quota enforcement can be exercised against the Supabase path in development before the full receiver rewrite.
 - **Live dev validation completed**:
   - GitHub OAuth login works end-to-end.
@@ -83,9 +84,9 @@ Companion execution plan for the next slice:
   - Retained request search now runs on Postgres/Supabase in integration tests.
   - Blog admin writes work through `/api/blog`.
 - **Still pending before the migration can close**:
-  - Close the remaining Phase 2a cleanup items (endpoint rate limiting coverage and a few missing verification cases).
+  - Close the remaining Phase 2a cleanup items (primarily RLS/ownership verification and a few missing verification cases).
   - Finish the remaining account/API-key UI migration work.
-  - Finish the remaining realtime verification and guest `/go` live dashboard migration work.
+  - Finish the remaining realtime Playwright verification.
   - Rewrite the receiver hot path and remove Redis/ClickHouse entirely.
 
 ---
@@ -123,12 +124,12 @@ Companion execution plan for the next slice:
 
 **Goal**: all read/write operations for endpoints, requests, users, and blog posts use Supabase.
 
-**Status**: in progress. Endpoint CRUD, usage reads, request list/detail, request search, device auth, the main dashboard request-management path, and the blog read/admin API surface are migrated. Remaining Convex-backed pages and the leftover Phase 2a cleanup items are still pending.
+**Status**: in progress. Endpoint CRUD, usage reads, request list/detail, request search, device auth, the main dashboard request-management path, the guest `/go` flow, and the blog read/admin API surface are migrated. The remaining work is mostly verification and cleanup rather than missing product paths.
 
 **Deliverables**:
 - [ ] Replace `ConvexProvider`/`ConvexAuthProvider` in app layout with Supabase context (if needed)
 - [x] Rewrite endpoint CRUD (list, create, get, update, delete) using Supabase client
-- [ ] Add rate limiting for endpoint creation (Postgres-based or in-memory token bucket) — per-user (10/10min) and anonymous (20/10min)
+- [x] Add rate limiting for endpoint creation (Postgres-based or in-memory token bucket) — per-user (10/10min) and anonymous (20/10min)
 - [x] Rewrite request listing/detail using Supabase client
 - [x] Rewrite request search (replace ClickHouse-backed `/api/search/requests` and `/api/search/requests/count` with Postgres queries)
 - [x] Rewrite user profile/usage queries
@@ -146,11 +147,11 @@ Companion execution plan for the next slice:
 
 **Tests**:
 - [x] Integration: CRUD operations on endpoints (create, list, get, update, delete)
-- [ ] Integration: endpoint creation rate limiting enforced
+- [x] Integration: endpoint creation rate limiting enforced
 - [x] Integration: request listing with pagination, filtering by endpoint
 - [x] Integration: request search returns correct results
 - [ ] Integration: RLS enforced — user A cannot see user B's endpoints/requests
-- [ ] Integration: ephemeral endpoints visible to unauthenticated users
+- [x] Integration: ephemeral endpoints visible to unauthenticated users
 - [x] Integration: API key validation (hash lookup, expiry check)
 - [x] Integration: device auth flow (create code, authorize, poll, claim)
 - [x] Integration: usage API returns correct used/remaining/limit
@@ -197,6 +198,7 @@ Companion execution plan for the next slice:
 - [x] SSE endpoint (`/api/stream/[slug]`) rewired to Supabase Realtime → SSE
 - [x] Request count badge updates in real-time
 - [x] Account plan/usage/subscription status updates in real-time from `users`
+- [x] Guest `/go` live dashboard updates from Supabase without Convex hooks
 
 **Tests**:
 - [x] Integration: insert request via admin client, verify Realtime channel fires INSERT event

@@ -3,6 +3,7 @@ import { createClient } from "./client";
 import type { Database } from "./database";
 
 type UserRow = Database["public"]["Tables"]["users"]["Row"];
+type EndpointRow = Database["public"]["Tables"]["endpoints"]["Row"];
 
 let channelSequence = 0;
 
@@ -55,6 +56,35 @@ export function subscribeToEndpointRequestInserts(endpointId: string, onInsert: 
         filter: `endpoint_id=eq.${endpointId}`,
       },
       () => onInsert()
+    )
+    .subscribe();
+
+  return () => removeChannel(channel);
+}
+
+export function subscribeToEndpointRow(
+  endpointId: string,
+  onChange: (row: EndpointRow | null) => void
+) {
+  const supabase = createClient();
+  const channel = supabase
+    .channel(nextChannelName(`endpoint:${endpointId}`))
+    .on(
+      "postgres_changes",
+      {
+        event: "*",
+        schema: "public",
+        table: "endpoints",
+        filter: `id=eq.${endpointId}`,
+      },
+      (payload) => {
+        if (payload.eventType === "DELETE") {
+          onChange(null);
+          return;
+        }
+
+        onChange(payload.new as EndpointRow);
+      }
     )
     .subscribe();
 

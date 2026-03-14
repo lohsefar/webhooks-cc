@@ -1,6 +1,10 @@
 import { authenticateRequest } from "@/lib/api-auth";
 import { parseJsonBody } from "@/lib/request-validation";
+import { checkRateLimitByKey } from "@/lib/rate-limit";
 import { createEndpointForUser, listEndpointsForUser } from "@/lib/supabase/endpoints";
+
+const USER_ENDPOINT_RATE_LIMIT_WINDOW_MS = 10 * 60_000;
+const USER_ENDPOINT_RATE_LIMIT_MAX = 10;
 
 export async function GET(request: Request) {
   const auth = await authenticateRequest(request);
@@ -18,6 +22,15 @@ export async function GET(request: Request) {
 export async function POST(request: Request) {
   const auth = await authenticateRequest(request);
   if (!auth.success) return auth.response;
+
+  const rateLimited = checkRateLimitByKey(
+    `endpoint-create:${auth.userId}`,
+    USER_ENDPOINT_RATE_LIMIT_MAX,
+    USER_ENDPOINT_RATE_LIMIT_WINDOW_MS
+  );
+  if (rateLimited) {
+    return rateLimited;
+  }
 
   const parsed = await parseJsonBody(request);
   if ("error" in parsed) return parsed.error;

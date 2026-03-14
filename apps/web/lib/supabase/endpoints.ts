@@ -31,7 +31,7 @@ export interface EndpointRecord {
 }
 
 interface CreateEndpointInput {
-  userId: string;
+  userId?: string;
   name?: string;
   isEphemeral?: boolean;
   expiresAt?: number;
@@ -210,7 +210,7 @@ export async function createEndpointForUser({
         : null;
 
   const insert: EndpointInsert = {
-    user_id: userId,
+    user_id: userId ?? null,
     slug,
     name: name ?? null,
     mock_response: (mockResponse as Json | undefined) ?? null,
@@ -230,6 +230,12 @@ export async function createEndpointForUser({
   }
 
   return normalizeEndpoint(data);
+}
+
+export async function createGuestEndpoint(): Promise<EndpointRecord> {
+  return createEndpointForUser({
+    isEphemeral: true,
+  });
 }
 
 export async function updateEndpointBySlugForUser({
