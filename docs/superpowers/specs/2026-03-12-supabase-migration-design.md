@@ -71,6 +71,7 @@ Companion execution plan for the next slice:
 - **Blog reads and admin writes are now split onto Supabase-backed web routes/helpers**. The blog index/post pages, blog preview, `feed.xml`, `sitemap-index.xml`, `sitemaps/blog.xml`, and the web app's `/api/blog` admin endpoints no longer depend on Convex storage.
 - **Phase 2b is complete in dev on the web/API side**. Polar checkout, cancel, resubscribe, webhook handling, and account deletion now run through Supabase-backed web routes/helpers, and the account page billing UI no longer depends on Convex.
 - **Billing period resets now run on Supabase**. A `pg_cron` job calls `process_billing_period_resets()` every minute in dev, replacing the old Convex billing reset cron behavior.
+- **Phase 3 is mostly complete on the web/API path in dev**. The account page now updates live from the `users` row, the main dashboard request list/count updates from Supabase Realtime, and `/api/stream/[slug]` now bridges Supabase Realtime to SSE instead of Convex.
 - **Receiver bridge work is in place for dev**. The branch includes Supabase-backed internal receiver control-plane routes plus receiver config support so endpoint creation, request capture, and quota enforcement can be exercised against the Supabase path in development before the full receiver rewrite.
 - **Live dev validation completed**:
   - GitHub OAuth login works end-to-end.
@@ -78,12 +79,13 @@ Companion execution plan for the next slice:
   - Endpoint creation works.
   - Webhook capture works.
   - Usage/quota enforcement works.
+  - Account billing state can upgrade, cancel, uncancel, and reset through the Supabase/Polar path.
   - Retained request search now runs on Postgres/Supabase in integration tests.
   - Blog admin writes work through `/api/blog`.
-- **Still pending before the data layer phase can close**:
+- **Still pending before the migration can close**:
   - Close the remaining Phase 2a cleanup items (endpoint rate limiting coverage and a few missing verification cases).
   - Finish the remaining account/API-key UI migration work.
-  - Migrate realtime/SSE.
+  - Finish the remaining realtime verification and guest `/go` live dashboard migration work.
   - Rewrite the receiver hot path and remove Redis/ClickHouse entirely.
 
 ---
@@ -190,15 +192,17 @@ Companion execution plan for the next slice:
 **Goal**: dashboard updates live when webhooks arrive. CLI SSE streaming works.
 
 **Deliverables**:
-- [ ] Subscribe to `postgres_changes` on `requests` table filtered by `endpoint_id`
-- [ ] Dashboard request list updates without page refresh on new webhook
-- [ ] SSE endpoint (`/api/stream/[slug]`) rewired to Supabase Realtime → SSE
-- [ ] Request count badge updates in real-time
+- [x] Subscribe to `postgres_changes` on `requests` table filtered by `endpoint_id`
+- [x] Dashboard request list updates without page refresh on new webhook
+- [x] SSE endpoint (`/api/stream/[slug]`) rewired to Supabase Realtime → SSE
+- [x] Request count badge updates in real-time
+- [x] Account plan/usage/subscription status updates in real-time from `users`
 
 **Tests**:
-- [ ] Integration: insert request via admin client, verify Realtime channel fires INSERT event
+- [x] Integration: insert request via admin client, verify Realtime channel fires INSERT event
+- [x] Integration: update user row via admin client, verify account-facing Realtime channel fires UPDATE event
+- [x] Integration: SSE endpoint streams new requests as they arrive
 - [ ] Playwright e2e: open dashboard, curl a webhook to the endpoint, verify request appears live
-- [ ] Integration: SSE endpoint streams new requests as they arrive
 - [ ] Playwright e2e: verify request count updates without refresh
 
 **Completion**: all tests pass, commit and mark phase complete.

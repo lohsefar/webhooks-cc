@@ -1,6 +1,6 @@
 "use client";
 
-import { Suspense, useEffect, useState } from "react";
+import { Suspense, useCallback, useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { DeleteAccountDialog } from "@/components/account/delete-account-dialog";
 import { ManageSubscriptionDialog } from "@/components/billing/manage-subscription-dialog";
@@ -12,6 +12,7 @@ import { ACCOUNT_PROFILE_SELECT, type AccountProfile } from "@/lib/account-profi
 import { trackUpgradeCompleted, resetUser } from "@/lib/analytics";
 import { useAuth } from "@/components/providers/supabase-auth-provider";
 import { createClient } from "@/lib/supabase/client";
+import { subscribeToUserRow } from "@/lib/supabase/realtime";
 import { CheckCircle, Github, LogOut } from "lucide-react";
 
 function UsageResetCountdown({ periodEnd }: { periodEnd: string }) {
@@ -77,12 +78,18 @@ export default function AccountPage() {
   const [profileLoading, setProfileLoading] = useState(true);
   const router = useRouter();
 
-  const refreshProfile = async (userId: string) => {
+  const refreshProfile = useCallback(async () => {
+    if (!authUser) {
+      setProfile(null);
+      setProfileLoading(false);
+      return;
+    }
+
     const supabase = createClient();
     const { data, error } = await supabase
       .from("users")
       .select(ACCOUNT_PROFILE_SELECT)
-      .eq("id", userId)
+      .eq("id", authUser.id)
       .single<AccountProfile>();
 
     if (error) {
@@ -91,7 +98,7 @@ export default function AccountPage() {
 
     setProfile(data ?? null);
     setProfileLoading(false);
-  };
+  }, [authUser]);
 
   useEffect(() => {
     if (!authUser) {
@@ -101,7 +108,18 @@ export default function AccountPage() {
     }
 
     setProfileLoading(true);
-    void refreshProfile(authUser.id);
+    void refreshProfile();
+  }, [authUser, refreshProfile]);
+
+  useEffect(() => {
+    if (!authUser) {
+      return;
+    }
+
+    return subscribeToUserRow(authUser.id, (row) => {
+      setProfile(row ? (row as AccountProfile) : null);
+      setProfileLoading(false);
+    });
   }, [authUser]);
 
   const handleSignOut = async () => {
@@ -266,7 +284,7 @@ export default function AccountPage() {
               <ManageSubscriptionDialog
                 accessToken={accessToken}
                 profile={profile}
-                onUpdated={() => refreshProfile(profile.id)}
+                onUpdated={refreshProfile}
               />
               {profile.cancel_at_period_end && profile.period_end && (
                 <div className="rounded-md bg-muted p-3 text-sm">

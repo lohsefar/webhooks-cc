@@ -14,6 +14,7 @@ import { Copy, Check, Send, Download, ChevronDown } from "lucide-react";
 import { WEBHOOK_BASE_URL } from "@/lib/constants";
 import { copyToClipboard } from "@/lib/clipboard";
 import { exportToJson, exportToCsv, downloadFile } from "@/lib/export";
+import { subscribeToEndpointRequestInserts } from "@/lib/supabase/realtime";
 import {
   fetchDashboardEndpoints,
   fetchDashboardRequests,
@@ -25,7 +26,6 @@ import {
 import {
   buildRetainedCountParams,
   computeShowHasMore,
-  incrementRetainedCount,
 } from "@/lib/dashboard-count";
 import type { ClickHouseRequest, ClickHouseSummary, AnyRequestSummary, Request } from "@/types/request";
 
@@ -40,6 +40,8 @@ export default function DashboardPage() {
   const endpointSlug = searchParams.get("endpoint");
 
   const currentEndpoint = endpoints?.find((ep) => ep.slug === endpointSlug) ?? endpoints?.[0];
+  const currentEndpointId = currentEndpoint?.id;
+  const currentSlug = currentEndpoint?.slug;
 
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [selectedClickHouseDetail, setSelectedClickHouseDetail] = useState<ClickHouseRequest | null>(
@@ -54,7 +56,7 @@ export default function DashboardPage() {
   const [searchInput, setSearchInput] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
 
-  // ClickHouse state
+  // Retained request history state
   const [olderRequests, setOlderRequests] = useState<ClickHouseRequest[]>([]);
   const [searchResults, setSearchResults] = useState<ClickHouseRequest[]>([]);
   const [hasMore, setHasMore] = useState(false);
@@ -64,6 +66,9 @@ export default function DashboardPage() {
   const [searchLoading, setSearchLoading] = useState(false);
   const [searchError, setSearchError] = useState(false);
   const retainedCountRequestSeq = useRef(0);
+  const recentRequestsRequestSeq = useRef(0);
+  const searchResultsRequestSeq = useRef(0);
+  const realtimeRefreshTimeoutRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
 
   const clickHouseDetailMap = useRef(new Map<string, ClickHouseRequest>());
 
@@ -89,6 +94,28 @@ export default function DashboardPage() {
     }
   }, [accessToken]);
 
+  const refreshRecentRequests = useCallback(async () => {
+    if (!accessToken || !currentSlug) {
+      recentRequestsRequestSeq.current++;
+      setRecentRequests([]);
+      return;
+    }
+
+    const requestSeq = ++recentRequestsRequestSeq.current;
+
+    try {
+      const nextRequests = await fetchDashboardRequests(accessToken, currentSlug, 50);
+      if (requestSeq === recentRequestsRequestSeq.current) {
+        setRecentRequests(nextRequests);
+      }
+    } catch (error) {
+      console.error("Failed to load dashboard requests:", error);
+      if (requestSeq === recentRequestsRequestSeq.current) {
+        setRecentRequests([]);
+      }
+    }
+  }, [accessToken, currentSlug]);
+
   useEffect(() => {
     if (!accessToken) {
       return;
@@ -103,37 +130,8 @@ export default function DashboardPage() {
   }, [accessToken, loadEndpoints]);
 
   useEffect(() => {
-    if (!accessToken || !currentEndpoint) {
-      setRecentRequests([]);
-      return;
-    }
-
-    let cancelled = false;
-
-    const load = async () => {
-      try {
-        const nextRequests = await fetchDashboardRequests(accessToken, currentEndpoint.slug, 50);
-        if (!cancelled) {
-          setRecentRequests(nextRequests);
-        }
-      } catch (error) {
-        console.error("Failed to load dashboard requests:", error);
-        if (!cancelled) {
-          setRecentRequests([]);
-        }
-      }
-    };
-
-    void load();
-    const interval = window.setInterval(() => {
-      void load();
-    }, 2500);
-
-    return () => {
-      cancelled = true;
-      window.clearInterval(interval);
-    };
-  }, [accessToken, currentEndpoint?.slug]);
+    void refreshRecentRequests();
+  }, [refreshRecentRequests]);
 
   const selectedRecentRequest = useMemo(
     () => recentRequests.find((request) => request._id === selectedId),
@@ -247,6 +245,46 @@ export default function DashboardPage() {
     storeClickHouseResults,
   ]);
 
+  const refreshSearchResults = useCallback(
+    async ({ showLoading }: { showLoading: boolean }) => {
+      if (!debouncedSearch || !currentEndpoint) {
+        searchResultsRequestSeq.current++;
+        setSearchResults([]);
+        setSearchError(false);
+        setSearchLoading(false);
+        return;
+      }
+
+      const requestSeq = ++searchResultsRequestSeq.current;
+      if (showLoading) {
+        setSearchLoading(true);
+      }
+      setSearchError(false);
+
+      const params: Record<string, string> = {
+        slug: currentEndpoint.slug,
+        q: debouncedSearch,
+        limit: String(CLICKHOUSE_PAGE_SIZE),
+        order: "desc",
+      };
+      if (methodFilter !== "ALL") params.method = methodFilter;
+
+      const { data: results, ok } = await fetchFromClickHouse(params);
+      if (requestSeq !== searchResultsRequestSeq.current) return;
+
+      if (!ok) {
+        setSearchError(true);
+        setSearchResults([]);
+      } else {
+        storeClickHouseResults(results);
+        setSearchResults(results);
+      }
+
+      setSearchLoading(false);
+    },
+    [currentEndpoint, debouncedSearch, methodFilter, fetchFromClickHouse, storeClickHouseResults]
+  );
+
   useEffect(() => {
     if (!debouncedSearch || !currentEndpoint) {
       setSearchResults([]);
@@ -255,39 +293,8 @@ export default function DashboardPage() {
       return;
     }
 
-    let cancelled = false;
-    setSearchLoading(true);
-    setSearchError(false);
-
-    const params: Record<string, string> = {
-      slug: currentEndpoint.slug,
-      q: debouncedSearch,
-      limit: String(CLICKHOUSE_PAGE_SIZE),
-      order: "desc",
-    };
-    if (methodFilter !== "ALL") params.method = methodFilter;
-
-    fetchFromClickHouse(params)
-      .then(({ data: results, ok }) => {
-        if (cancelled) return;
-        if (!ok) {
-          setSearchError(true);
-          setSearchResults([]);
-        } else {
-          storeClickHouseResults(results);
-          setSearchResults(results);
-        }
-      })
-      .finally(() => {
-        if (!cancelled) setSearchLoading(false);
-      });
-
-    return () => {
-      cancelled = true;
-    };
-  }, [debouncedSearch, currentEndpoint, methodFilter, fetchFromClickHouse, storeClickHouseResults]);
-
-  const currentSlug = currentEndpoint?.slug;
+    void refreshSearchResults({ showLoading: true });
+  }, [debouncedSearch, currentEndpoint, refreshSearchResults]);
 
   const refreshRetainedCount = useCallback(async () => {
     if (!currentSlug) return;
@@ -314,11 +321,15 @@ export default function DashboardPage() {
     if (!currentSlug || !accessToken) return;
 
     const onFocus = () => {
+      void refreshRecentRequests();
+      if (debouncedSearch) {
+        void refreshSearchResults({ showLoading: false });
+      }
       void refreshRetainedCount();
     };
     const onVisibilityChange = () => {
       if (document.visibilityState === "visible") {
-        void refreshRetainedCount();
+        onFocus();
       }
     };
 
@@ -328,7 +339,50 @@ export default function DashboardPage() {
       window.removeEventListener("focus", onFocus);
       document.removeEventListener("visibilitychange", onVisibilityChange);
     };
-  }, [currentSlug, accessToken, refreshRetainedCount]);
+  }, [
+    accessToken,
+    currentSlug,
+    debouncedSearch,
+    refreshRecentRequests,
+    refreshRetainedCount,
+    refreshSearchResults,
+  ]);
+
+  useEffect(() => {
+    if (!currentEndpointId) {
+      return;
+    }
+
+    const queueRefresh = () => {
+      if (realtimeRefreshTimeoutRef.current) {
+        clearTimeout(realtimeRefreshTimeoutRef.current);
+      }
+
+      realtimeRefreshTimeoutRef.current = setTimeout(() => {
+        void refreshRecentRequests();
+        if (debouncedSearch) {
+          void refreshSearchResults({ showLoading: false });
+        }
+
+        void refreshRetainedCount();
+      }, 150);
+    };
+
+    const unsubscribe = subscribeToEndpointRequestInserts(currentEndpointId, queueRefresh);
+    return () => {
+      if (realtimeRefreshTimeoutRef.current) {
+        clearTimeout(realtimeRefreshTimeoutRef.current);
+        realtimeRefreshTimeoutRef.current = undefined;
+      }
+      unsubscribe();
+    };
+  }, [
+    currentEndpointId,
+    debouncedSearch,
+    refreshRecentRequests,
+    refreshRetainedCount,
+    refreshSearchResults,
+  ]);
 
   const displayedItems = useMemo((): AnyRequestSummary[] => {
     if (debouncedSearch) {
@@ -383,20 +437,6 @@ export default function DashboardPage() {
           setNewCount((prev) => prev + arrived);
         }
 
-        // Keep ClickHouse count feeling "live" between polling ticks.
-        if (!debouncedSearch) {
-          const newRows = recentRequests.slice(0, arrived);
-          const matchedCount =
-            methodFilter === "ALL"
-              ? arrived
-              : newRows.filter((r) => r.method === methodFilter).length;
-          if (matchedCount > 0) {
-            setRetainedTotalCount((prev) => incrementRetainedCount(prev, matchedCount));
-          }
-        }
-
-        // If previous top is no longer in the window, we don't know exact arrived count.
-        // Re-sync from ClickHouse immediately.
         if (previousIdx === -1) {
           void refreshRetainedCount();
         }
@@ -404,7 +444,7 @@ export default function DashboardPage() {
     }
 
     prevTopSummaryId.current = topId;
-  }, [recentRequests, liveMode, methodFilter, debouncedSearch, refreshRetainedCount]);
+  }, [recentRequests, liveMode, refreshRetainedCount]);
 
   useEffect(() => {
     if (recentRequests.length > 0 && !selectedId) {
@@ -412,7 +452,6 @@ export default function DashboardPage() {
     }
   }, [recentRequests, selectedId]);
 
-  const currentEndpointId = currentEndpoint?.id;
   useEffect(() => {
     setSelectedId(null);
     setSelectedClickHouseDetail(null);
@@ -431,6 +470,14 @@ export default function DashboardPage() {
     setSearchError(false);
     clickHouseDetailMap.current.clear();
   }, [currentEndpointId]);
+
+  useEffect(() => {
+    return () => {
+      if (realtimeRefreshTimeoutRef.current) {
+        clearTimeout(realtimeRefreshTimeoutRef.current);
+      }
+    };
+  }, []);
 
   const handleSelect = useCallback((id: string) => {
     setSelectedId(id);

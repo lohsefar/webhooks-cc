@@ -211,6 +211,39 @@ export async function listRequestsForEndpointByUser(input: {
   return (data ?? []).map(normalizeRequest);
 }
 
+export async function listNewRequestsForEndpointByUser(input: {
+  userId: string;
+  slug: string;
+  after: number;
+  limit?: number;
+}): Promise<RequestRecord[] | null> {
+  const admin = createAdminClient();
+  const endpoint = await getOwnedEndpoint(input.userId, input.slug);
+  if (!endpoint) {
+    return null;
+  }
+
+  const cutoff = await getUserCutoff(input.userId);
+  const floor = Math.max(input.after, cutoff);
+
+  const { data, error } = await admin
+    .from("requests")
+    .select(
+      "id, endpoint_id, method, path, headers, body, query_params, content_type, ip, size, received_at"
+    )
+    .eq("endpoint_id", endpoint.id)
+    .gt("received_at", new Date(floor).toISOString())
+    .order("received_at", { ascending: true })
+    .limit(clampLimit(input.limit, 100))
+    .returns<SelectedRequestRow[]>();
+
+  if (error) {
+    throw error;
+  }
+
+  return (data ?? []).map(normalizeRequest);
+}
+
 export async function listPaginatedRequestsForEndpointByUser(input: {
   userId: string;
   slug: string;

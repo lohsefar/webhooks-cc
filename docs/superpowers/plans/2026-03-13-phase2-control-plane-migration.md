@@ -101,6 +101,8 @@ The branch has already moved past the original control-plane boundary:
 
 That follow-on work has now landed too: request list/detail, usage reads in the dashboard, request search, public blog/feed/sitemap reads, blog admin writes, and billing/account management are all Supabase-backed on this branch.
 
+Since then, the core realtime slice has landed too: the account page now reflects live `users` changes from Supabase Realtime, the main dashboard request list/count updates live from `requests` inserts, and `/api/stream/[slug]` now streams Supabase Realtime events instead of Convex subscriptions.
+
 ## Remaining Major Phases
 
 The remaining major phases after the web/API migration are:
@@ -111,4 +113,4 @@ The remaining major phases after the web/API migration are:
 - [x] public read-only blog/feed/sitemap queries
 - [x] billing/account management
 
-The next active gaps are realtime/SSE, the remaining account/API-key UI cleanup, cron cleanup/reset jobs, and then the receiver rewrite that finally removes Redis/ClickHouse/Convex from the hot path.
+The next active gaps are the remaining guest `/go` live dashboard work, the leftover account/API-key UI cleanup, the remaining cron cleanup jobs, and then the receiver rewrite that finally removes Redis/ClickHouse/Convex from the hot path.
