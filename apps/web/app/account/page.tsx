@@ -22,7 +22,7 @@ function UsageResetCountdown({ periodEnd }: { periodEnd: string }) {
     const update = () => {
       const remaining = new Date(periodEnd).getTime() - Date.now();
       if (remaining <= 0) {
-        setTimeRemaining("Resets on next request");
+        setTimeRemaining("New 24h period starts on next request");
         return;
       }
       if (remaining < 60_000) {
@@ -269,7 +269,9 @@ export default function AccountPage() {
               </p>
             )}
             {profile.plan === "free" && !profile.period_end && (
-              <p className="text-xs text-muted-foreground">Resets on first request</p>
+              <p className="text-xs text-muted-foreground">
+                Your 24h period starts on first request
+              </p>
             )}
           </div>
 
