@@ -25,6 +25,7 @@ import { ArrowRight, Bot, Check, Circle, Copy, Eye, Plus, Send, Terminal } from 
 
 const REQUEST_LIMIT = 25;
 const BACKGROUND_SYNC_INTERVAL_MS = 2000;
+const REQUEST_SYNC_INTERVAL_MS = 250;
 const INTERNAL_TEST_SEND_HEADER = "X-Webhooks-CC-Test-Send";
 // Local fallback so refreshes immediately after create still restore the slug.
 // This is overwritten with the authoritative `endpoint.expiresAt` once the endpoint read completes.
@@ -331,6 +332,26 @@ function GuestLiveDashboardInner() {
   }, [clearDemoEndpoint, endpoint?.id, endpointSlug, refreshRequests]);
 
   useEffect(() => {
+    if (!endpoint?.id) {
+      return;
+    }
+
+    if (endpoint.requestCount === 0 || requests.length >= endpoint.requestCount) {
+      return;
+    }
+
+    void refreshRequests(endpoint.id);
+
+    const interval = window.setInterval(() => {
+      void refreshRequests(endpoint.id);
+    }, REQUEST_SYNC_INTERVAL_MS);
+
+    return () => {
+      window.clearInterval(interval);
+    };
+  }, [endpoint?.id, endpoint?.requestCount, requests.length, refreshRequests]);
+
+  useEffect(() => {
     if (!endpoint?.id || !endpointSlug) return;
 
     const onFocus = () => {
@@ -596,6 +617,7 @@ function GuestLiveDashboardInner() {
   }
 
   const hasRequests = requests.length > 0;
+  const isSyncingRequests = requestCount > 0 && requests.length === 0;
 
   return (
     <div className="h-screen flex flex-col overflow-hidden">
@@ -676,6 +698,10 @@ function GuestLiveDashboardInner() {
               )}
             </div>
           </>
+        ) : isSyncingRequests ? (
+          <div className="flex-1 flex items-center justify-center p-8">
+            <p className="text-muted-foreground animate-pulse">Loading captured request...</p>
+          </div>
         ) : (
           <DemoWaitingState url={endpointUrl} />
         )}
