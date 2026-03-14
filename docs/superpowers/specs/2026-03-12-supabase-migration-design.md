@@ -219,14 +219,14 @@ Companion execution plan for the next slice:
 - [x] Install/enable `pg_cron` extension in Supabase Postgres
 - [ ] Schedule: `cleanup_old_requests()` daily at 01:00 UTC
 - [ ] Schedule: `cleanup_free_user_requests()` daily at 01:30 UTC
-- [ ] Schedule: expired ephemeral endpoint cleanup (+ orphaned requests) every 5 minutes
+- [x] Schedule: expired ephemeral endpoint cleanup (+ orphaned requests) every 5 minutes
 - [ ] Schedule: expired device code cleanup every 5 minutes
 - [ ] Schedule: expired API key cleanup daily at 02:00 UTC
 - [x] Schedule: billing period reset every minute
 - [x] Write billing period reset SQL: downgrade canceled pro users to free, reset usage and advance period for active pro users
 
 **Tests**:
-- [ ] Integration: insert expired ephemeral endpoint, run cleanup, verify endpoint + its requests deleted
+- [x] Integration: insert expired ephemeral endpoint, run cleanup, verify endpoint + its requests deleted
 - [ ] Integration: insert expired device code, run cleanup, verify deleted
 - [ ] Integration: insert free user requests older than 7 days, run cleanup, verify deleted
 - [ ] Integration: insert requests older than 31 days, run cleanup, verify deleted
