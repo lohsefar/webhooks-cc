@@ -1,5 +1,9 @@
 .PHONY: dev dev-all dev-web dev-convex dev-receiver dev-cli build build-receiver build-cli test lint clean db-push prod prod-web prod-receiver start
 
+# Ensure user systemd bus is reachable (needed in Proxmox xterm.js / non-login shells)
+export XDG_RUNTIME_DIR ?= /run/user/$(shell id -u)
+export DBUS_SESSION_BUS_ADDRESS ?= unix:path=$(XDG_RUNTIME_DIR)/bus
+
 # Development
 dev:
 	@echo "Starting development servers..."
