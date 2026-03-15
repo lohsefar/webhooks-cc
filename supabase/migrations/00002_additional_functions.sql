@@ -8,13 +8,13 @@ security definer set search_path = ''
 as $$
 begin
   return query
-  update public.endpoints
-  set request_count = request_count + 1
-  where id = p_endpoint_id
-    and is_ephemeral = true
-    and request_count < 25
-    and (expires_at is null or expires_at > now())
-  returning public.endpoints.request_count;
+  update public.endpoints e
+  set request_count = e.request_count + 1
+  where e.id = p_endpoint_id
+    and e.is_ephemeral = true
+    and e.request_count < 25
+    and (e.expires_at is null or e.expires_at > now())
+  returning e.request_count;
 end;
 $$;
 
