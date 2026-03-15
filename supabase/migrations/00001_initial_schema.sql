@@ -85,7 +85,7 @@ create index endpoints_ephemeral_expires on public.endpoints(is_ephemeral, expir
 
 create table public.requests (
   id               uuid primary key default gen_random_uuid(),
-  endpoint_id      uuid not null,
+  endpoint_id      uuid not null references public.endpoints(id) on delete cascade,
   user_id          uuid,           -- denormalized from endpoint, null for ephemeral
   method           text not null,
   path             text not null,

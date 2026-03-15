@@ -65,10 +65,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ sl
   }
 }
 
-export async function DELETE(
-  request: Request,
-  { params }: { params: Promise<{ slug: string }> }
-) {
+export async function DELETE(request: Request, { params }: { params: Promise<{ slug: string }> }) {
   const authError = verifyBlogSecret(request);
   if (authError) return authError;
 

@@ -140,9 +140,7 @@ Fix:
 Evidence:
 
 ```ts
-export async function validateBearerTokenWithPlan(
-  token: string
-): Promise<ApiKeyValidation | null> {
+export async function validateBearerTokenWithPlan(token: string): Promise<ApiKeyValidation | null> {
   if (token.startsWith("whcc_")) {
     return await validateApiKeyWithMetadata(token);
   }

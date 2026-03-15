@@ -10,10 +10,7 @@ import { StatusCodePicker } from "./status-code-picker";
 import { Plus } from "lucide-react";
 import { parseStatusCode } from "@/lib/http";
 import { trackEndpointCreated } from "@/lib/analytics";
-import {
-  createDashboardEndpoint,
-  emitDashboardEndpointsChanged,
-} from "@/lib/dashboard-api";
+import { createDashboardEndpoint, emitDashboardEndpointsChanged } from "@/lib/dashboard-api";
 import {
   Dialog,
   DialogContent,

@@ -107,7 +107,10 @@ describe("Supabase Blog Posts Integration", () => {
   });
 
   afterAll(async () => {
-    await admin.from("blog_posts").delete().in("slug", [publishedSlug, olderPublishedSlug, draftSlug]);
+    await admin
+      .from("blog_posts")
+      .delete()
+      .in("slug", [publishedSlug, olderPublishedSlug, draftSlug]);
   });
 
   it("lists published posts via the public Supabase path in publish date order", async () => {

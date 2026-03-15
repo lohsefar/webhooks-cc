@@ -2,10 +2,7 @@
 
 import { useState } from "react";
 import type { AccountProfile } from "@/lib/account-profile";
-import {
-  cancelBillingSubscription,
-  resubscribeBillingSubscription,
-} from "@/lib/billing-api";
+import { cancelBillingSubscription, resubscribeBillingSubscription } from "@/lib/billing-api";
 import {
   Dialog,
   DialogContent,

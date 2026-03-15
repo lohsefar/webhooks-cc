@@ -8,11 +8,12 @@ services:
     ports:
       - "3000:3000"
     environment:
-      - NEXT_PUBLIC_CONVEX_URL=${NEXT_PUBLIC_CONVEX_URL}
-      - CONVEX_DEPLOYMENT=${CONVEX_DEPLOYMENT}
+      - NEXT_PUBLIC_SUPABASE_URL=${NEXT_PUBLIC_SUPABASE_URL}
+      - NEXT_PUBLIC_SUPABASE_ANON_KEY=${NEXT_PUBLIC_SUPABASE_ANON_KEY}
+      - SUPABASE_URL=${SUPABASE_URL}
+      - SUPABASE_SERVICE_ROLE_KEY=${SUPABASE_SERVICE_ROLE_KEY}
       - NEXT_PUBLIC_WEBHOOK_URL=${NEXT_PUBLIC_WEBHOOK_URL}
       - NEXT_PUBLIC_APP_URL=${NEXT_PUBLIC_APP_URL}
-      - CONVEX_SITE_URL=${CONVEX_SITE_URL}
       - CAPTURE_SHARED_SECRET=${CAPTURE_SHARED_SECRET}
       - SENTRY_DSN=${SENTRY_DSN}
       - NEXT_PUBLIC_SENTRY_DSN=${NEXT_PUBLIC_SENTRY_DSN}
@@ -32,22 +33,13 @@ services:
     ports:
       - "3001:3001"
     environment:
-      - CONVEX_SITE_URL=${CONVEX_SITE_URL}
+      - DATABASE_URL=${DATABASE_URL}
       - CAPTURE_SHARED_SECRET=${CAPTURE_SHARED_SECRET}
       - PORT=3001
-      - REDIS_URL=redis://redis:6379
-    depends_on:
-      - redis
     healthcheck:
       test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:3001/health"]
       interval: 30s
       timeout: 5s
       retries: 3
       start_period: 10s
-    restart: unless-stopped
-
-  redis:
-    image: redis:7-alpine
-    ports:
-      - "6380:6379"
     restart: unless-stopped

@@ -20,7 +20,7 @@ export interface RequestSummary {
   receivedAt: number;
 }
 
-/** A request from ClickHouse search/pagination (no Convex _id). */
+/** A request from search/pagination (uses string id instead of _id). */
 export interface ClickHouseRequest {
   id: string;
   slug: string;
@@ -42,7 +42,7 @@ export interface ClickHouseSummary {
   receivedAt: number;
 }
 
-/** Union type for items in the request list (Convex or ClickHouse). */
+/** Union type for items in the request list. */
 export type AnyRequestSummary = RequestSummary | ClickHouseSummary;
 
 export type HttpMethod = "GET" | "POST" | "PUT" | "PATCH" | "DELETE" | "HEAD" | "OPTIONS";

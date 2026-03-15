@@ -15,7 +15,9 @@ describe("Guest demo storage parsing", () => {
   });
 
   it("returns null for expired endpoints", () => {
-    expect(parseStoredDemoEndpoint(JSON.stringify({ slug: "abcd1234", expiresAt: 99 }), 100)).toBeNull();
+    expect(
+      parseStoredDemoEndpoint(JSON.stringify({ slug: "abcd1234", expiresAt: 99 }), 100)
+    ).toBeNull();
   });
 
   it("returns the stored endpoint when it is still valid", () => {

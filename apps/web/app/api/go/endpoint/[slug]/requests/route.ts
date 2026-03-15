@@ -2,10 +2,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 
 const MAX_LIMIT = 100;
 
-export async function GET(
-  request: Request,
-  { params }: { params: Promise<{ slug: string }> }
-) {
+export async function GET(request: Request, { params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params;
   const url = new URL(request.url);
   const limit = Math.min(

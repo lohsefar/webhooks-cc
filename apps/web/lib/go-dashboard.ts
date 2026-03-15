@@ -42,7 +42,22 @@ export function normalizeGuestEndpoint(
   };
 }
 
-function normalizeRequest(row: Pick<RequestRow, "id" | "endpoint_id" | "method" | "path" | "headers" | "body" | "query_params" | "content_type" | "ip" | "size" | "received_at">): Request {
+function normalizeRequest(
+  row: Pick<
+    RequestRow,
+    | "id"
+    | "endpoint_id"
+    | "method"
+    | "path"
+    | "headers"
+    | "body"
+    | "query_params"
+    | "content_type"
+    | "ip"
+    | "size"
+    | "received_at"
+  >
+): Request {
   const receivedAt = parseMillis(row.received_at) ?? Date.now();
   return {
     _id: row.id,
@@ -95,10 +110,7 @@ export async function fetchGuestDashboardEndpoint(
   return response.json() as Promise<GuestEndpointRecord>;
 }
 
-export async function fetchGuestDashboardRequests(
-  slug: string,
-  limit: number
-): Promise<Request[]> {
+export async function fetchGuestDashboardRequests(slug: string, limit: number): Promise<Request[]> {
   const response = await fetch(
     `/api/go/endpoint/${encodeURIComponent(slug)}/requests?limit=${limit}`
   );

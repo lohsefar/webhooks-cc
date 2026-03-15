@@ -11,7 +11,14 @@ type EndpointInsert = Database["public"]["Tables"]["endpoints"]["Insert"];
 type EndpointUpdate = Database["public"]["Tables"]["endpoints"]["Update"];
 type SelectedEndpointRow = Pick<
   EndpointRow,
-  "id" | "user_id" | "slug" | "name" | "mock_response" | "is_ephemeral" | "expires_at" | "created_at"
+  | "id"
+  | "user_id"
+  | "slug"
+  | "name"
+  | "mock_response"
+  | "is_ephemeral"
+  | "expires_at"
+  | "created_at"
 >;
 type OwnedEndpointRow = Pick<EndpointRow, "id" | "slug" | "user_id">;
 
@@ -270,10 +277,7 @@ export async function updateEndpointBySlugForUser({
   return data ? normalizeEndpoint(data) : null;
 }
 
-export async function deleteEndpointBySlugForUser(
-  userId: string,
-  slug: string
-): Promise<boolean> {
+export async function deleteEndpointBySlugForUser(userId: string, slug: string): Promise<boolean> {
   const admin = createAdminClient();
   const endpoint = await findOwnedEndpoint(userId, slug);
 

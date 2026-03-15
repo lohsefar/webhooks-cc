@@ -6,8 +6,7 @@ import { POST as createGuestEndpointRoute } from "@/app/api/go/endpoint/route";
 
 const SUPABASE_URL = process.env.SUPABASE_URL ?? "http://192.168.0.247:8000";
 const SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY!;
-const ANON_KEY =
-  process.env.SUPABASE_ANON_KEY ?? process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ?? "";
+const ANON_KEY = process.env.SUPABASE_ANON_KEY ?? process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ?? "";
 const TEST_PASSWORD = "TestPassword123!";
 
 if (!SERVICE_ROLE_KEY) {
@@ -141,7 +140,7 @@ describe("Supabase Guest Endpoint Integration", () => {
       method: "POST",
       path: "/guest-visible",
       headers: { "content-type": "application/json" },
-      body: "{\"ok\":true}",
+      body: '{"ok":true}',
       query_params: { source: "guest" },
       content_type: "application/json",
       ip: "127.0.0.1",

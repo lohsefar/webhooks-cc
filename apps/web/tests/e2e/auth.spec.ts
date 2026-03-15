@@ -1,10 +1,5 @@
 import { test, expect } from "@playwright/test";
-import {
-  createTestUser,
-  deleteTestUser,
-  signInTestUser,
-  type TestUser,
-} from "./helpers/auth";
+import { createTestUser, deleteTestUser, signInTestUser, type TestUser } from "./helpers/auth";
 
 let testUser: TestUser;
 

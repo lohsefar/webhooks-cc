@@ -31,7 +31,7 @@ export async function GET() {
       return d > latest ? d : latest;
     }, LAST_CONTENT_UPDATE);
   } catch {
-    // Convex unavailable (e.g. CI build with placeholder URL) — use fallback
+    // Supabase unavailable (e.g. CI build with placeholder URL) — use fallback
   }
 
   const sitemaps = [

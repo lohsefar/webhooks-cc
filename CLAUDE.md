@@ -81,14 +81,14 @@ cd apps/receiver-rs && cargo clippy     # Rust receiver lint
 
 ### Service Layout
 
-| Service   | Port    | Stack                               | Purpose                                       |
-| --------- | ------- | ----------------------------------- | --------------------------------------------- |
-| Web app   | 3000    | Next.js 16, React 19, Tailwind v4   | Dashboard, docs, landing page, API routes     |
-| Receiver  | 3001    | Rust (Axum, Tokio, sqlx/Postgres)   | Captures webhooks at `/w/{slug}`              |
-| Supabase  | managed | Postgres, Supabase Auth, Realtime   | Database, auth, real-time subscriptions       |
-| CLI       | n/a     | Go 1.25, Cobra                      | `whk tunnel`, `whk listen`, device auth       |
-| SDK       | n/a     | TypeScript, tsup                    | `@webhooks-cc/sdk` on npm                     |
-| MCP       | n/a     | TypeScript, tsup                    | `@webhooks-cc/mcp` on npm — MCP server for AI agents |
+| Service  | Port    | Stack                             | Purpose                                              |
+| -------- | ------- | --------------------------------- | ---------------------------------------------------- |
+| Web app  | 3000    | Next.js 16, React 19, Tailwind v4 | Dashboard, docs, landing page, API routes            |
+| Receiver | 3001    | Rust (Axum, Tokio, sqlx/Postgres) | Captures webhooks at `/w/{slug}`                     |
+| Supabase | managed | Postgres, Supabase Auth, Realtime | Database, auth, real-time subscriptions              |
+| CLI      | n/a     | Go 1.25, Cobra                    | `whk tunnel`, `whk listen`, device auth              |
+| SDK      | n/a     | TypeScript, tsup                  | `@webhooks-cc/sdk` on npm                            |
+| MCP      | n/a     | TypeScript, tsup                  | `@webhooks-cc/mcp` on npm — MCP server for AI agents |
 
 ### Directory Structure
 
@@ -150,7 +150,7 @@ The Rust receiver (`apps/receiver-rs/`) handles all webhook ingestion. It connec
 
 1. Extract slug, method, path, headers, body, query params, client IP
 2. Validate slug format (`^[A-Za-z0-9_-]{1,50}$`)
-3. Filter proxy headers (Cloudflare, Caddy, X-Forwarded-*)
+3. Filter proxy headers (Cloudflare, Caddy, X-Forwarded-\*)
 4. Call `SELECT capture_webhook(slug, method, path, headers, body, query_params, content_type, ip, received_at)`
 5. Map result status to HTTP response:
    - `ok` + mock_response → build mock HTTP response (with security header blocking, CRLF validation)
@@ -162,15 +162,15 @@ The Rust receiver (`apps/receiver-rs/`) handles all webhook ingestion. It connec
 
 **Receiver env vars:**
 
-| Variable               | Required | Default    | Purpose                       |
-| ---------------------- | -------- | ---------- | ----------------------------- |
-| `DATABASE_URL`         | yes      |            | Postgres connection string (use session pooler) |
-| `CAPTURE_SHARED_SECRET`| yes      |            | Shared secret (kept for future internal auth)   |
-| `PORT`                 | no       | 3001       | Listen port                   |
-| `RECEIVER_DEBUG`       | no       |            | Enable debug logging          |
-| `RECEIVER_LOG_DIR`     | no       | logs/      | Rolling JSON log file directory |
-| `PG_POOL_MIN`          | no       | 5          | Min Postgres pool connections |
-| `PG_POOL_MAX`          | no       | 20         | Max Postgres pool connections |
+| Variable                | Required | Default | Purpose                                         |
+| ----------------------- | -------- | ------- | ----------------------------------------------- |
+| `DATABASE_URL`          | yes      |         | Postgres connection string (use session pooler) |
+| `CAPTURE_SHARED_SECRET` | yes      |         | Shared secret (kept for future internal auth)   |
+| `PORT`                  | no       | 3001    | Listen port                                     |
+| `RECEIVER_DEBUG`        | no       |         | Enable debug logging                            |
+| `RECEIVER_LOG_DIR`      | no       | logs/   | Rolling JSON log file directory                 |
+| `PG_POOL_MIN`           | no       | 5       | Min Postgres pool connections                   |
+| `PG_POOL_MAX`           | no       | 20      | Max Postgres pool connections                   |
 
 ### CLI Commands
 
@@ -193,38 +193,38 @@ Config stored at `~/.config/whk/token.json`. Override API URL with `WHK_API_URL`
 
 **Schema (6 tables + auth system):**
 
-| Table         | Key fields                                                                     | Notes                                                  |
-| ------------- | ------------------------------------------------------------------------------ | ------------------------------------------------------ |
-| `users`       | email, plan (free/pro), requests_used, request_limit, polar_customer_id, period_end | Indexes: email, polar_customer, plan, plan+period_end |
-| `endpoints`   | slug (unique), user_id?, mock_response (jsonb)?, is_ephemeral, expires_at?     | Indexes: slug, user, expires, ephemeral+expires        |
-| `requests`    | endpoint_id, user_id, method, path, headers (jsonb), body, ip, received_at     | Indexes: endpoint+time, user+time, received_at         |
-| `api_keys`    | user_id, key_hash (SHA-256), key_prefix, expires_at                            | Indexes: key_hash, user                                |
-| `device_codes`| device_code, user_code, status, user_id?, expires_at                           | Indexes: device_code, user_code, status                |
-| `blog_posts`  | slug (unique), title, content, status (draft/published)                        | Index: slug, status                                    |
+| Table          | Key fields                                                                          | Notes                                                 |
+| -------------- | ----------------------------------------------------------------------------------- | ----------------------------------------------------- |
+| `users`        | email, plan (free/pro), requests_used, request_limit, polar_customer_id, period_end | Indexes: email, polar_customer, plan, plan+period_end |
+| `endpoints`    | slug (unique), user_id?, mock_response (jsonb)?, is_ephemeral, expires_at?          | Indexes: slug, user, expires, ephemeral+expires       |
+| `requests`     | endpoint_id, user_id, method, path, headers (jsonb), body, ip, received_at          | Indexes: endpoint+time, user+time, received_at        |
+| `api_keys`     | user_id, key_hash (SHA-256), key_prefix, expires_at                                 | Indexes: key_hash, user                               |
+| `device_codes` | device_code, user_code, status, user_id?, expires_at                                | Indexes: device_code, user_code, status               |
+| `blog_posts`   | slug (unique), title, content, status (draft/published)                             | Index: slug, status                                   |
 
 **Key stored procedures:**
 
-| Function                        | Purpose                                                              |
-| ------------------------------- | -------------------------------------------------------------------- |
-| `capture_webhook()`             | Hot path: endpoint lookup + quota + insert + counters in one call    |
-| `check_and_decrement_quota()`   | Atomic quota check + decrement for owned endpoints                   |
-| `check_and_increment_ephemeral()` | Atomic request count check + increment for ephemeral endpoints (25 cap) |
-| `start_free_period()`           | Lazy 24h period activation for free users                            |
-| `increment_endpoint_request_count()` | Increment endpoint counter                                     |
-| `increment_user_requests_used()` | Increment user usage counter                                        |
+| Function                             | Purpose                                                                 |
+| ------------------------------------ | ----------------------------------------------------------------------- |
+| `capture_webhook()`                  | Hot path: endpoint lookup + quota + insert + counters in one call       |
+| `check_and_decrement_quota()`        | Atomic quota check + decrement for owned endpoints                      |
+| `check_and_increment_ephemeral()`    | Atomic request count check + increment for ephemeral endpoints (25 cap) |
+| `start_free_period()`                | Lazy 24h period activation for free users                               |
+| `increment_endpoint_request_count()` | Increment endpoint counter                                              |
+| `increment_user_requests_used()`     | Increment user usage counter                                            |
 
 **RLS policies:** All tables have row-level security enabled. Anonymous access is blocked on all tables except `blog_posts` (published only) and `endpoints` INSERT (ephemeral with bounded expiry only). Guest endpoint/request reads are mediated through server API routes using the service role.
 
 **Cron jobs (via pg_cron):**
 
-| Job | Schedule | Purpose |
-|-----|----------|---------|
-| Billing period resets | Every minute | Reset free (24h) and pro (30d) periods, downgrade canceled subscriptions |
-| Ephemeral endpoint cleanup | Every 5 min | Delete expired ephemeral endpoints and orphaned requests |
-| Expired device code cleanup | Every 5 min | Delete expired CLI login codes |
-| Free user request cleanup | Daily 01:30 UTC | Delete requests older than 7 days for free users |
-| Old request cleanup | Daily 01:00 UTC | Delete all requests older than 31 days |
-| Expired API key cleanup | Daily 02:00 UTC | Delete expired API keys |
+| Job                         | Schedule        | Purpose                                                                  |
+| --------------------------- | --------------- | ------------------------------------------------------------------------ |
+| Billing period resets       | Every minute    | Reset free (24h) and pro (30d) periods, downgrade canceled subscriptions |
+| Ephemeral endpoint cleanup  | Every 5 min     | Delete expired ephemeral endpoints and orphaned requests                 |
+| Expired device code cleanup | Every 5 min     | Delete expired CLI login codes                                           |
+| Free user request cleanup   | Daily 01:30 UTC | Delete requests older than 7 days for free users                         |
+| Old request cleanup         | Daily 01:00 UTC | Delete all requests older than 31 days                                   |
+| Expired API key cleanup     | Daily 02:00 UTC | Delete expired API keys                                                  |
 
 **Key patterns:**
 
@@ -301,17 +301,17 @@ const req = await client.requests.waitFor(endpoint.slug, {
 
 ### Root `.env.local` (shared)
 
-| Variable                       | Required | Purpose                                    |
-| ------------------------------ | -------- | ------------------------------------------ |
-| `NEXT_PUBLIC_SUPABASE_URL`     | yes      | Supabase project URL                       |
-| `NEXT_PUBLIC_SUPABASE_ANON_KEY`| yes      | Supabase public anon key                   |
-| `SUPABASE_URL`                 | yes      | Supabase project URL (server-side)         |
-| `SUPABASE_SERVICE_ROLE_KEY`    | yes      | Supabase service role key                  |
-| `SUPABASE_DB_URL`              | yes      | Direct Postgres connection string          |
-| `DATABASE_URL`                 | yes      | Postgres connection for receiver (session pooler) |
-| `NEXT_PUBLIC_WEBHOOK_URL`      | yes      | Webhook receiver base URL                  |
-| `NEXT_PUBLIC_APP_URL`          | yes      | App base URL                               |
-| `CAPTURE_SHARED_SECRET`        | yes      | Shared secret for internal auth            |
+| Variable                        | Required | Purpose                                           |
+| ------------------------------- | -------- | ------------------------------------------------- |
+| `NEXT_PUBLIC_SUPABASE_URL`      | yes      | Supabase project URL                              |
+| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | yes      | Supabase public anon key                          |
+| `SUPABASE_URL`                  | yes      | Supabase project URL (server-side)                |
+| `SUPABASE_SERVICE_ROLE_KEY`     | yes      | Supabase service role key                         |
+| `SUPABASE_DB_URL`               | yes      | Direct Postgres connection string                 |
+| `DATABASE_URL`                  | yes      | Postgres connection for receiver (session pooler) |
+| `NEXT_PUBLIC_WEBHOOK_URL`       | yes      | Webhook receiver base URL                         |
+| `NEXT_PUBLIC_APP_URL`           | yes      | App base URL                                      |
+| `CAPTURE_SHARED_SECRET`         | yes      | Shared secret for internal auth                   |
 
 ### Supabase Environment
 
@@ -327,12 +327,12 @@ const req = await client.requests.waitFor(endpoint.slug, {
 
 ### Optional
 
-| Variable                                | Purpose                       |
-| --------------------------------------- | ----------------------------- |
-| `SENTRY_DSN` / `NEXT_PUBLIC_SENTRY_DSN` | Error tracking                |
-| `RECEIVER_DEBUG`                        | Enable receiver debug logging |
-| `WHK_DEBUG`                             | Enable CLI debug logging      |
-| `PG_POOL_MIN` / `PG_POOL_MAX`          | Receiver connection pool sizing |
+| Variable                                | Purpose                         |
+| --------------------------------------- | ------------------------------- |
+| `SENTRY_DSN` / `NEXT_PUBLIC_SENTRY_DSN` | Error tracking                  |
+| `RECEIVER_DEBUG`                        | Enable receiver debug logging   |
+| `WHK_DEBUG`                             | Enable CLI debug logging        |
+| `PG_POOL_MIN` / `PG_POOL_MAX`           | Receiver connection pool sizing |
 
 ## CI/CD & Releases
 

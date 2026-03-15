@@ -66,12 +66,8 @@ interface EndpointSettingsDialogProps {
   };
 }
 
-export function EndpointSettingsDialog({
-  endpointId,
-  endpointName,
-  slug,
-  mockResponse,
-}: EndpointSettingsDialogProps) {
+export function EndpointSettingsDialog(props: EndpointSettingsDialogProps) {
+  const { endpointName, slug, mockResponse } = props;
   const { session } = useAuth();
   const router = useRouter();
 

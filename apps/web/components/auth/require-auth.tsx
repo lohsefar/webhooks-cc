@@ -2,10 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useEffect } from "react";
-import {
-  SupabaseAuthProvider,
-  useAuth,
-} from "@/components/providers/supabase-auth-provider";
+import { SupabaseAuthProvider, useAuth } from "@/components/providers/supabase-auth-provider";
 import { identifyUser } from "@/lib/analytics";
 
 export function RequireAuth({ children }: { children: React.ReactNode }) {

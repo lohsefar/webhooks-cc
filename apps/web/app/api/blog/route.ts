@@ -1,6 +1,10 @@
 import { createBlogPostSchema } from "@/lib/blog-api-schema";
 import { verifyBlogSecret } from "@/lib/blog-api-auth";
-import { createBlogPost, listAllBlogPosts, listPublishedBlogPosts } from "@/lib/supabase/blog-posts";
+import {
+  createBlogPost,
+  listAllBlogPosts,
+  listPublishedBlogPosts,
+} from "@/lib/supabase/blog-posts";
 
 function isSlugExistsError(error: unknown): boolean {
   if (error instanceof Error && error.message === "slug_exists") {

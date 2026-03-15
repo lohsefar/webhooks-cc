@@ -12,9 +12,7 @@ export async function GET(request: Request) {
   // Surface OAuth provider errors (e.g. user denied consent)
   const errorDescription = searchParams.get("error_description");
   if (errorDescription) {
-    return NextResponse.redirect(
-      `${origin}/login?error=${encodeURIComponent(errorDescription)}`
-    );
+    return NextResponse.redirect(`${origin}/login?error=${encodeURIComponent(errorDescription)}`);
   }
 
   if (code) {

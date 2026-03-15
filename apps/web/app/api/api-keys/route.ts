@@ -60,7 +60,7 @@ export async function POST(request: Request) {
 
   const rawKey = generateApiKey();
   const keyHash = hashApiKey(rawKey);
-  const keyPrefix = rawKey.slice(0, 10);
+  const keyPrefix = rawKey.slice(0, 12);
   const expiresAt = new Date(Date.now() + DEFAULT_TTL_DAYS * 86_400_000).toISOString();
 
   const { error: insertError } = await admin.from("api_keys").insert({

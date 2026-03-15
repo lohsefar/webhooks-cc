@@ -5,8 +5,7 @@ import { createEndpointForUser } from "@/lib/supabase/endpoints";
 
 const SUPABASE_URL = process.env.SUPABASE_URL ?? "http://192.168.0.247:8000";
 const SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY!;
-const ANON_KEY =
-  process.env.SUPABASE_ANON_KEY ?? process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ?? "";
+const ANON_KEY = process.env.SUPABASE_ANON_KEY ?? process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ?? "";
 const TEST_PASSWORD = "TestPassword123!";
 
 if (!SERVICE_ROLE_KEY) {
@@ -95,178 +94,166 @@ describe("Supabase Realtime Integration", () => {
     }
   });
 
-  it(
-    "delivers authenticated user row updates over realtime",
-    async () => {
-      const anonClient = createAnonClient();
-      const signIn = await anonClient.auth.signInWithPassword({
-        email: testUserEmail,
-        password: TEST_PASSWORD,
-      });
+  it("delivers authenticated user row updates over realtime", async () => {
+    const anonClient = createAnonClient();
+    const signIn = await anonClient.auth.signInWithPassword({
+      email: testUserEmail,
+      password: TEST_PASSWORD,
+    });
 
-      expect(signIn.error).toBeNull();
+    expect(signIn.error).toBeNull();
 
-      const channel = anonClient.channel(`test-users-${testUserId}`);
-      const updatePromise = new Promise<Database["public"]["Tables"]["users"]["Row"]>(
-        (resolve, reject) => {
-          const timeout = setTimeout(() => {
-            reject(new Error("Timed out waiting for user realtime update"));
-          }, 10_000);
+    const channel = anonClient.channel(`test-users-${testUserId}`);
+    const updatePromise = new Promise<Database["public"]["Tables"]["users"]["Row"]>(
+      (resolve, reject) => {
+        const timeout = setTimeout(() => {
+          reject(new Error("Timed out waiting for user realtime update"));
+        }, 10_000);
 
-          channel.on(
-            "postgres_changes",
-            {
-              event: "UPDATE",
-              schema: "public",
-              table: "users",
-              filter: `id=eq.${testUserId}`,
-            },
-            (payload) => {
-              clearTimeout(timeout);
-              resolve(payload.new as Database["public"]["Tables"]["users"]["Row"]);
-            }
-          );
-        }
-      );
+        channel.on(
+          "postgres_changes",
+          {
+            event: "UPDATE",
+            schema: "public",
+            table: "users",
+            filter: `id=eq.${testUserId}`,
+          },
+          (payload) => {
+            clearTimeout(timeout);
+            resolve(payload.new as Database["public"]["Tables"]["users"]["Row"]);
+          }
+        );
+      }
+    );
 
-      await waitForSubscribed(channel);
+    await waitForSubscribed(channel);
 
-      const { error: updateError } = await admin
-        .from("users")
-        .update({
-          requests_used: 7,
-          subscription_status: "past_due",
-        })
-        .eq("id", testUserId);
-
-      expect(updateError).toBeNull();
-
-      await expect(updatePromise).resolves.toMatchObject({
-        id: testUserId,
+    const { error: updateError } = await admin
+      .from("users")
+      .update({
         requests_used: 7,
         subscription_status: "past_due",
-      });
+      })
+      .eq("id", testUserId);
 
-      await anonClient.removeChannel(channel);
-      await anonClient.auth.signOut();
-    },
-    20_000
-  );
+    expect(updateError).toBeNull();
 
-  it(
-    "delivers retained request inserts for an owned endpoint over realtime",
-    async () => {
-      const anonClient = createAnonClient();
-      const signIn = await anonClient.auth.signInWithPassword({
-        email: testUserEmail,
-        password: TEST_PASSWORD,
-      });
+    await expect(updatePromise).resolves.toMatchObject({
+      id: testUserId,
+      requests_used: 7,
+      subscription_status: "past_due",
+    });
 
-      expect(signIn.error).toBeNull();
+    await anonClient.removeChannel(channel);
+    await anonClient.auth.signOut();
+  }, 20_000);
 
-      const channel = anonClient.channel(`test-requests-${testEndpointId}`);
-      const requestPromise = new Promise<Database["public"]["Tables"]["requests"]["Row"]>(
-        (resolve, reject) => {
-          const timeout = setTimeout(() => {
-            reject(new Error("Timed out waiting for request realtime insert"));
-          }, 10_000);
+  it("delivers retained request inserts for an owned endpoint over realtime", async () => {
+    const anonClient = createAnonClient();
+    const signIn = await anonClient.auth.signInWithPassword({
+      email: testUserEmail,
+      password: TEST_PASSWORD,
+    });
 
-          channel.on(
-            "postgres_changes",
-            {
-              event: "INSERT",
-              schema: "public",
-              table: "requests",
-              filter: `endpoint_id=eq.${testEndpointId}`,
-            },
-            (payload) => {
-              clearTimeout(timeout);
-              resolve(payload.new as Database["public"]["Tables"]["requests"]["Row"]);
-            }
-          );
-        }
-      );
+    expect(signIn.error).toBeNull();
 
-      await waitForSubscribed(channel);
+    const channel = anonClient.channel(`test-requests-${testEndpointId}`);
+    const requestPromise = new Promise<Database["public"]["Tables"]["requests"]["Row"]>(
+      (resolve, reject) => {
+        const timeout = setTimeout(() => {
+          reject(new Error("Timed out waiting for request realtime insert"));
+        }, 10_000);
 
-      const { error: insertError } = await admin.from("requests").insert({
-        endpoint_id: testEndpointId,
-        user_id: testUserId,
-        method: "POST",
-        path: "/realtime-test",
-        headers: { "content-type": "application/json" },
-        body: "{\"ok\":true}",
-        query_params: { source: "realtime" },
-        content_type: "application/json",
-        ip: "127.0.0.1",
-        size: 11,
-      });
+        channel.on(
+          "postgres_changes",
+          {
+            event: "INSERT",
+            schema: "public",
+            table: "requests",
+            filter: `endpoint_id=eq.${testEndpointId}`,
+          },
+          (payload) => {
+            clearTimeout(timeout);
+            resolve(payload.new as Database["public"]["Tables"]["requests"]["Row"]);
+          }
+        );
+      }
+    );
 
-      expect(insertError).toBeNull();
+    await waitForSubscribed(channel);
 
-      await expect(requestPromise).resolves.toMatchObject({
-        endpoint_id: testEndpointId,
-        user_id: testUserId,
-        method: "POST",
-        path: "/realtime-test",
-      });
+    const { error: insertError } = await admin.from("requests").insert({
+      endpoint_id: testEndpointId,
+      user_id: testUserId,
+      method: "POST",
+      path: "/realtime-test",
+      headers: { "content-type": "application/json" },
+      body: '{"ok":true}',
+      query_params: { source: "realtime" },
+      content_type: "application/json",
+      ip: "127.0.0.1",
+      size: 11,
+    });
 
-      await anonClient.removeChannel(channel);
-      await anonClient.auth.signOut();
-    },
-    20_000
-  );
+    expect(insertError).toBeNull();
 
-  it(
-    "delivers owned endpoint row updates over realtime",
-    async () => {
-      const anonClient = createAnonClient();
-      const signIn = await anonClient.auth.signInWithPassword({
-        email: testUserEmail,
-        password: TEST_PASSWORD,
-      });
+    await expect(requestPromise).resolves.toMatchObject({
+      endpoint_id: testEndpointId,
+      user_id: testUserId,
+      method: "POST",
+      path: "/realtime-test",
+    });
 
-      expect(signIn.error).toBeNull();
+    await anonClient.removeChannel(channel);
+    await anonClient.auth.signOut();
+  }, 20_000);
 
-      const channel = anonClient.channel(`test-owned-endpoint-${testEndpointId}`);
-      const updatePromise = new Promise<Database["public"]["Tables"]["endpoints"]["Row"]>(
-        (resolve, reject) => {
-          const timeout = setTimeout(() => {
-            reject(new Error("Timed out waiting for owned endpoint realtime update"));
-          }, 10_000);
+  it("delivers owned endpoint row updates over realtime", async () => {
+    const anonClient = createAnonClient();
+    const signIn = await anonClient.auth.signInWithPassword({
+      email: testUserEmail,
+      password: TEST_PASSWORD,
+    });
 
-          channel.on(
-            "postgres_changes",
-            {
-              event: "UPDATE",
-              schema: "public",
-              table: "endpoints",
-              filter: `id=eq.${testEndpointId}`,
-            },
-            (payload) => {
-              clearTimeout(timeout);
-              resolve(payload.new as Database["public"]["Tables"]["endpoints"]["Row"]);
-            }
-          );
-        }
-      );
+    expect(signIn.error).toBeNull();
 
-      await waitForSubscribed(channel);
+    const channel = anonClient.channel(`test-owned-endpoint-${testEndpointId}`);
+    const updatePromise = new Promise<Database["public"]["Tables"]["endpoints"]["Row"]>(
+      (resolve, reject) => {
+        const timeout = setTimeout(() => {
+          reject(new Error("Timed out waiting for owned endpoint realtime update"));
+        }, 10_000);
 
-      const { error: countError } = await callRpc("increment_endpoint_request_count", {
-        p_endpoint_id: testEndpointId,
-        p_count: 1,
-      });
+        channel.on(
+          "postgres_changes",
+          {
+            event: "UPDATE",
+            schema: "public",
+            table: "endpoints",
+            filter: `id=eq.${testEndpointId}`,
+          },
+          (payload) => {
+            clearTimeout(timeout);
+            resolve(payload.new as Database["public"]["Tables"]["endpoints"]["Row"]);
+          }
+        );
+      }
+    );
 
-      expect(countError).toBeNull();
+    await waitForSubscribed(channel);
 
-      await expect(updatePromise).resolves.toMatchObject({
-        id: testEndpointId,
-      });
+    const { error: countError } = await callRpc("increment_endpoint_request_count", {
+      p_endpoint_id: testEndpointId,
+      p_count: 1,
+    });
 
-      await anonClient.removeChannel(channel);
-      await anonClient.auth.signOut();
-    },
-    20_000
-  );
+    expect(countError).toBeNull();
+
+    await expect(updatePromise).resolves.toMatchObject({
+      id: testEndpointId,
+    });
+
+    await anonClient.removeChannel(channel);
+    await anonClient.auth.signOut();
+  }, 20_000);
 });

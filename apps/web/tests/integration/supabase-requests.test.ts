@@ -35,7 +35,7 @@ async function insertRequest(path: string, receivedAt: number) {
       method: "POST",
       path,
       headers: { "content-type": "application/json" },
-      body: "{\"ok\":true}",
+      body: '{"ok":true}',
       query_params: { page: "1" },
       content_type: "application/json",
       ip: "127.0.0.1",

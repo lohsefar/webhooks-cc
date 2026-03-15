@@ -6,8 +6,6 @@ import { NextRequest, NextResponse } from "next/server";
  *
  * 1. Refreshes the Supabase JWT on every request so server components get fresh cookies.
  * 2. Sets Content-Security-Policy and related headers on every response.
- *
- * CSP allows Supabase origin (self-hosted) + Convex (kept during migration transition).
  */
 
 function sanitizeCspOrigin(raw: string | undefined, fallback: string): string {
@@ -77,19 +75,6 @@ export async function middleware(request: NextRequest) {
     supabaseWsOrigin = "wss://api1.webhooks.cc";
   }
 
-  // Keep Convex origins during transition (Phase 7 removes them)
-  const convexOrigin = sanitizeCspOrigin(
-    process.env.NEXT_PUBLIC_CONVEX_URL,
-    "https://api.webhooks.cc"
-  );
-  let convexWsOrigin: string;
-  try {
-    const url = new URL(convexOrigin);
-    convexWsOrigin = `wss://${url.host}`;
-  } catch {
-    convexWsOrigin = "wss://api.webhooks.cc";
-  }
-
   const isDev = process.env.NODE_ENV === "development";
   const edgeSetsSecurityHeaders = process.env.EDGE_SETS_SECURITY_HEADERS === "true";
 
@@ -99,7 +84,7 @@ export async function middleware(request: NextRequest) {
     "style-src 'self' 'unsafe-inline'",
     "img-src 'self' data: blob:",
     "font-src 'self'",
-    `connect-src 'self' ${supabaseOrigin} ${supabaseWsOrigin} https://*.convex.cloud https://*.convex.site wss://*.convex.cloud ${convexOrigin} ${convexWsOrigin} ${webhookOrigin} https://eu-assets.i.posthog.com https://f.webhooks.cc`,
+    `connect-src 'self' ${supabaseOrigin} ${supabaseWsOrigin} ${webhookOrigin} https://eu-assets.i.posthog.com https://f.webhooks.cc`,
     "object-src 'none'",
     "worker-src 'self'",
     "frame-ancestors 'none'",

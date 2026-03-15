@@ -349,7 +349,9 @@ describe("Supabase Billing Integration", () => {
 
     const { data: downgradedUser, error: downgradedError } = await admin
       .from("users")
-      .select("plan, request_limit, polar_subscription_id, subscription_status, cancel_at_period_end")
+      .select(
+        "plan, request_limit, polar_subscription_id, subscription_status, cancel_at_period_end"
+      )
       .eq("id", testUserId)
       .single();
 
@@ -413,16 +415,18 @@ describe("Supabase Billing Integration", () => {
     expect(response.status).toBe(200);
     await expect(response.json()).resolves.toEqual({ success: true });
 
-    const { data: deletedAuthUser, error: deletedAuthError } = await admin.auth.admin.getUserById(
-      testUserId
-    );
+    const { data: deletedAuthUser, error: deletedAuthError } =
+      await admin.auth.admin.getUserById(testUserId);
     expect(deletedAuthError?.status).toBe(404);
     expect(deletedAuthUser.user).toBeNull();
 
     const { data: userRows } = await admin.from("users").select("id").eq("id", testUserId);
     expect(userRows).toEqual([]);
 
-    const { data: requestRows } = await admin.from("requests").select("id").eq("user_id", testUserId);
+    const { data: requestRows } = await admin
+      .from("requests")
+      .select("id")
+      .eq("user_id", testUserId);
     expect(requestRows).toEqual([]);
 
     const { data: endpointRows } = await admin
@@ -431,7 +435,10 @@ describe("Supabase Billing Integration", () => {
       .eq("user_id", testUserId);
     expect(endpointRows).toEqual([]);
 
-    const { data: apiKeyRows } = await admin.from("api_keys").select("id").eq("user_id", testUserId);
+    const { data: apiKeyRows } = await admin
+      .from("api_keys")
+      .select("id")
+      .eq("user_id", testUserId);
     expect(apiKeyRows).toEqual([]);
 
     const { data: deviceCodeRows } = await admin

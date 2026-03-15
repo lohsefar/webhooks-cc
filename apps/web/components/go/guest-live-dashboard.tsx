@@ -414,7 +414,9 @@ function GuestLiveDashboardInner() {
         );
     }
     const filteredRequests =
-      methodFilter === "ALL" ? requests : requests.filter((request) => request.method === methodFilter);
+      methodFilter === "ALL"
+        ? requests
+        : requests.filter((request) => request.method === methodFilter);
     return filteredRequests.map(
       (request): RequestSummary => ({
         _id: request._id,

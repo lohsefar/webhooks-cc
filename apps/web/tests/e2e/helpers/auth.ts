@@ -48,8 +48,7 @@ export async function signInTestUser(
   targetPath = "/account"
 ): Promise<void> {
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL ?? SUPABASE_URL;
-  const anonKey =
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ?? process.env.SUPABASE_ANON_KEY!;
+  const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ?? process.env.SUPABASE_ANON_KEY!;
 
   // Sign in via Node.js Supabase client to get tokens
   const { createClient: createNodeClient } = await import("@supabase/supabase-js");
@@ -63,8 +62,6 @@ export async function signInTestUser(
   if (error) throw new Error(`signInWithPassword failed: ${error.message}`);
 
   const session = data.session!;
-  const origin = new URL(supabaseUrl).origin;
-
   // Navigate to any page to establish the correct origin
   await page.goto("/login");
   await page.waitForLoadState("domcontentloaded");

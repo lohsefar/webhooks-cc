@@ -119,7 +119,9 @@ export async function GET(request: Request, { params }: { params: Promise<{ slug
   const stream = new ReadableStream({
     async start(controller) {
       controller.enqueue(
-        encoder.encode(`event: connected\ndata: ${JSON.stringify({ slug, endpointId: endpoint.id })}\n\n`)
+        encoder.encode(
+          `event: connected\ndata: ${JSON.stringify({ slug, endpointId: endpoint.id })}\n\n`
+        )
       );
 
       const abortSignal = request.signal;
@@ -186,60 +188,59 @@ export async function GET(request: Request, { params }: { params: Promise<{ slug
         }
       }, KEEPALIVE_INTERVAL_MS);
 
-      durationTimer = setTimeout(() => {
-        if (closed || abortSignal.aborted) return;
-        try {
-          controller.enqueue(
-            encoder.encode(
-              `event: timeout\ndata: ${JSON.stringify({ reason: "max_duration" })}\n\n`
-            )
-          );
-        } catch {
-          // Stream may already be closed.
+      durationTimer = setTimeout(
+        () => {
+          if (closed || abortSignal.aborted) return;
+          try {
+            controller.enqueue(
+              encoder.encode(
+                `event: timeout\ndata: ${JSON.stringify({ reason: "max_duration" })}\n\n`
+              )
+            );
+          } catch {
+            // Stream may already be closed.
+          }
+          closeStream();
+        },
+        Math.max(0, MAX_CONNECTION_DURATION_MS - (Date.now() - connectionStart))
+      );
+
+      requestsChannel = supabase.channel(`stream:requests:${endpoint.id}:${connectionStart}`).on(
+        "postgres_changes",
+        {
+          event: "INSERT",
+          schema: "public",
+          table: "requests",
+          filter: `endpoint_id=eq.${endpoint.id}`,
+        },
+        (payload) => {
+          try {
+            enqueueRequest(toRequestRecord(payload.new as RequestRow));
+          } catch (error) {
+            Sentry.captureException(error);
+          }
         }
-        closeStream();
-      }, Math.max(0, MAX_CONNECTION_DURATION_MS - (Date.now() - connectionStart)));
+      );
 
-      requestsChannel = supabase
-        .channel(`stream:requests:${endpoint.id}:${connectionStart}`)
-        .on(
-          "postgres_changes",
-          {
-            event: "INSERT",
-            schema: "public",
-            table: "requests",
-            filter: `endpoint_id=eq.${endpoint.id}`,
-          },
-          (payload) => {
-            try {
-              enqueueRequest(toRequestRecord(payload.new as RequestRow));
-            } catch (error) {
-              Sentry.captureException(error);
-            }
+      endpointChannel = supabase.channel(`stream:endpoint:${endpoint.id}:${connectionStart}`).on(
+        "postgres_changes",
+        {
+          event: "DELETE",
+          schema: "public",
+          table: "endpoints",
+          filter: `id=eq.${endpoint.id}`,
+        },
+        () => {
+          try {
+            controller.enqueue(
+              encoder.encode(`event: endpoint_deleted\ndata: ${JSON.stringify({ slug })}\n\n`)
+            );
+          } catch {
+            // Stream may already be closed.
           }
-        );
-
-      endpointChannel = supabase
-        .channel(`stream:endpoint:${endpoint.id}:${connectionStart}`)
-        .on(
-          "postgres_changes",
-          {
-            event: "DELETE",
-            schema: "public",
-            table: "endpoints",
-            filter: `id=eq.${endpoint.id}`,
-          },
-          () => {
-            try {
-              controller.enqueue(
-                encoder.encode(`event: endpoint_deleted\ndata: ${JSON.stringify({ slug })}\n\n`)
-              );
-            } catch {
-              // Stream may already be closed.
-            }
-            closeStream();
-          }
-        );
+          closeStream();
+        }
+      );
 
       try {
         await Promise.all([waitForSubscribed(requestsChannel), waitForSubscribed(endpointChannel)]);

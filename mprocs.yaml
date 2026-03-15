@@ -3,6 +3,3 @@ procs:
     cmd: ["pnpm", "--filter", "web", "start"]
   receiver:
     shell: "set -a && . ./.env.local && set +a && ./dist/receiver"
-  deploy:
-    shell: "npx convex deploy && echo '✓ Convex deployed successfully'"
-    autostart: true

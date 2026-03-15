@@ -13,7 +13,6 @@ export default tseslint.config(
       "**/dist/**",
       "**/.next/**",
       "**/.turbo/**",
-      "**/convex/_generated/**",
       "**/*.config.js",
       "**/*.config.mjs",
       "**/public/_pagefind/**",
@@ -60,17 +59,6 @@ export default tseslint.config(
     rules: {
       "@typescript-eslint/explicit-function-return-type": "off",
       "@typescript-eslint/no-explicit-any": "warn",
-    },
-  },
-
-  // Convex rules
-  {
-    files: ["convex/**/*.ts"],
-    rules: {
-      "@typescript-eslint/no-unused-vars": [
-        "error",
-        { argsIgnorePattern: "^_", varsIgnorePattern: "^_" },
-      ],
     },
   },
 

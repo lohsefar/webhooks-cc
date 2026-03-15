@@ -243,7 +243,9 @@ export async function getAnyBlogPostBySlug(slug: string): Promise<BlogPostRecord
   return data ? normalizeBlogPost(data) : null;
 }
 
-export async function createBlogPost(input: BlogPostMutationInput): Promise<{ id: string; slug: string }> {
+export async function createBlogPost(
+  input: BlogPostMutationInput
+): Promise<{ id: string; slug: string }> {
   const admin = createAdminClient();
 
   const { data: existing, error: existingError } = await admin
@@ -352,12 +354,15 @@ export async function updateBlogPostBySlug(
   };
 }
 
-export async function deleteBlogPostBySlug(
-  slug: string
-): Promise<{ slug: string; deleted: true }> {
+export async function deleteBlogPostBySlug(slug: string): Promise<{ slug: string; deleted: true }> {
   const admin = createAdminClient();
 
-  const { data, error } = await admin.from("blog_posts").delete().eq("slug", slug).select("slug").maybeSingle();
+  const { data, error } = await admin
+    .from("blog_posts")
+    .delete()
+    .eq("slug", slug)
+    .select("slug")
+    .maybeSingle();
 
   if (error) {
     throw error;

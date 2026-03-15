@@ -225,10 +225,7 @@ export async function resubscribeForUser(userId: string): Promise<void> {
     throw new BillingActionError("no_subscription", "No subscription to reactivate");
   }
   if (!user.cancel_at_period_end) {
-    throw new BillingActionError(
-      "not_scheduled",
-      "Subscription is not scheduled for cancellation"
-    );
+    throw new BillingActionError("not_scheduled", "Subscription is not scheduled for cancellation");
   }
 
   const polar = createPolarClient();

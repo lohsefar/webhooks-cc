@@ -90,7 +90,7 @@ export default function PrivacyPage() {
           <h2 className="text-xl font-bold mb-3">Third-Party Services</h2>
           <div className="space-y-3 text-sm text-muted-foreground">
             <p>
-              <span className="font-bold text-foreground">Convex</span> hosts our database and
+              <span className="font-bold text-foreground">Supabase</span> hosts our database and
               handles authentication.
             </p>
             <p>
@@ -182,7 +182,7 @@ export default function PrivacyPage() {
           <h2 className="text-xl font-bold mb-3">Cookies & Storage</h2>
           <div className="space-y-3 text-sm text-muted-foreground">
             <p>
-              Authentication is managed by Convex and uses standard session mechanisms. We store
+              Authentication is managed by Supabase and uses standard session mechanisms. We store
               your theme preference (light/dark) and a PostHog anonymous identifier in localStorage.
               We do not use tracking cookies.
             </p>

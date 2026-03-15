@@ -7,7 +7,7 @@ import { useAuth } from "@/components/providers/supabase-auth-provider";
 import { UrlBar } from "@/components/dashboard/url-bar";
 import { RequestList } from "@/components/dashboard/request-list";
 import { RequestDetail, RequestDetailEmpty } from "@/components/dashboard/request-detail";
-import type { DisplayableRequest } from "@/components/dashboard/request-detail";
+
 import { ErrorBoundary } from "@/components/error-boundary";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Copy, Check, Send, Download, ChevronDown } from "lucide-react";
@@ -23,11 +23,13 @@ import {
   subscribeDashboardEndpointsChanged,
   type DashboardEndpoint,
 } from "@/lib/dashboard-api";
-import {
-  buildRetainedCountParams,
-  computeShowHasMore,
-} from "@/lib/dashboard-count";
-import type { ClickHouseRequest, ClickHouseSummary, AnyRequestSummary, Request } from "@/types/request";
+import { buildRetainedCountParams, computeShowHasMore } from "@/lib/dashboard-count";
+import type {
+  ClickHouseRequest,
+  ClickHouseSummary,
+  AnyRequestSummary,
+  Request,
+} from "@/types/request";
 
 const CLICKHOUSE_PAGE_SIZE = 50;
 
@@ -44,9 +46,8 @@ export default function DashboardPage() {
   const currentSlug = currentEndpoint?.slug;
 
   const [selectedId, setSelectedId] = useState<string | null>(null);
-  const [selectedClickHouseDetail, setSelectedClickHouseDetail] = useState<ClickHouseRequest | null>(
-    null
-  );
+  const [selectedClickHouseDetail, setSelectedClickHouseDetail] =
+    useState<ClickHouseRequest | null>(null);
   const [liveMode, setLiveMode] = useState(true);
   const [sortNewest, setSortNewest] = useState(true);
   const [mobileDetail, setMobileDetail] = useState(false);

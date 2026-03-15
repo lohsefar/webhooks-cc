@@ -5,10 +5,7 @@ import { compileBlogMDX } from "@/lib/blog-mdx";
 import { createDynamicBlogPostMetadata } from "@/lib/seo";
 import { BlogPostShell, type BlogPostData } from "@/components/blog/blog-post-shell";
 import { extractHowToSteps } from "@/lib/mdx-schema-extract";
-import {
-  getPublishedBlogPostBySlug,
-  listPublishedBlogPosts,
-} from "@/lib/supabase/blog-posts";
+import { getPublishedBlogPostBySlug, listPublishedBlogPosts } from "@/lib/supabase/blog-posts";
 
 export const dynamic = "force-dynamic";
 

@@ -74,11 +74,7 @@ export function AppHeader({
           <Link href="/account" className="text-sm text-muted-foreground hover:text-foreground">
             Account
           </Link>
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={handleSignOut}
-          >
+          <Button variant="ghost" size="sm" onClick={handleSignOut}>
             Sign out
           </Button>
         </div>

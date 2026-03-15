@@ -1,4 +1,4 @@
-.PHONY: dev dev-all dev-web dev-convex dev-receiver dev-cli build build-receiver build-cli test lint clean db-push prod prod-web prod-receiver start
+.PHONY: dev dev-all dev-web dev-receiver dev-cli build build-receiver build-cli test lint clean prod prod-web prod-receiver start
 
 # Development
 dev:
@@ -6,9 +6,6 @@ dev:
 
 dev-web:
 	pnpm --filter web dev
-
-dev-convex:
-	pnpm convex dev
 
 dev-receiver:
 	@set -a && . ./.env.local && set +a && cd apps/receiver-rs && $$HOME/.cargo/bin/cargo run
@@ -18,8 +15,7 @@ dev-cli:
 
 # Production
 prod:
-	@echo "Deploying Convex and building..."
-	npx convex deploy
+	@echo "Building..."
 	pnpm build
 	cd apps/receiver-rs && $$HOME/.cargo/bin/cargo build --release && cp target/release/webhooks-receiver ../../dist/receiver
 	@echo "Starting production servers..."
@@ -46,7 +42,6 @@ build-cli:
 # Test
 test:
 	pnpm test
-	pnpm test:convex
 	cd apps/receiver-rs && $$HOME/.cargo/bin/cargo test
 	cd apps/cli && go test ./...
 
@@ -54,10 +49,6 @@ test:
 lint:
 	cd apps/receiver-rs && $$HOME/.cargo/bin/cargo clippy -- -D warnings
 	cd apps/cli && golangci-lint run
-
-# Database
-db-push:
-	pnpm convex deploy
 
 # Start (production with mprocs)
 start:

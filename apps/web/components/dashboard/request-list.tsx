@@ -5,7 +5,7 @@ import { Circle, ArrowUpDown, Search, X, Loader2 } from "lucide-react";
 import { getMethodColor, formatTimestamp } from "@/types/request";
 import type { AnyRequestSummary } from "@/types/request";
 
-/** Extract a string ID from either a Convex RequestSummary or ClickHouseSummary. */
+/** Extract a string ID from a RequestSummary or ClickHouseSummary. */
 function getItemId(item: AnyRequestSummary): string {
   return "_id" in item ? item._id : item.id;
 }

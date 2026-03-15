@@ -40,12 +40,7 @@ export function unwrapPolarResult<T>(
   result: T | { ok: true; value: T } | { ok: false; error: unknown },
   operation: string
 ): T {
-  if (
-    result &&
-    typeof result === "object" &&
-    "ok" in result &&
-    typeof result.ok === "boolean"
-  ) {
+  if (result && typeof result === "object" && "ok" in result && typeof result.ok === "boolean") {
     if (result.ok) {
       return result.value;
     }

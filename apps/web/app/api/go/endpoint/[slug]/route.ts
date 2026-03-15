@@ -1,9 +1,6 @@
 import { createAdminClient } from "@/lib/supabase/admin";
 
-export async function GET(
-  _request: Request,
-  { params }: { params: Promise<{ slug: string }> }
-) {
+export async function GET(_request: Request, { params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params;
 
   const admin = createAdminClient();

@@ -6,8 +6,7 @@ import { cleanupExpiredEphemeralEndpoints } from "@/lib/supabase/cleanup";
 
 const SUPABASE_URL = process.env.SUPABASE_URL ?? "http://192.168.0.247:8000";
 const SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY!;
-const ANON_KEY =
-  process.env.SUPABASE_ANON_KEY ?? process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ?? "";
+const ANON_KEY = process.env.SUPABASE_ANON_KEY ?? process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ?? "";
 
 if (!SERVICE_ROLE_KEY) {
   throw new Error("SUPABASE_SERVICE_ROLE_KEY env var required for integration tests");
@@ -77,7 +76,7 @@ describe("Supabase Cleanup Integration", () => {
         method: "POST",
         path: "/cleanup-expired",
         headers: { "content-type": "application/json" },
-        body: "{\"expired\":true}",
+        body: '{"expired":true}',
         query_params: {},
         content_type: "application/json",
         ip: "127.0.0.1",
@@ -89,7 +88,7 @@ describe("Supabase Cleanup Integration", () => {
         method: "POST",
         path: "/cleanup-active",
         headers: { "content-type": "application/json" },
-        body: "{\"active\":true}",
+        body: '{"active":true}',
         query_params: {},
         content_type: "application/json",
         ip: "127.0.0.1",
@@ -101,7 +100,7 @@ describe("Supabase Cleanup Integration", () => {
         method: "POST",
         path: "/cleanup-persistent",
         headers: { "content-type": "application/json" },
-        body: "{\"persistent\":true}",
+        body: '{"persistent":true}',
         query_params: {},
         content_type: "application/json",
         ip: "127.0.0.1",

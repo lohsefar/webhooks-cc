@@ -141,9 +141,7 @@ export async function searchRequestsForUser(
   return (data ?? []).map(normalizeSearchRow);
 }
 
-export async function countSearchRequestsForUser(
-  input: CountSearchRequestsInput
-): Promise<number> {
+export async function countSearchRequestsForUser(input: CountSearchRequestsInput): Promise<number> {
   const admin = createAdminClient();
   const plan = await resolvePlan(input.userId, input.plan);
 

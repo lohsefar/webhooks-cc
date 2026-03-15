@@ -4,7 +4,7 @@ import { checkRateLimitByKey } from "@/lib/rate-limit";
 import { createEndpointForUser, listEndpointsForUser } from "@/lib/supabase/endpoints";
 
 const USER_ENDPOINT_RATE_LIMIT_WINDOW_MS = 10 * 60_000;
-const USER_ENDPOINT_RATE_LIMIT_MAX = 10;
+const USER_ENDPOINT_RATE_LIMIT_MAX = 30;
 
 export async function GET(request: Request) {
   const auth = await authenticateRequest(request);
@@ -88,7 +88,9 @@ export async function POST(request: Request) {
       isEphemeral,
       expiresAt,
       mockResponse:
-        body.mockResponse === undefined ? undefined : (body.mockResponse as Record<string, unknown>),
+        body.mockResponse === undefined
+          ? undefined
+          : (body.mockResponse as Record<string, unknown>),
     });
 
     return Response.json(created);

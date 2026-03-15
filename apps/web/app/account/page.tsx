@@ -286,8 +286,7 @@ export default function AccountPage() {
             <div className="flex justify-between text-sm">
               <span>{profile.plan === "free" ? "Requests today" : "Requests this period"}</span>
               <span className={isNearLimit ? "text-destructive font-medium" : "font-medium"}>
-                {displayedRequestsUsed.toLocaleString()} /{" "}
-                {profile.request_limit.toLocaleString()}
+                {displayedRequestsUsed.toLocaleString()} / {profile.request_limit.toLocaleString()}
               </span>
             </div>
 
@@ -385,9 +384,7 @@ export default function AccountPage() {
               <div key={key.id} className="p-4 flex items-center justify-between gap-4">
                 <div className="min-w-0">
                   <p className="font-medium truncate">{key.name}</p>
-                  <p className="text-xs text-muted-foreground font-mono">
-                    {key.key_prefix}...
-                  </p>
+                  <p className="text-xs text-muted-foreground font-mono">{key.key_prefix}...</p>
                   <p className="text-xs text-muted-foreground">
                     Created {new Date(key.created_at).toLocaleDateString()}
                     {key.last_used_at &&

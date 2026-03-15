@@ -1,10 +1,7 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { createClient } from "@supabase/supabase-js";
 import { createEndpointForUser } from "@/lib/supabase/endpoints";
-import {
-  countSearchRequestsForUser,
-  searchRequestsForUser,
-} from "@/lib/supabase/search";
+import { countSearchRequestsForUser, searchRequestsForUser } from "@/lib/supabase/search";
 
 const SUPABASE_URL = process.env.SUPABASE_URL ?? "http://192.168.0.247:8000";
 const SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY!;
@@ -100,7 +97,7 @@ describe("Supabase Search Integration", () => {
     await insertRequest({
       endpointId: primaryEndpointId,
       path: "/stripe/webhook",
-      body: "{\"provider\":\"stripe\",\"status\":\"ok\"}",
+      body: '{"provider":"stripe","status":"ok"}',
       headers: { "x-provider": "stripe" },
       receivedAt: now - 60_000,
     });
@@ -108,21 +105,21 @@ describe("Supabase Search Integration", () => {
       endpointId: primaryEndpointId,
       path: "/github/webhook",
       method: "PUT",
-      body: "{\"provider\":\"github\"}",
+      body: '{"provider":"github"}',
       headers: { "x-provider": "github" },
       receivedAt: now - 30_000,
     });
     await insertRequest({
       endpointId: secondaryEndpointId,
       path: "/other",
-      body: "{\"provider\":\"stripe\",\"source\":\"secondary\"}",
+      body: '{"provider":"stripe","source":"secondary"}',
       headers: { "x-provider": "stripe" },
       receivedAt: now - 10_000,
     });
     await insertRequest({
       endpointId: primaryEndpointId,
       path: "/too-old",
-      body: "{\"provider\":\"stripe\",\"status\":\"stale\"}",
+      body: '{"provider":"stripe","status":"stale"}',
       headers: { "x-provider": "stripe" },
       receivedAt: now - 8 * 24 * 60 * 60 * 1000,
     });
@@ -178,28 +175,28 @@ describe("Supabase Search Integration", () => {
       endpointId: primaryEndpointId,
       path: "/first",
       method: "POST",
-      body: "{\"batch\":1}",
+      body: '{"batch":1}',
       receivedAt: now - 3_000,
     });
     await insertRequest({
       endpointId: primaryEndpointId,
       path: "/second",
       method: "POST",
-      body: "{\"batch\":2}",
+      body: '{"batch":2}',
       receivedAt: now - 2_000,
     });
     await insertRequest({
       endpointId: primaryEndpointId,
       path: "/third",
       method: "POST",
-      body: "{\"batch\":3}",
+      body: '{"batch":3}',
       receivedAt: now - 1_000,
     });
     await insertRequest({
       endpointId: primaryEndpointId,
       path: "/ignored-get",
       method: "GET",
-      body: "{\"batch\":4}",
+      body: '{"batch":4}',
       receivedAt: now - 500,
     });
 

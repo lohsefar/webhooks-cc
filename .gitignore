@@ -14,8 +14,6 @@ next-env.d.ts
 .env.local
 .env*.local
 
-# Convex (generated types are committed for CI/contributors)
-
 # Go
 apps/cli/whk
 
@@ -49,3 +47,20 @@ apps/web/public/_pagefind/
 
 # Temporary files
 tmp/
+
+# Playwright artifacts
+apps/web/playwright-report/
+apps/web/test-results/
+
+# Migration data (Convex export)
+convex-export/
+convex-export-prod.zip
+
+# Redis dump
+dump.rdb
+
+# Screenshots
+*.png
+
+# Load test env
+.env.loadtest
