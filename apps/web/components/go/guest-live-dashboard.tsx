@@ -3,8 +3,6 @@
 import Link from "next/link";
 import dynamic from "next/dynamic";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { useConvexAuth, useMutation, useQuery } from "convex/react";
-import { api } from "@convex/_generated/api";
 import { useRouter } from "next/navigation";
 import { cn } from "@/lib/utils";
 import { copyToClipboard } from "@/lib/clipboard";
@@ -12,14 +10,25 @@ import { getWebhookUrl } from "@/lib/constants";
 import { ErrorBoundary } from "@/components/error-boundary";
 import { ThemeToggle } from "@/components/ui/theme-toggle";
 import { OAuthSignInButtons } from "@/components/auth/oauth-signin-buttons";
-import type { Id } from "@convex/_generated/dataModel";
+import { SupabaseAuthProvider, useAuth } from "@/components/providers/supabase-auth-provider";
+import {
+  createGuestDashboardEndpoint,
+  fetchGuestDashboardEndpoint,
+  fetchGuestDashboardRequests,
+  normalizeGuestEndpoint,
+  type GuestEndpointRecord,
+} from "@/lib/go-dashboard";
+import { parseStoredDemoEndpoint } from "@/lib/go-demo-storage";
+import { subscribeToEndpointRow } from "@/lib/supabase/realtime";
 import type { Request, RequestSummary } from "@/types/request";
 import { ArrowRight, Bot, Check, Circle, Copy, Eye, Plus, Send, Terminal } from "lucide-react";
-import { ConvexAuthProvider } from "@/components/providers/convex-auth-provider";
 
 const REQUEST_LIMIT = 25;
+const BACKGROUND_SYNC_INTERVAL_MS = 2000;
+const REQUEST_SYNC_INTERVAL_MS = 250;
+const INTERNAL_TEST_SEND_HEADER = "X-Webhooks-CC-Test-Send";
 // Local fallback so refreshes immediately after create still restore the slug.
-// This is overwritten with the authoritative `endpoint.expiresAt` once Convex returns it.
+// This is overwritten with the authoritative `endpoint.expiresAt` once the endpoint read completes.
 const EXPIRY_MS = 12 * 60 * 60 * 1000;
 const COPY_FEEDBACK_MS = 2000;
 const SEND_FEEDBACK_MS = 3000;
@@ -122,16 +131,15 @@ function RequestDetailLoading() {
 
 export function GuestLiveDashboard() {
   return (
-    <ConvexAuthProvider>
+    <SupabaseAuthProvider>
       <GuestLiveDashboardInner />
-    </ConvexAuthProvider>
+    </SupabaseAuthProvider>
   );
 }
 
 function GuestLiveDashboardInner() {
-  const { isAuthenticated, isLoading } = useConvexAuth();
+  const { isAuthenticated, isLoading } = useAuth();
   const router = useRouter();
-  const createEndpoint = useMutation(api.endpoints.create);
 
   useEffect(() => {
     if (!isLoading && isAuthenticated) {
@@ -140,10 +148,14 @@ function GuestLiveDashboardInner() {
   }, [isAuthenticated, isLoading, router]);
 
   const [endpointSlug, setEndpointSlug] = useState<string | null>(null);
+  const [endpoint, setEndpoint] = useState<GuestEndpointRecord | null | undefined>(undefined);
+  const [requests, setRequests] = useState<Request[]>([]);
   const [expiresAt, setExpiresAt] = useState<number | null>(null);
   const [timeRemaining, setTimeRemaining] = useState<string | null>(null);
   const [isCreating, setIsCreating] = useState(false);
   const [createError, setCreateError] = useState<string | null>(null);
+  const [endpointLoadError, setEndpointLoadError] = useState<string | null>(null);
+  const [storageReady, setStorageReady] = useState(false);
 
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [liveMode, setLiveMode] = useState(true);
@@ -156,7 +168,7 @@ function GuestLiveDashboardInner() {
 
   const prevRequestCount = useRef(0);
 
-  // Debounce search to avoid rapid Convex subscription churn
+  // Debounce search to avoid unnecessary filtering work while typing
   const searchDebounceRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   useEffect(() => {
     if (searchInput === "") {
@@ -167,67 +179,10 @@ function GuestLiveDashboardInner() {
     return () => clearTimeout(searchDebounceRef.current);
   }, [searchInput]);
 
-  const endpoint = useQuery(
-    api.endpoints.getBySlug,
-    endpointSlug ? { slug: endpointSlug } : "skip"
-  );
-
-  // Sync local expiry to the authoritative server expiry as soon as we have it.
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-    if (!endpointSlug || !endpoint?.isEphemeral || !endpoint.expiresAt) return;
-
-    // Avoid unnecessary re-renders/LS writes.
-    if (expiresAt === endpoint.expiresAt) return;
-
-    setExpiresAt(endpoint.expiresAt);
-    localStorage.setItem(
-      DEMO_ENDPOINT_STORAGE_KEY,
-      JSON.stringify({ slug: endpointSlug, expiresAt: endpoint.expiresAt })
-    );
-  }, [endpoint?.expiresAt, endpoint?.isEphemeral, endpointSlug, expiresAt]);
-
-  const summaries = useQuery(
-    api.requests.listSummaries,
-    endpoint ? { endpointId: endpoint._id, limit: REQUEST_LIMIT } : "skip"
-  );
-
-  // Full list only needed when debounced search is active (body search)
-  const needsFullList = debouncedSearch.length > 0;
-  const fullRequests = useQuery(
-    api.requests.list,
-    needsFullList && endpoint ? { endpointId: endpoint._id, limit: REQUEST_LIMIT } : "skip"
-  );
-
-  // Full detail for selected request
-  const selectedDetail = useQuery(
-    api.requests.get,
-    selectedId ? { id: selectedId as Id<"requests"> } : "skip"
-  );
-
-  const requestCount = endpoint?.requestCount ?? 0;
-  const remainingRequests = Math.max(0, REQUEST_LIMIT - requestCount);
-
-  // Cache last loaded request to prevent flicker during selection changes
-  const lastLoadedDetail = useRef<typeof selectedDetail>(undefined);
-  useEffect(() => {
-    if (selectedDetail !== undefined) {
-      lastLoadedDetail.current = selectedDetail;
-    }
-  }, [selectedDetail]);
-
-  // Clear stale selectedId when the request no longer exists
-  useEffect(() => {
-    if (selectedDetail === null && selectedId) {
-      setSelectedId(null);
-    }
-  }, [selectedDetail, selectedId]);
-
-  // Show previous request while new one loads (prevents flicker)
-  const displayDetail = selectedDetail !== undefined ? selectedDetail : lastLoadedDetail.current;
-
   const clearDemoEndpoint = useCallback((nextError: string | null = null) => {
     setEndpointSlug(null);
+    setEndpoint(null);
+    setRequests([]);
     setExpiresAt(null);
     setTimeRemaining(null);
     setSelectedId(null);
@@ -239,39 +194,89 @@ function GuestLiveDashboardInner() {
     setSearchInput("");
     setDebouncedSearch("");
     setCreateError(nextError);
+    setEndpointLoadError(null);
     prevRequestCount.current = 0;
     if (typeof window !== "undefined") {
       localStorage.removeItem(DEMO_ENDPOINT_STORAGE_KEY);
     }
   }, []);
 
+  const refreshEndpoint = useCallback(async (slug: string) => {
+    try {
+      const nextEndpoint = await fetchGuestDashboardEndpoint(slug);
+      if (!nextEndpoint) {
+        setEndpoint(null);
+        setEndpointLoadError(
+          "Could not restore your test endpoint yet. It may still be syncing, so try again."
+        );
+        return;
+      }
+
+      setEndpoint(nextEndpoint);
+      setEndpointLoadError(null);
+
+      if (typeof window !== "undefined" && nextEndpoint.expiresAt) {
+        setExpiresAt(nextEndpoint.expiresAt);
+        localStorage.setItem(
+          DEMO_ENDPOINT_STORAGE_KEY,
+          JSON.stringify({ slug: nextEndpoint.slug, expiresAt: nextEndpoint.expiresAt })
+        );
+      }
+    } catch (error) {
+      console.error("Failed to load guest endpoint:", error);
+      setEndpointLoadError("Could not refresh your test endpoint. Please try again.");
+    }
+  }, []);
+
+  const refreshRequests = useCallback(async (slug: string) => {
+    try {
+      const nextRequests = await fetchGuestDashboardRequests(slug, REQUEST_LIMIT);
+      setRequests(nextRequests);
+    } catch (error) {
+      console.error("Failed to load guest requests:", error);
+      setRequests([]);
+    }
+  }, []);
+
   useEffect(() => {
     if (typeof window === "undefined") return;
 
-    const stored = localStorage.getItem(DEMO_ENDPOINT_STORAGE_KEY);
-    if (!stored) return;
-
     try {
-      const parsed = JSON.parse(stored);
-      const slug = parsed?.slug;
-      const storedExpiry = parsed?.expiresAt;
+      const storedValue = localStorage.getItem(DEMO_ENDPOINT_STORAGE_KEY);
+      const storedEndpoint = parseStoredDemoEndpoint(storedValue);
 
-      if (typeof slug !== "string" || typeof storedExpiry !== "number") {
-        localStorage.removeItem(DEMO_ENDPOINT_STORAGE_KEY);
+      if (!storedEndpoint) {
+        if (storedValue) {
+          localStorage.removeItem(DEMO_ENDPOINT_STORAGE_KEY);
+        }
         return;
       }
 
-      if (storedExpiry <= Date.now()) {
-        localStorage.removeItem(DEMO_ENDPOINT_STORAGE_KEY);
-        return;
-      }
-
-      setEndpointSlug(slug);
-      setExpiresAt(storedExpiry);
-    } catch {
-      localStorage.removeItem(DEMO_ENDPOINT_STORAGE_KEY);
+      setEndpointSlug(storedEndpoint.slug);
+      setExpiresAt(storedEndpoint.expiresAt);
+    } finally {
+      setStorageReady(true);
     }
   }, []);
+
+  useEffect(() => {
+    if (!endpointSlug) {
+      setEndpoint(null);
+      return;
+    }
+
+    setEndpoint(undefined);
+    void refreshEndpoint(endpointSlug);
+  }, [endpointSlug, refreshEndpoint]);
+
+  useEffect(() => {
+    if (!endpoint?.id || !endpointSlug) {
+      setRequests([]);
+      return;
+    }
+
+    void refreshRequests(endpointSlug);
+  }, [endpoint?.id, endpointSlug, refreshRequests]);
 
   useEffect(() => {
     if (!expiresAt) {
@@ -282,6 +287,7 @@ function GuestLiveDashboardInner() {
     const updateTimer = () => {
       const remaining = expiresAt - Date.now();
       if (remaining <= 0) {
+        localStorage.removeItem(DEMO_ENDPOINT_STORAGE_KEY);
         clearDemoEndpoint();
         return;
       }
@@ -295,15 +301,102 @@ function GuestLiveDashboardInner() {
   }, [clearDemoEndpoint, expiresAt]);
 
   useEffect(() => {
-    if (!endpointSlug || endpoint !== null) return;
+    if (!endpoint?.id || !endpointSlug) {
+      return;
+    }
 
-    clearDemoEndpoint("Your test endpoint expired. Create a new one.");
-  }, [clearDemoEndpoint, endpoint, endpointSlug]);
+    const unsubscribeEndpoint = subscribeToEndpointRow(endpoint.id, (row) => {
+      if (!row) {
+        clearDemoEndpoint("Your test endpoint expired. Create a new one.");
+        return;
+      }
+
+      const nextEndpoint = normalizeGuestEndpoint(row);
+      setEndpoint(nextEndpoint);
+      setEndpointLoadError(null);
+
+      if (typeof window !== "undefined" && nextEndpoint.expiresAt) {
+        setExpiresAt(nextEndpoint.expiresAt);
+        localStorage.setItem(
+          DEMO_ENDPOINT_STORAGE_KEY,
+          JSON.stringify({ slug: nextEndpoint.slug, expiresAt: nextEndpoint.expiresAt })
+        );
+      }
+
+      void refreshRequests(endpointSlug);
+    });
+
+    return () => {
+      unsubscribeEndpoint();
+    };
+  }, [clearDemoEndpoint, endpoint?.id, endpointSlug, refreshRequests]);
+
+  useEffect(() => {
+    if (!endpoint?.id || !endpointSlug) {
+      return;
+    }
+
+    if (endpoint.requestCount === 0 || requests.length >= endpoint.requestCount) {
+      return;
+    }
+
+    void refreshRequests(endpointSlug);
+
+    const interval = window.setInterval(() => {
+      void refreshRequests(endpointSlug);
+    }, REQUEST_SYNC_INTERVAL_MS);
+
+    return () => {
+      window.clearInterval(interval);
+    };
+  }, [endpoint?.id, endpointSlug, endpoint?.requestCount, requests.length, refreshRequests]);
+
+  useEffect(() => {
+    if (!endpoint?.id || !endpointSlug) return;
+
+    const onFocus = () => {
+      void refreshEndpoint(endpointSlug);
+      void refreshRequests(endpointSlug);
+    };
+    const onVisibilityChange = () => {
+      if (document.visibilityState === "visible") {
+        onFocus();
+      }
+    };
+
+    window.addEventListener("focus", onFocus);
+    document.addEventListener("visibilitychange", onVisibilityChange);
+    return () => {
+      window.removeEventListener("focus", onFocus);
+      document.removeEventListener("visibilitychange", onVisibilityChange);
+    };
+  }, [endpoint?.id, endpointSlug, refreshEndpoint, refreshRequests]);
+
+  useEffect(() => {
+    if (!endpoint?.id || !endpointSlug) {
+      return;
+    }
+
+    const interval = window.setInterval(() => {
+      // Browsers can deprioritize guest realtime delivery when the page is blurred.
+      // Keep the guest dashboard fresh with a lightweight fallback sync until focus returns.
+      if (document.visibilityState === "visible" && document.hasFocus()) {
+        return;
+      }
+
+      void refreshEndpoint(endpointSlug);
+      void refreshRequests(endpointSlug);
+    }, BACKGROUND_SYNC_INTERVAL_MS);
+
+    return () => {
+      window.clearInterval(interval);
+    };
+  }, [endpoint?.id, endpointSlug, refreshEndpoint, refreshRequests]);
 
   const filteredSummaries = useMemo(() => {
-    if (debouncedSearch && fullRequests) {
+    if (debouncedSearch) {
       const q = debouncedSearch.toLowerCase();
-      return fullRequests
+      return requests
         .filter((r: Request) => {
           if (methodFilter !== "ALL" && r.method !== methodFilter) return false;
           const matchesPath = r.path.toLowerCase().includes(q);
@@ -320,35 +413,61 @@ function GuestLiveDashboardInner() {
           })
         );
     }
-    if (!summaries) return [];
-    if (methodFilter === "ALL") return summaries;
-    return summaries.filter((r) => r.method === methodFilter);
-  }, [summaries, fullRequests, methodFilter, debouncedSearch]);
+    const filteredRequests =
+      methodFilter === "ALL"
+        ? requests
+        : requests.filter((request) => request.method === methodFilter);
+    return filteredRequests.map(
+      (request): RequestSummary => ({
+        _id: request._id,
+        _creationTime: request._creationTime,
+        method: request.method,
+        receivedAt: request.receivedAt,
+      })
+    );
+  }, [requests, methodFilter, debouncedSearch]);
+
+  const displayDetail = useMemo(
+    () => requests.find((request) => request._id === selectedId),
+    [requests, selectedId]
+  );
+
+  const requestCount = Math.max(endpoint?.requestCount ?? 0, requests.length);
+  const remainingRequests = Math.max(0, REQUEST_LIMIT - requestCount);
 
   useEffect(() => {
-    if (!summaries) return;
+    if (requests.length === 0) {
+      prevRequestCount.current = 0;
+      return;
+    }
 
-    const currentCount = summaries.length;
+    const currentCount = requests.length;
     const diff = currentCount - prevRequestCount.current;
 
     if (prevRequestCount.current > 0 && diff > 0) {
       if (liveMode) {
-        setSelectedId(summaries[0]._id);
+        setSelectedId(requests[0]?._id ?? null);
       } else {
         setNewCount((prev) => prev + diff);
       }
     }
 
     prevRequestCount.current = currentCount;
-  }, [summaries, liveMode]);
+  }, [requests, liveMode]);
 
   useEffect(() => {
-    if (summaries && summaries.length > 0 && !selectedId) {
-      setSelectedId(summaries[0]._id);
+    if (requests.length > 0 && !selectedId) {
+      setSelectedId(requests[0]!._id);
     }
-  }, [summaries, selectedId]);
+  }, [requests, selectedId]);
 
-  const currentEndpointId = endpoint?._id;
+  useEffect(() => {
+    if (selectedId && !requests.some((request) => request._id === selectedId)) {
+      setSelectedId(null);
+    }
+  }, [requests, selectedId]);
+
+  const currentEndpointId = endpoint?.id;
   useEffect(() => {
     setSelectedId(null);
     setNewCount(0);
@@ -356,18 +475,20 @@ function GuestLiveDashboardInner() {
     setMethodFilter("ALL");
     setSearchInput("");
     setDebouncedSearch("");
-    lastLoadedDetail.current = undefined;
   }, [currentEndpointId]);
 
   const handleCreateEndpoint = async () => {
     setIsCreating(true);
     setCreateError(null);
+    setEndpointLoadError(null);
 
     try {
-      const result = await createEndpoint({ isEphemeral: true });
-      const expiry = Date.now() + EXPIRY_MS;
+      const result = await createGuestDashboardEndpoint();
+      const expiry = result.expiresAt ?? Date.now() + EXPIRY_MS;
 
       setEndpointSlug(result.slug);
+      setEndpoint(result);
+      setRequests([]);
       setExpiresAt(expiry);
       setSelectedId(null);
 
@@ -378,7 +499,7 @@ function GuestLiveDashboardInner() {
     } catch (error) {
       const rawMessage = error instanceof Error ? error.message : "";
       if (
-        rawMessage.includes("Rate limit exceeded") ||
+        rawMessage.includes("Too many requests") ||
         rawMessage.includes("Too many active demo endpoints")
       ) {
         setCreateError(rawMessage);
@@ -404,12 +525,23 @@ function GuestLiveDashboardInner() {
   }, []);
 
   const handleJumpToNew = useCallback(() => {
-    if (!summaries || summaries.length === 0) return;
-    setSelectedId(summaries[0]._id);
+    if (requests.length === 0) return;
+    setSelectedId(requests[0]!._id);
     setNewCount(0);
-  }, [summaries]);
+  }, [requests]);
 
   const endpointUrl = endpointSlug ? getWebhookUrl(endpointSlug) : null;
+
+  if (!storageReady) {
+    return (
+      <div className="h-screen flex flex-col overflow-hidden">
+        <GoHeader isAuthenticated={isAuthenticated} isLoading={true} />
+        <div className="flex-1 flex items-center justify-center p-8">
+          <p className="text-muted-foreground animate-pulse">Loading test endpoint...</p>
+        </div>
+      </div>
+    );
+  }
 
   if (!endpointSlug) {
     return (
@@ -424,24 +556,76 @@ function GuestLiveDashboardInner() {
     );
   }
 
-  if (!endpointUrl || !endpoint) {
+  if (!endpointUrl || endpoint === undefined) {
     return (
       <div className="h-screen flex flex-col overflow-hidden">
         <GoHeader isAuthenticated={isAuthenticated} isLoading={isLoading} />
         <div className="flex-1 flex items-center justify-center p-8">
-          <p className="text-muted-foreground animate-pulse">Loading test endpoint...</p>
+          {endpointLoadError ? (
+            <div className="neo-card neo-card-static max-w-md w-full text-center space-y-4">
+              <div className="space-y-2">
+                <h2 className="text-xl font-bold">Couldn&apos;t load your test endpoint</h2>
+                <p className="text-sm text-muted-foreground">{endpointLoadError}</p>
+              </div>
+              <div className="flex items-center justify-center gap-3">
+                <button
+                  onClick={() => endpointSlug && void refreshEndpoint(endpointSlug)}
+                  className="neo-btn-primary"
+                >
+                  Retry
+                </button>
+                <button onClick={() => clearDemoEndpoint()} className="neo-btn-outline">
+                  Start over
+                </button>
+              </div>
+            </div>
+          ) : (
+            <p className="text-muted-foreground animate-pulse">Loading test endpoint...</p>
+          )}
         </div>
       </div>
     );
   }
 
-  const hasRequests = Boolean(summaries && summaries.length > 0);
+  if (!endpoint) {
+    return (
+      <div className="h-screen flex flex-col overflow-hidden">
+        <GoHeader isAuthenticated={isAuthenticated} isLoading={isLoading} />
+        <div className="flex-1 flex items-center justify-center p-8">
+          {endpointLoadError ? (
+            <div className="neo-card neo-card-static max-w-md w-full text-center space-y-4">
+              <div className="space-y-2">
+                <h2 className="text-xl font-bold">Couldn&apos;t restore your test endpoint</h2>
+                <p className="text-sm text-muted-foreground">{endpointLoadError}</p>
+              </div>
+              <div className="flex items-center justify-center gap-3">
+                <button
+                  onClick={() => endpointSlug && void refreshEndpoint(endpointSlug)}
+                  className="neo-btn-primary"
+                >
+                  Retry
+                </button>
+                <button onClick={() => clearDemoEndpoint()} className="neo-btn-outline">
+                  Start over
+                </button>
+              </div>
+            </div>
+          ) : (
+            <p className="text-muted-foreground animate-pulse">Loading test endpoint...</p>
+          )}
+        </div>
+      </div>
+    );
+  }
+
+  const hasRequests = requests.length > 0;
+  const isSyncingRequests = requestCount > 0 && requests.length === 0;
 
   return (
     <div className="h-screen flex flex-col overflow-hidden">
       <GoHeader isAuthenticated={isAuthenticated} isLoading={isLoading} />
 
-      <ErrorBoundary resetKey={endpoint._id}>
+      <ErrorBoundary resetKey={endpoint.id}>
         <DemoUrlBar
           url={endpointUrl}
           timeRemaining={timeRemaining}
@@ -516,6 +700,10 @@ function GuestLiveDashboardInner() {
               )}
             </div>
           </>
+        ) : isSyncingRequests ? (
+          <div className="flex-1 flex items-center justify-center p-8">
+            <p className="text-muted-foreground animate-pulse">Loading captured request...</p>
+          </div>
         ) : (
           <DemoWaitingState url={endpointUrl} />
         )}
@@ -886,7 +1074,10 @@ function DemoWaitingState({ url }: { url: string }) {
     try {
       await fetch(url, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          [INTERNAL_TEST_SEND_HEADER]: "1",
+        },
         body: JSON.stringify({
           message: "Hello from the browser!",
           timestamp: new Date().toISOString(),

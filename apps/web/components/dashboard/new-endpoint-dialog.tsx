@@ -1,9 +1,8 @@
 "use client";
 
 import { useState } from "react";
-import { useMutation } from "convex/react";
 import { useRouter } from "next/navigation";
-import { api } from "@convex/_generated/api";
+import { useAuth } from "@/components/providers/supabase-auth-provider";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
@@ -11,6 +10,7 @@ import { StatusCodePicker } from "./status-code-picker";
 import { Plus } from "lucide-react";
 import { parseStatusCode } from "@/lib/http";
 import { trackEndpointCreated } from "@/lib/analytics";
+import { createDashboardEndpoint, emitDashboardEndpointsChanged } from "@/lib/dashboard-api";
 import {
   Dialog,
   DialogContent,
@@ -22,8 +22,8 @@ import {
 
 /** Dialog for creating a new webhook endpoint with optional mock response configuration. */
 export function NewEndpointDialog() {
+  const { session } = useAuth();
   const router = useRouter();
-  const createEndpoint = useMutation(api.endpoints.create);
 
   const [open, setOpen] = useState(false);
   const [name, setName] = useState("");
@@ -38,7 +38,12 @@ export function NewEndpointDialog() {
     setError(null);
 
     try {
-      const result = await createEndpoint({
+      const accessToken = session?.access_token;
+      if (!accessToken) {
+        throw new Error("Not authenticated");
+      }
+
+      const result = await createDashboardEndpoint(accessToken, {
         name: name || undefined,
         mockResponse: mockBody
           ? {
@@ -50,6 +55,7 @@ export function NewEndpointDialog() {
       });
 
       trackEndpointCreated();
+      emitDashboardEndpointsChanged();
       setOpen(false);
       resetForm();
       router.push(`/dashboard?endpoint=${result.slug}`);
@@ -136,7 +142,7 @@ export function NewEndpointDialog() {
           <div className="flex gap-3">
             <Button
               type="submit"
-              disabled={isSubmitting}
+              disabled={isSubmitting || !session?.access_token}
               className="neo-btn-primary rounded-none! flex-1"
             >
               {isSubmitting ? "Creating..." : "Create Endpoint"}

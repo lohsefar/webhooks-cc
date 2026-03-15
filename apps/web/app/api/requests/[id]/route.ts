@@ -1,4 +1,5 @@
-import { authenticateRequest, convexCliRequest, formatRequest } from "@/lib/api-auth";
+import { authenticateRequest } from "@/lib/api-auth";
+import { getRequestByIdForUser } from "@/lib/supabase/requests";
 
 export async function GET(request: Request, { params }: { params: Promise<{ id: string }> }) {
   const auth = await authenticateRequest(request);
@@ -6,12 +7,15 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
 
   const { id } = await params;
 
-  const resp = await convexCliRequest("/cli/requests", {
-    params: { requestId: id, userId: auth.userId },
-  });
+  try {
+    const data = await getRequestByIdForUser(auth.userId, id);
+    if (!data) {
+      return Response.json({ error: "not_found" }, { status: 404 });
+    }
 
-  if (!resp.ok) return resp;
-
-  const data = (await resp.json()) as Record<string, unknown>;
-  return Response.json(formatRequest(data));
+    return Response.json(data);
+  } catch (error) {
+    console.error("Failed to get request:", error);
+    return Response.json({ error: "Failed to get request" }, { status: 500 });
+  }
 }

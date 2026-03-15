@@ -10,8 +10,6 @@ webhooks.cc is a production webhook inspection and testing service. Users captur
 
 - App: `https://webhooks.cc`
 - Webhook receiver: `https://go.webhooks.cc`
-- Convex API: `https://api.webhooks.cc` (.cloud)
-- Convex HTTP actions: `https://site.webhooks.cc` (.site)
 
 ## Commands
 
@@ -19,7 +17,6 @@ webhooks.cc is a production webhook inspection and testing service. Users captur
 
 ```bash
 pnpm install              # Install all dependencies
-pnpm dev:convex           # Start Convex backend (run first, in separate terminal)
 pnpm dev:web              # Start Next.js web app
 make dev-receiver         # Start Rust webhook receiver
 make dev-cli ARGS="..."   # Run CLI with arguments
@@ -46,22 +43,19 @@ Without this step the old binary continues running and code changes have no effe
 ### Test
 
 ```bash
-make test                 # Run all tests (TS + Go + Rust)
-pnpm test:convex          # Convex backend tests only (vitest, 58+ cases)
+make test                           # Run all tests (TS + Go + Rust)
+cd apps/web && npx vitest run tests/integration/  # Supabase integration tests (42 cases)
 cd apps/receiver-rs && cargo test   # Rust receiver tests
 cd apps/cli && go test ./...        # CLI tests only
 ```
 
-### Convex
+### Supabase
+
+Migrations live in `supabase/migrations/`. Apply to the dev instance:
 
 ```bash
-npx convex dev --once     # Push schema/functions to dev deployment
-npx convex deploy         # Deploy to production
-npx convex run <fn> '{}'  # Run a function
+psql "$SUPABASE_DB_URL" -f supabase/migrations/00010_capture_webhook.sql
 ```
-
-- Dev deployment: `dev:good-starfish-831`
-- Prod deployment: `prod:affable-corgi-165`
 
 ### Systemd Services
 
@@ -87,14 +81,14 @@ cd apps/receiver-rs && cargo clippy     # Rust receiver lint
 
 ### Service Layout
 
-| Service  | Port    | Stack                             | Purpose                                               |
-| -------- | ------- | --------------------------------- | ----------------------------------------------------- |
-| Web app  | 3000    | Next.js 16, React 19, Tailwind v4 | Dashboard, docs, landing page                         |
-| Receiver | 3001    | Rust (Axum, Tokio, Redis)         | Captures webhooks at `/w/{slug}`                      |
-| Convex   | managed | Convex 1.31                       | Database, auth, real-time subscriptions, HTTP actions |
-| CLI      | n/a     | Go 1.25, Cobra                    | `whk tunnel`, `whk listen`, device auth               |
-| SDK      | n/a     | TypeScript, tsup                  | `@webhooks-cc/sdk` on npm                             |
-| MCP      | n/a     | TypeScript, tsup                  | `@webhooks-cc/mcp` on npm — MCP server for AI agents  |
+| Service  | Port    | Stack                             | Purpose                                              |
+| -------- | ------- | --------------------------------- | ---------------------------------------------------- |
+| Web app  | 3000    | Next.js 16, React 19, Tailwind v4 | Dashboard, docs, landing page, API routes            |
+| Receiver | 3001    | Rust (Axum, Tokio, sqlx/Postgres) | Captures webhooks at `/w/{slug}`                     |
+| Supabase | managed | Postgres, Supabase Auth, Realtime | Database, auth, real-time subscriptions              |
+| CLI      | n/a     | Go 1.25, Cobra                    | `whk tunnel`, `whk listen`, device auth              |
+| SDK      | n/a     | TypeScript, tsup                  | `@webhooks-cc/sdk` on npm                            |
+| MCP      | n/a     | TypeScript, tsup                  | `@webhooks-cc/mcp` on npm — MCP server for AI agents |
 
 ### Directory Structure
 
@@ -102,13 +96,14 @@ cd apps/receiver-rs && cargo clippy     # Rust receiver lint
 webhooks-cc/
 ├── apps/
 │   ├── web/              # Next.js 16 App Router (Tailwind v4, shadcn/ui, Sentry)
-│   ├── receiver-rs/      # Rust Axum webhook receiver
+│   ├── receiver-rs/      # Rust Axum webhook receiver (direct Postgres via sqlx)
 │   ├── cli/              # Go Cobra CLI (cmd/whk + internal packages)
 │   └── go-shared/        # Shared Go types (types/types.go)
 ├── packages/
 │   ├── sdk/              # @webhooks-cc/sdk (TypeScript, tsup, vitest)
 │   └── mcp/              # @webhooks-cc/mcp (MCP server for AI agents)
-├── convex/               # Backend: schema, functions, HTTP actions, crons, tests
+├── supabase/
+│   └── migrations/       # Postgres schema, functions, RLS policies, cron jobs
 ├── docs/                 # Internal planning docs (gitignored)
 ├── .github/workflows/    # CI, CLI release, SDK publish
 ├── Makefile              # Build/dev/test orchestration
@@ -121,68 +116,61 @@ webhooks-cc/
 
 ```
 External service -> POST /w/{slug}/path
-  -> Rust Receiver (hot path, ~0.3ms):
+  -> Rust Receiver:
      1. Validate slug, extract headers/body/IP
-     2. Fetch endpoint info from Redis cache (300s TTL, warmed proactively)
-     3. Check quota via Redis Lua script (atomic decrement, no locks)
-     4. Push request to Redis list buffer, mark slug active
-     5. Return mock response immediately (if configured)
-  -> Background flush workers (4x, async):
-     1. Poll active slugs from Redis set
-     2. Atomically take batch from Redis list (Lua script)
-     3. POST to Convex /capture-batch (Bearer CAPTURE_SHARED_SECRET)
-     4. At-most-once delivery (only re-enqueue on CircuitOpen)
-  -> Convex HTTP action:
-     1. Look up endpoint, check expiry
-     2. Store request(s) in `requests` table
-     3. Schedule usage increment (avoids OCC conflicts)
-  -> Dashboard: real-time update via Convex reactive query
+     2. Call capture_webhook() stored procedure (single Postgres RPC)
+        - Look up endpoint, check expiry
+        - Check/decrement quota atomically
+        - INSERT request row
+        - Increment counters
+     3. Return mock response (if configured) or 200 OK
+  -> Dashboard: real-time update via Supabase Realtime (postgres_changes)
   -> CLI: SSE stream at /api/stream/{slug} -> forward to localhost
 ```
 
 ### Receiver Internals (Rust)
 
-The Rust receiver (`apps/receiver-rs/`) handles all webhook ingestion. Benchmarked at ~86k RPS (oha), verified 100% delivery accuracy at 3.2k sustained RPS.
+The Rust receiver (`apps/receiver-rs/`) handles all webhook ingestion. It connects directly to Postgres via sqlx — no Redis, no intermediary services.
 
 **Architecture:**
 
-- **Axum + Tokio**: Async HTTP server, hot path returns in ~0.3ms (3 pipelined Redis commands)
-- **Redis**: All state lives in Redis — endpoint cache, quota, request buffers, circuit breaker. Configured via `REDIS_HOST`, `REDIS_PORT`, `REDIS_PASSWORD`, `REDIS_DB` env vars
-- **No Convex on hot path**: Webhook capture never touches Convex directly, only Redis
+- **Axum + Tokio**: Async HTTP server
+- **sqlx + Postgres**: Direct database access via connection pool
+- **Single stored procedure**: `capture_webhook()` handles endpoint lookup, quota, insert, and counters in one transaction
+- **Fail-open**: On DB errors, returns 200 OK to avoid dropping webhooks from the sender's perspective
 
-**Key components (`src/`):**
+**Source files (`src/`):**
 
-- `handlers/webhook.rs` — Hot path: validate slug, check cache, check quota, buffer request
-- `handlers/health.rs` — Health check endpoint
-- `handlers/cache_invalidate.rs` — Convex calls this to invalidate cached endpoint/quota
-- `redis/endpoint_cache.rs` — Endpoint info cache (300s TTL, proactively warmed)
-- `redis/quota.rs` — Atomic quota check via Lua script (decrement + check in one call)
-- `redis/request_buffer.rs` — Redis list per slug, atomic batch-take via Lua script
-- `convex/client.rs` — HTTP client for Convex API (30s timeout, connection pooling)
-- `convex/circuit_breaker.rs` — Redis-backed circuit breaker (5 failures → 30s cooldown)
-- `workers/flush.rs` — 4 concurrent workers drain Redis buffers to Convex
-- `workers/cache_warmer.rs` — Proactively refreshes endpoint/quota cache before TTL expiry
-- `config.rs` — Env var loading
+- `main.rs` — Axum setup, PgPool creation, route registration, tracing
+- `config.rs` — Env var loading (`DATABASE_URL`, `CAPTURE_SHARED_SECRET`, `PORT`, pool sizing)
+- `handlers/webhook.rs` — Hot path: call stored procedure, map result to HTTP response
+- `handlers/health.rs` — Pool connectivity check
 
-**Flush workers:**
+**Webhook handler pipeline:**
 
-- 4 workers, each processes a strided subset of shuffled slugs for fair distribution
-- Atomic batch-take from Redis lists (Lua script with DEL when fully consumed)
-- At-most-once delivery: only re-enqueue on `CircuitOpen` (request never sent)
-- All other errors (network, server, client) drop the batch to avoid duplicates
+1. Extract slug, method, path, headers, body, query params, client IP
+2. Validate slug format (`^[A-Za-z0-9_-]{1,50}$`)
+3. Filter proxy headers (Cloudflare, Caddy, X-Forwarded-\*)
+4. Call `SELECT capture_webhook(slug, method, path, headers, body, query_params, content_type, ip, received_at)`
+5. Map result status to HTTP response:
+   - `ok` + mock_response → build mock HTTP response (with security header blocking, CRLF validation)
+   - `ok` → 200 "ok"
+   - `not_found` → 404
+   - `expired` → 410
+   - `quota_exceeded` → 429 with Retry-After header
+6. On DB error → 200 "ok" (fail open)
 
-**Redis data model:**
+**Receiver env vars:**
 
-- `ep:{slug}` — Cached endpoint info (JSON, 300s TTL)
-- `quota:{slug}` — Quota remaining/limit (hash, 300s TTL)
-- `quota:user:{userId}` — Per-user shared quota across endpoints
-- `buf:{slug}` — Request buffer (list, LPUSH new / LRANGE+DEL old)
-- `buf:active` — Set of slugs with pending requests
-- `cb:failures` / `cb:state` / `cb:last_failure` — Circuit breaker state
-
-Receiver env vars: `CONVEX_SITE_URL`, `CAPTURE_SHARED_SECRET`, `PORT` (default 3001), `RECEIVER_DEBUG`, `REDIS_HOST` (default `127.0.0.1`), `REDIS_PORT` (default `6380`), `REDIS_PASSWORD`, `REDIS_DB` (default `0`)
-
-**Requires Redis running** — configured via env vars in `.env.local` (default: `192.168.0.20:6379`)
+| Variable                | Required | Default | Purpose                                         |
+| ----------------------- | -------- | ------- | ----------------------------------------------- |
+| `DATABASE_URL`          | yes      |         | Postgres connection string (use session pooler) |
+| `CAPTURE_SHARED_SECRET` | yes      |         | Shared secret (kept for future internal auth)   |
+| `PORT`                  | no       | 3001    | Listen port                                     |
+| `RECEIVER_DEBUG`        | no       |         | Enable debug logging                            |
+| `RECEIVER_LOG_DIR`      | no       | logs/   | Rolling JSON log file directory                 |
+| `PG_POOL_MIN`           | no       | 5       | Min Postgres pool connections                   |
+| `PG_POOL_MAX`           | no       | 20      | Max Postgres pool connections                   |
 
 ### CLI Commands
 
@@ -201,42 +189,52 @@ Receiver env vars: `CONVEX_SITE_URL`, `CAPTURE_SHARED_SECRET`, `PORT` (default 3
 
 Config stored at `~/.config/whk/token.json`. Override API URL with `WHK_API_URL` env var. Debug logging via `WHK_DEBUG`.
 
-### Convex Backend
+### Supabase Backend
 
-**Schema (5 tables + auth system):**
+**Schema (6 tables + auth system):**
 
-| Table         | Key fields                                                                     | Notes                                            |
-| ------------- | ------------------------------------------------------------------------------ | ------------------------------------------------ |
-| `users`       | email, plan (free/pro), requestsUsed, requestLimit, polarCustomerId, periodEnd | Indexes: by_email, by_polar_customer, by_plan    |
-| `endpoints`   | slug, userId?, mockResponse?, isEphemeral, expiresAt?                          | Indexes: by_slug, by_user, by_expires            |
-| `requests`    | endpointId, method, path, headers, body, ip, receivedAt                        | Index: by_endpoint_time                          |
-| `apiKeys`     | userId, keyHash (SHA-256), keyPrefix, expiresAt                                | Indexes: by_key_hash, by_user                    |
-| `deviceCodes` | deviceCode, userCode, status, userId?, expiresAt                               | Indexes: by_device_code, by_user_code, by_status |
+| Table          | Key fields                                                                          | Notes                                                 |
+| -------------- | ----------------------------------------------------------------------------------- | ----------------------------------------------------- |
+| `users`        | email, plan (free/pro), requests_used, request_limit, polar_customer_id, period_end | Indexes: email, polar_customer, plan, plan+period_end |
+| `endpoints`    | slug (unique), user_id?, mock_response (jsonb)?, is_ephemeral, expires_at?          | Indexes: slug, user, expires, ephemeral+expires       |
+| `requests`     | endpoint_id, user_id, method, path, headers (jsonb), body, ip, received_at          | Indexes: endpoint+time, user+time, received_at        |
+| `api_keys`     | user_id, key_hash (SHA-256), key_prefix, expires_at                                 | Indexes: key_hash, user                               |
+| `device_codes` | device_code, user_code, status, user_id?, expires_at                                | Indexes: device_code, user_code, status               |
+| `blog_posts`   | slug (unique), title, content, status (draft/published)                             | Index: slug, status                                   |
 
-**Key files:**
+**Key stored procedures:**
 
-| File             | Purpose                                                                                                                                              |
-| ---------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `schema.ts`      | Database schema definition                                                                                                                           |
-| `http.ts`        | HTTP actions: `/capture`, `/capture-batch`, `/quota`, `/endpoint-info`, `/check-period`, `/validate-api-key`, `/cli/*`, `/polar-webhook`             |
-| `auth.ts`        | GitHub + Google OAuth via @convex-dev/auth, cross-provider email linking                                                                             |
-| `users.ts`       | `current` (public, filters Polar IDs), `currentFull` (internal, includes Polar IDs), `deleteAccount` with phased deletion                            |
-| `endpoints.ts`   | CRUD with auth checks. Unauth users forced to `isEphemeral: true`. Schedules receiver cache invalidation on update                                   |
-| `requests.ts`    | Capture, quota checking (lazy period activation for free users), cleanup crons                                                                       |
-| `billing.ts`     | Polar.sh integration: checkout, cancel, resubscribe, webhook handling (HMAC-SHA256 verified)                                                         |
-| `apiKeys.ts`     | SHA-256 hashed storage, `whcc_` prefix, O(1) validation by hash lookup, 1-year max TTL                                                               |
-| `deviceAuth.ts`  | Device flow: create -> authorize -> poll -> claim (API key generated at claim time, one-time use)                                                    |
-| `rateLimiter.ts` | Token bucket via @convex-dev/rate-limiter: ephemeral (25/12hrs), user creation (10/10min), anon creation (20/10min)                                  |
-| `config.ts`      | Zod-validated env config: FREE_REQUEST_LIMIT (50), PRO_REQUEST_LIMIT (100k), EPHEMERAL_TTL_MS (12hrs), BILLING_PERIOD_MS (30d), FREE_PERIOD_MS (24h) |
-| `crons.ts`       | Every 5min: cleanup expired endpoints + device codes. Daily: billing period resets, API key cleanup, old request cleanup (30d for pro)               |
+| Function                             | Purpose                                                                 |
+| ------------------------------------ | ----------------------------------------------------------------------- |
+| `capture_webhook()`                  | Hot path: endpoint lookup + quota + insert + counters in one call       |
+| `check_and_decrement_quota()`        | Atomic quota check + decrement for owned endpoints                      |
+| `check_and_increment_ephemeral()`    | Atomic request count check + increment for ephemeral endpoints (25 cap) |
+| `start_free_period()`                | Lazy 24h period activation for free users                               |
+| `increment_endpoint_request_count()` | Increment endpoint counter                                              |
+| `increment_user_requests_used()`     | Increment user usage counter                                            |
+
+**RLS policies:** All tables have row-level security enabled. Anonymous access is blocked on all tables except `blog_posts` (published only) and `endpoints` INSERT (ephemeral with bounded expiry only). Guest endpoint/request reads are mediated through server API routes using the service role.
+
+**Cron jobs (via pg_cron):**
+
+| Job                         | Schedule        | Purpose                                                                  |
+| --------------------------- | --------------- | ------------------------------------------------------------------------ |
+| Billing period resets       | Every minute    | Reset free (24h) and pro (30d) periods, downgrade canceled subscriptions |
+| Ephemeral endpoint cleanup  | Every 5 min     | Delete expired ephemeral endpoints and orphaned requests                 |
+| Expired device code cleanup | Every 5 min     | Delete expired CLI login codes                                           |
+| Free user request cleanup   | Daily 01:30 UTC | Delete requests older than 7 days for free users                         |
+| Old request cleanup         | Daily 01:00 UTC | Delete all requests older than 31 days                                   |
+| Expired API key cleanup     | Daily 02:00 UTC | Delete expired API keys                                                  |
 
 **Key patterns:**
 
-- `users.current` (public) filters out `polarCustomerId` and `polarSubscriptionId` - use `internal.users.currentFull` for server-side billing access
-- Usage increments scheduled via `ctx.scheduler.runAfter(0, ...)` to avoid OCC read-modify-write races
-- Large deletions (account, request cleanup) split into phases to stay under 10s mutation timeout
-- Free user periods activate lazily on first request, not at signup
-- All receiver/CLI HTTP actions require `CAPTURE_SHARED_SECRET` Bearer token (except OAuth routes and `/polar-webhook`)
+- The receiver writes directly to Postgres via `capture_webhook()` — no intermediary
+- Usage increments happen atomically inside the stored procedure (no race conditions)
+- Free user periods activate lazily on first request via `start_free_period()`
+- Supabase Auth handles GitHub + Google OAuth with auto-provisioning via `handle_new_user()` trigger
+- API keys use SHA-256 hashed storage with `whcc_` prefix, validated by hash lookup
+- Device auth flow: create → authorize → poll → claim (API key generated at claim time)
+- Sensitive routes (account deletion, billing mutations) require Supabase session tokens — API keys are rejected
 
 ### Web App Structure
 
@@ -246,13 +244,14 @@ Next.js 16 App Router with neobrutalism design (Space Grotesk + JetBrains Mono f
 
 **Authenticated routes:** `/dashboard` (split-pane request viewer), `/account` (profile, billing, API keys), `/endpoints/new`, `/endpoints/[slug]/settings`, `/cli/verify` (device auth)
 
-**API routes:** `/api/health`, `/api/auth/device-*` (3 routes), `/api/endpoints` (CRUD + PATCH), `/api/endpoints/[slug]/requests`, `/api/requests/[id]`, `/api/stream/[slug]` (SSE)
+**API routes:** `/api/health`, `/api/auth/device-*` (4 routes), `/api/endpoints` (CRUD + PATCH), `/api/endpoints/[slug]/requests`, `/api/requests/[id]`, `/api/stream/[slug]` (SSE), `/api/api-keys` (CRUD), `/api/account` (DELETE), `/api/billing/*` (checkout/cancel/resubscribe), `/api/go/endpoint/*` (guest dashboard reads)
 
 **Key directories:**
 
 - `app/` - Pages and API routes
 - `components/` - UI components organized by feature (dashboard/, landing/, billing/, auth/, nav/, ui/)
 - `lib/` - Utilities: env validation (zod), API auth, rate limiting, formatting, SEO, export (JSON/CSV)
+- `lib/supabase/` - Supabase client utilities: admin (service role), client (browser), server (SSR), api-keys, billing, endpoints, requests, device-auth, cleanup, realtime, search
 
 ### SDK
 
@@ -302,39 +301,38 @@ const req = await client.requests.waitFor(endpoint.slug, {
 
 ### Root `.env.local` (shared)
 
-| Variable                  | Required | Purpose                                    |
-| ------------------------- | -------- | ------------------------------------------ |
-| `CONVEX_DEPLOYMENT`       | yes      | Convex deployment identifier               |
-| `NEXT_PUBLIC_CONVEX_URL`  | yes      | Convex `.cloud` URL                        |
-| `CONVEX_SITE_URL`         | yes      | Convex `.site` URL (HTTP actions)          |
-| `NEXT_PUBLIC_WEBHOOK_URL` | yes      | Webhook receiver base URL                  |
-| `NEXT_PUBLIC_APP_URL`     | yes      | App base URL                               |
-| `CAPTURE_SHARED_SECRET`   | yes      | Shared secret for receiver <-> Convex auth |
-| `REDIS_HOST`              | yes      | Redis host (e.g. `192.168.0.20`)           |
-| `REDIS_PORT`              | yes      | Redis port (e.g. `6379`)                   |
-| `REDIS_PASSWORD`          | yes      | Redis password                             |
-| `REDIS_DB`                | yes      | Redis database number (e.g. `0`)           |
+| Variable                        | Required | Purpose                                           |
+| ------------------------------- | -------- | ------------------------------------------------- |
+| `NEXT_PUBLIC_SUPABASE_URL`      | yes      | Supabase project URL                              |
+| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | yes      | Supabase public anon key                          |
+| `SUPABASE_URL`                  | yes      | Supabase project URL (server-side)                |
+| `SUPABASE_SERVICE_ROLE_KEY`     | yes      | Supabase service role key                         |
+| `SUPABASE_DB_URL`               | yes      | Direct Postgres connection string                 |
+| `DATABASE_URL`                  | yes      | Postgres connection for receiver (session pooler) |
+| `NEXT_PUBLIC_WEBHOOK_URL`       | yes      | Webhook receiver base URL                         |
+| `NEXT_PUBLIC_APP_URL`           | yes      | App base URL                                      |
+| `CAPTURE_SHARED_SECRET`         | yes      | Shared secret for internal auth                   |
 
-### Convex Environment (set via dashboard)
+### Supabase Environment
 
 | Variable                | Purpose                        |
 | ----------------------- | ------------------------------ |
-| `CONVEX_SITE_URL`       | Auth config                    |
-| `CAPTURE_SHARED_SECRET` | HTTP action auth               |
 | `POLAR_ACCESS_TOKEN`    | Polar.sh API                   |
 | `POLAR_ORGANIZATION_ID` | Polar org                      |
 | `POLAR_WEBHOOK_SECRET`  | Webhook signature verification |
 | `POLAR_PRO_PRODUCT_ID`  | Product ID for checkout        |
 | `POLAR_PRO_PRICE_ID`    | Price ID for checkout          |
 | `POLAR_SANDBOX`         | `true` for sandbox mode        |
+| `BLOG_API_SECRET`       | Blog admin API auth            |
 
 ### Optional
 
-| Variable                                | Purpose                       |
-| --------------------------------------- | ----------------------------- |
-| `SENTRY_DSN` / `NEXT_PUBLIC_SENTRY_DSN` | Error tracking                |
-| `RECEIVER_DEBUG`                        | Enable receiver debug logging |
-| `WHK_DEBUG`                             | Enable CLI debug logging      |
+| Variable                                | Purpose                         |
+| --------------------------------------- | ------------------------------- |
+| `SENTRY_DSN` / `NEXT_PUBLIC_SENTRY_DSN` | Error tracking                  |
+| `RECEIVER_DEBUG`                        | Enable receiver debug logging   |
+| `WHK_DEBUG`                             | Enable CLI debug logging        |
+| `PG_POOL_MIN` / `PG_POOL_MAX`           | Receiver connection pool sizing |
 
 ## CI/CD & Releases
 
@@ -346,18 +344,17 @@ const req = await client.requests.waitFor(endpoint.slug, {
 
 ## Key Gotchas
 
-- Convex optional fields must be `undefined`, not `null` (except `v.null()` in validators)
-- HTTP actions served from `.convex.site`, not `.convex.cloud`
-- Rust receiver requires Redis — configured via `REDIS_HOST`, `REDIS_PORT`, `REDIS_PASSWORD`, `REDIS_DB` in `.env.local`
-- Rust receiver flush uses at-most-once delivery — batches are dropped (not retried) on network/server errors to prevent duplicates
-- `generateUniqueSlug` helper uses `any` type for db parameter (Convex DB types are complex generics)
-- Device auth `apiKey` field in schema is vestigial (raw keys are no longer stored, generated at claim time)
-- The Rust receiver caches endpoint info for 300s — mock response changes propagate via cache invalidation (Convex mutations schedule it automatically) or cache warmer refresh
-- Free user billing periods are lazy: `periodEnd` is unset until first request triggers `checkAndStartPeriod`
+- The Rust receiver connects directly to Postgres via `DATABASE_URL` — use the Supabase session pooler URL, not the direct connection
+- Receiver fails open on DB errors: returns 200 OK so webhook senders don't retry
+- Mock response changes take effect immediately (no caching layer)
+- Free user billing periods are lazy: `period_end` is unset until first request triggers `start_free_period()`
+- RLS is hardened: anonymous users cannot read endpoints, requests, or device codes directly — all guest reads go through server API routes with service role
+- Sensitive routes (account deletion, billing) require Supabase session tokens — API keys return 403
+- Supabase migrations are in `supabase/migrations/` and must be applied manually to the dev instance via psql
 
 ## Licensing
 
 Split license model:
 
-- **AGPL-3.0**: `apps/web`, `apps/receiver-rs`, `convex/`
+- **AGPL-3.0**: `apps/web`, `apps/receiver-rs`, `supabase/`
 - **MIT**: `apps/cli`, `packages/sdk`, `packages/mcp`, `apps/go-shared`

@@ -1,15 +1,18 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
-import { useMutation } from "convex/react";
 import { useRouter } from "next/navigation";
-import { api } from "@convex/_generated/api";
-import { Id } from "@convex/_generated/dataModel";
+import { useAuth } from "@/components/providers/supabase-auth-provider";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { StatusCodePicker } from "./status-code-picker";
 import { Settings } from "lucide-react";
 import { parseStatusCode } from "@/lib/http";
+import {
+  deleteDashboardEndpoint,
+  emitDashboardEndpointsChanged,
+  updateDashboardEndpoint,
+} from "@/lib/dashboard-api";
 import {
   Dialog,
   DialogContent,
@@ -49,8 +52,8 @@ const DEFAULT_BODY_VALUES = new Set(Object.values(DEFAULT_BODIES));
 
 /** Props for the EndpointSettingsDialog component. */
 interface EndpointSettingsDialogProps {
-  /** Convex document ID for the endpoint. */
-  endpointId: Id<"endpoints">;
+  /** Stable endpoint ID. */
+  endpointId: string;
   /** Display name of the endpoint. */
   endpointName: string;
   /** URL-safe slug for the endpoint. */
@@ -63,15 +66,10 @@ interface EndpointSettingsDialogProps {
   };
 }
 
-export function EndpointSettingsDialog({
-  endpointId,
-  endpointName,
-  slug,
-  mockResponse,
-}: EndpointSettingsDialogProps) {
+export function EndpointSettingsDialog(props: EndpointSettingsDialogProps) {
+  const { endpointName, slug, mockResponse } = props;
+  const { session } = useAuth();
   const router = useRouter();
-  const updateEndpoint = useMutation(api.endpoints.update);
-  const deleteEndpoint = useMutation(api.endpoints.remove);
 
   const [open, setOpen] = useState(false);
   const [name, setName] = useState(endpointName);
@@ -100,9 +98,13 @@ export function EndpointSettingsDialog({
     setError(null);
 
     try {
+      const accessToken = session?.access_token;
+      if (!accessToken) {
+        throw new Error("Not authenticated");
+      }
+
       const hasCustomMock = mockBody || mockStatus !== "200";
-      await updateEndpoint({
-        id: endpointId,
+      await updateDashboardEndpoint(accessToken, slug, {
         name: name || undefined,
         mockResponse: hasCustomMock
           ? {
@@ -112,6 +114,7 @@ export function EndpointSettingsDialog({
             }
           : null,
       });
+      emitDashboardEndpointsChanged();
       setOpen(false);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to save");
@@ -128,7 +131,13 @@ export function EndpointSettingsDialog({
 
     setIsDeleting(true);
     try {
-      await deleteEndpoint({ id: endpointId });
+      const accessToken = session?.access_token;
+      if (!accessToken) {
+        throw new Error("Not authenticated");
+      }
+
+      await deleteDashboardEndpoint(accessToken, slug);
+      emitDashboardEndpointsChanged();
       setOpen(false);
       router.push("/dashboard");
     } catch (err) {
@@ -236,7 +245,7 @@ export function EndpointSettingsDialog({
             </button>
             <button
               onClick={handleSave}
-              disabled={isSaving}
+              disabled={isSaving || !session?.access_token}
               className="neo-btn-primary py-1.5! px-3! text-xs"
             >
               {isSaving ? "Saving..." : "Save Changes"}

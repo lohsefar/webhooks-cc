@@ -5,13 +5,12 @@ import { Suspense, useEffect, useState } from "react";
 import Link from "next/link";
 import { ThemeToggle } from "@/components/ui/theme-toggle";
 import { OAuthSignInButtons } from "@/components/auth/oauth-signin-buttons";
-import { useConvexAuth } from "convex/react";
-import { ConvexAuthProvider } from "@/components/providers/convex-auth-provider";
+import { SupabaseAuthProvider, useAuth } from "@/components/providers/supabase-auth-provider";
 import { isMaintenanceBannerEnabled } from "@/components/maintenance-banner";
 
 export default function LoginPage() {
   return (
-    <ConvexAuthProvider>
+    <SupabaseAuthProvider>
       <Suspense
         fallback={
           <div className="min-h-screen flex items-center justify-center">
@@ -21,12 +20,12 @@ export default function LoginPage() {
       >
         <LoginContent />
       </Suspense>
-    </ConvexAuthProvider>
+    </SupabaseAuthProvider>
   );
 }
 
 function LoginContent() {
-  const { isAuthenticated, isLoading } = useConvexAuth();
+  const { isAuthenticated, isLoading } = useAuth();
   const router = useRouter();
   const searchParams = useSearchParams();
   const [hasMounted, setHasMounted] = useState(false);

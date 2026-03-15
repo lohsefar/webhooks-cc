@@ -1,4 +1,5 @@
-import { authenticateRequest, convexCliRequest, formatRequest } from "@/lib/api-auth";
+import { authenticateRequest } from "@/lib/api-auth";
+import { listPaginatedRequestsForEndpointByUser } from "@/lib/supabase/requests";
 
 export async function GET(request: Request, { params }: { params: Promise<{ slug: string }> }) {
   const auth = await authenticateRequest(request);
@@ -7,37 +8,33 @@ export async function GET(request: Request, { params }: { params: Promise<{ slug
   const { slug } = await params;
   const url = new URL(request.url);
 
-  const queryParams: Record<string, string> = {
-    slug,
-    userId: auth.userId,
-  };
-
   const limit = url.searchParams.get("limit");
-  if (limit) queryParams.limit = limit;
-
   const cursor = url.searchParams.get("cursor");
-  if (cursor) queryParams.cursor = cursor;
+  const parsedLimit = limit ? Number(limit) : undefined;
 
-  const resp = await convexCliRequest("/cli/requests-list-paginated", {
-    params: queryParams,
-  });
-
-  if (!resp.ok) return resp;
-
-  const data: unknown = await resp.json();
-  if (
-    typeof data !== "object" ||
-    data === null ||
-    !("items" in data) ||
-    !Array.isArray((data as { items: unknown }).items)
-  ) {
-    return Response.json({ error: "Unexpected response format" }, { status: 502 });
+  if (parsedLimit !== undefined && (!Number.isFinite(parsedLimit) || parsedLimit < 1)) {
+    return Response.json({ error: "invalid_limit" }, { status: 400 });
   }
 
-  const page = data as { items: Array<Record<string, unknown>>; cursor?: string; hasMore: boolean };
-  return Response.json({
-    items: page.items.map((item) => formatRequest(item)),
-    cursor: page.cursor,
-    hasMore: page.hasMore,
-  });
+  try {
+    const page = await listPaginatedRequestsForEndpointByUser({
+      userId: auth.userId,
+      slug,
+      limit: parsedLimit,
+      cursor: cursor ?? undefined,
+    });
+
+    if (!page) {
+      return Response.json({ error: "not_found" }, { status: 404 });
+    }
+
+    return Response.json(page);
+  } catch (error) {
+    if (error instanceof Error && error.message === "invalid_cursor") {
+      return Response.json({ error: "invalid_cursor" }, { status: 400 });
+    }
+
+    console.error("Failed to list paginated requests:", error);
+    return Response.json({ error: "Failed to list paginated requests" }, { status: 500 });
+  }
 }

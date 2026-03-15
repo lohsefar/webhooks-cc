@@ -1,17 +1,25 @@
-import { extractBearerToken, validateApiKeyWithPlan } from "@/lib/api-auth";
-import { serverEnv, publicEnv } from "@/lib/env";
+import { extractBearerToken, validateBearerTokenWithPlan } from "@/lib/api-auth";
 import { checkRateLimitByKey } from "@/lib/rate-limit";
+import { searchRequestsForUser } from "@/lib/supabase/search";
 import * as Sentry from "@sentry/nextjs";
-import { ConvexHttpClient } from "convex/browser";
-import { api } from "@convex/_generated/api";
 
-/**
- * GET /api/search/requests — Proxy search requests to the Rust receiver's
- * ClickHouse-backed /search endpoint.
- *
- * Auth: accepts either a Convex JWT (browser) or API key (CLI/SDK).
- * Injects user_id and forwards query params to the receiver.
- */
+function parseOptionalInteger(
+  searchParams: URLSearchParams,
+  key: string
+): { value?: number; error?: Response } {
+  const raw = searchParams.get(key);
+  if (raw === null) {
+    return {};
+  }
+
+  const value = Number(raw);
+  if (!Number.isFinite(value) || value < 0) {
+    return { error: Response.json({ error: `invalid_${key}` }, { status: 400 }) };
+  }
+
+  return { value };
+}
+
 export async function GET(request: Request) {
   try {
     const token = extractBearerToken(request);
@@ -19,36 +27,13 @@ export async function GET(request: Request) {
       return Response.json({ error: "Missing authorization header" }, { status: 401 });
     }
 
-    let userId: string;
-    let plan: "free" | "pro" | undefined;
-
-    if (token.startsWith("whcc_")) {
-      // API key auth (CLI/SDK)
-      const validated = await validateApiKeyWithPlan(token);
-      if (!validated) {
-        return Response.json({ error: "Invalid API key" }, { status: 401 });
-      }
-      userId = validated.userId;
-      plan = validated.plan;
-    } else {
-      // Convex JWT auth (browser dashboard)
-      const convex = new ConvexHttpClient(publicEnv().NEXT_PUBLIC_CONVEX_URL);
-      convex.setAuth(token);
-      try {
-        const user = await convex.query(api.users.current);
-        if (!user?._id) {
-          return Response.json({ error: "Invalid token" }, { status: 401 });
-        }
-        userId = user._id;
-        plan = user.plan === "free" || user.plan === "pro" ? user.plan : undefined;
-      } catch (authErr: unknown) {
-        const msg = authErr instanceof Error ? authErr.message : String(authErr);
-        if (msg.includes("Unauthenticated") || msg.includes("OIDC token")) {
-          return Response.json({ error: "Token expired" }, { status: 401 });
-        }
-        throw authErr;
-      }
+    const validated = await validateBearerTokenWithPlan(token);
+    if (!validated) {
+      return Response.json({ error: "Invalid token" }, { status: 401 });
     }
+
+    const userId = validated.userId;
+    const plan = validated.plan;
 
     const rateLimited = checkRateLimitByKey(`search:${userId}`, 60, 10 * 60_000);
     if (rateLimited) {
@@ -56,40 +41,37 @@ export async function GET(request: Request) {
     }
 
     const url = new URL(request.url);
-    const receiverBase = publicEnv().NEXT_PUBLIC_WEBHOOK_URL;
-    const secret = serverEnv().CAPTURE_SHARED_SECRET;
-
-    // Build receiver search URL with user_id and forwarded params
-    const searchUrl = new URL(`${receiverBase}/search`);
-    searchUrl.searchParams.set("user_id", userId);
-    if (plan) {
-      searchUrl.searchParams.set("plan", plan);
+    const parsedFrom = parseOptionalInteger(url.searchParams, "from");
+    if (parsedFrom.error) {
+      return parsedFrom.error;
+    }
+    const parsedTo = parseOptionalInteger(url.searchParams, "to");
+    if (parsedTo.error) {
+      return parsedTo.error;
+    }
+    const parsedLimit = parseOptionalInteger(url.searchParams, "limit");
+    if (parsedLimit.error) {
+      return parsedLimit.error;
+    }
+    const parsedOffset = parseOptionalInteger(url.searchParams, "offset");
+    if (parsedOffset.error) {
+      return parsedOffset.error;
     }
 
-    // Forward allowed query params
-    for (const key of ["slug", "method", "q", "from", "to", "limit", "offset", "order"]) {
-      const value = url.searchParams.get(key);
-      if (value) {
-        searchUrl.searchParams.set(key, value);
-      }
-    }
-
-    const resp = await fetch(searchUrl.toString(), {
-      headers: {
-        Authorization: `Bearer ${secret}`,
-      },
+    const order = url.searchParams.get("order");
+    const data = await searchRequestsForUser({
+      userId,
+      plan,
+      slug: url.searchParams.get("slug") ?? undefined,
+      method: url.searchParams.get("method") ?? undefined,
+      q: url.searchParams.get("q") ?? undefined,
+      from: parsedFrom.value,
+      to: parsedTo.value,
+      limit: parsedLimit.value,
+      offset: parsedOffset.value,
+      order: order === "asc" ? "asc" : "desc",
     });
 
-    if (!resp.ok) {
-      const text = await resp.text();
-      console.error("Search proxy error:", resp.status, text);
-      return Response.json(
-        { error: "Search request failed" },
-        { status: resp.status >= 500 ? 502 : resp.status }
-      );
-    }
-
-    const data: unknown = await resp.json();
     return Response.json(data);
   } catch (err) {
     Sentry.captureException(err);

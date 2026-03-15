@@ -1,8 +1,7 @@
-import { getConvexClient } from "@/lib/convex-client";
 import { checkRateLimit } from "@/lib/rate-limit";
 import { parseJsonBody } from "@/lib/request-validation";
+import { claimDeviceCode } from "@/lib/supabase/device-auth";
 import * as Sentry from "@sentry/nextjs";
-import { api } from "@convex/_generated/api";
 
 export async function POST(request: Request) {
   const rateLimited = checkRateLimit(request, 10);
@@ -17,10 +16,7 @@ export async function POST(request: Request) {
   }
 
   try {
-    const convex = getConvexClient();
-    const result = await convex.mutation(api.deviceAuth.claimDeviceCode, {
-      deviceCode: body.deviceCode,
-    });
+    const result = await claimDeviceCode(body.deviceCode);
 
     return Response.json({
       apiKey: result.apiKey,
@@ -33,6 +29,7 @@ export async function POST(request: Request) {
       error instanceof Error &&
       (error.message.includes("expired") ||
         error.message.includes("Invalid") ||
+        error.message.includes("already claimed") ||
         error.message.includes("not yet authorized") ||
         error.message.includes("not properly authorized") ||
         error.message.includes("Maximum of"))

@@ -1,9 +1,7 @@
-import { Id } from "@convex/_generated/dataModel";
-
 export interface Request {
-  _id: Id<"requests">;
+  _id: string;
   _creationTime: number;
-  endpointId: Id<"endpoints">;
+  endpointId: string;
   method: HttpMethod | string; // HttpMethod for known methods, string for custom methods
   path: string;
   headers: Record<string, string>;
@@ -16,13 +14,13 @@ export interface Request {
 }
 
 export interface RequestSummary {
-  _id: Id<"requests">;
+  _id: string;
   _creationTime: number;
   method: HttpMethod | string;
   receivedAt: number;
 }
 
-/** A request from ClickHouse search/pagination (no Convex _id). */
+/** A request from search/pagination (uses string id instead of _id). */
 export interface ClickHouseRequest {
   id: string;
   slug: string;
@@ -44,7 +42,7 @@ export interface ClickHouseSummary {
   receivedAt: number;
 }
 
-/** Union type for items in the request list (Convex or ClickHouse). */
+/** Union type for items in the request list. */
 export type AnyRequestSummary = RequestSummary | ClickHouseSummary;
 
 export type HttpMethod = "GET" | "POST" | "PUT" | "PATCH" | "DELETE" | "HEAD" | "OPTIONS";

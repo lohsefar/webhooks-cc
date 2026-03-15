@@ -1,8 +1,7 @@
 import { getAllDocSlugs, getDocFrontmatter } from "@/lib/docs";
 import { LAST_CONTENT_UPDATE, SITE_URL } from "@/lib/seo";
 import { getLatestSitemapUpdate, splitPublicSitemapEntries } from "@/lib/sitemap-utils";
-import { getConvexClient } from "@/lib/convex-client";
-import { api } from "@convex/_generated/api";
+import { listPublishedBlogPosts } from "@/lib/supabase/blog-posts";
 
 export const revalidate = 3600;
 
@@ -26,14 +25,13 @@ export async function GET() {
   // Compute blog lastmod from actual published posts
   let blogLastmod = LAST_CONTENT_UPDATE;
   try {
-    const convex = getConvexClient();
-    const posts = await convex.query(api.blogPosts.listPublished);
+    const posts = await listPublishedBlogPosts();
     blogLastmod = posts.reduce<Date>((latest, post) => {
       const d = new Date(post.updatedAt);
       return d > latest ? d : latest;
     }, LAST_CONTENT_UPDATE);
   } catch {
-    // Convex unavailable (e.g. CI build with placeholder URL) — use fallback
+    // Supabase unavailable (e.g. CI build with placeholder URL) — use fallback
   }
 
   const sitemaps = [

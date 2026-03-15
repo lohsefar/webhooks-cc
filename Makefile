@@ -1,4 +1,4 @@
-.PHONY: dev dev-all dev-web dev-convex dev-receiver dev-cli build build-receiver build-cli test lint clean db-push prod prod-web prod-receiver start
+.PHONY: dev dev-all dev-web dev-receiver dev-cli build build-receiver build-cli test lint clean prod prod-web prod-receiver start
 
 # Ensure user systemd bus is reachable (needed in Proxmox xterm.js / non-login shells)
 export XDG_RUNTIME_DIR ?= /run/user/$(shell id -u)
@@ -6,14 +6,10 @@ export DBUS_SESSION_BUS_ADDRESS ?= unix:path=$(XDG_RUNTIME_DIR)/bus
 
 # Development
 dev:
-	@echo "Starting development servers..."
-	@make -j3 dev-web dev-convex dev-receiver
+	mprocs --config mprocs-dev.yaml
 
 dev-web:
 	pnpm --filter web dev
-
-dev-convex:
-	pnpm convex dev
 
 dev-receiver:
 	@set -a && . ./.env.local && set +a && cd apps/receiver-rs && $$HOME/.cargo/bin/cargo run
@@ -26,7 +22,7 @@ prod:
 	@echo "Ensuring services are running..."
 	@systemctl --user start webhooks-web webhooks-receiver
 	@echo "Opening log viewer (mprocs)..."
-	$$HOME/.cargo/bin/mprocs --config mprocs.yaml
+	mprocs --config mprocs.yaml
 
 prod-status:
 	@systemctl --user status webhooks-web webhooks-receiver
@@ -72,7 +68,6 @@ build-cli:
 # Test
 test:
 	pnpm test
-	pnpm test:convex
 	cd apps/receiver-rs && $$HOME/.cargo/bin/cargo test
 	cd apps/cli && go test ./...
 
@@ -80,10 +75,6 @@ test:
 lint:
 	cd apps/receiver-rs && $$HOME/.cargo/bin/cargo clippy -- -D warnings
 	cd apps/cli && golangci-lint run
-
-# Database
-db-push:
-	pnpm convex deploy
 
 # Start (alias for prod — ensures services are running + opens log viewer)
 start:

@@ -1,38 +1,42 @@
 "use client";
 
-import { useQuery, useMutation } from "convex/react";
-import { api } from "@convex/_generated/api";
-import { Id } from "@convex/_generated/dataModel";
-import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import { ApiKeyDialog } from "@/components/account/api-key-dialog";
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
-import { Trash2, Github, CheckCircle } from "lucide-react";
-import { useAuthActions } from "@convex-dev/auth/react";
-import { useState, useEffect, Suspense } from "react";
+import { Suspense, useCallback, useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { UpgradeButton } from "@/components/billing/upgrade-button";
+import { ApiKeyDialog } from "@/components/account/api-key-dialog";
+import { DeleteAccountDialog } from "@/components/account/delete-account-dialog";
 import { ManageSubscriptionDialog } from "@/components/billing/manage-subscription-dialog";
 import { PastDueBanner } from "@/components/billing/past-due-banner";
-import { trackUpgradeCompleted, trackAccountDeleted, resetUser } from "@/lib/analytics";
+import { UpgradeButton } from "@/components/billing/upgrade-button";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { ACCOUNT_PROFILE_SELECT, type AccountProfile } from "@/lib/account-profile";
+import { trackUpgradeCompleted, resetUser } from "@/lib/analytics";
+import { useAuth } from "@/components/providers/supabase-auth-provider";
+import { createClient } from "@/lib/supabase/client";
+import { subscribeToUserRow } from "@/lib/supabase/realtime";
+import { CheckCircle, Github, LogOut, Trash2 } from "lucide-react";
 
-function UsageResetCountdown({ periodEnd }: { periodEnd: number }) {
+interface ApiKeyEntry {
+  id: string;
+  name: string;
+  key_prefix: string;
+  created_at: string;
+  expires_at: string | null;
+  last_used_at: string | null;
+}
+
+function UsageResetCountdown({ periodEnd }: { periodEnd: string }) {
   const [timeRemaining, setTimeRemaining] = useState<string>("");
 
   useEffect(() => {
     const update = () => {
-      const remaining = periodEnd - Date.now();
+      const remaining = new Date(periodEnd).getTime() - Date.now();
       if (remaining <= 0) {
-        setTimeRemaining("Resets on next request");
+        setTimeRemaining("New 24h period starts on next request");
+        return;
+      }
+      if (remaining < 60_000) {
+        setTimeRemaining("Resets in <1m");
         return;
       }
       const hours = Math.floor(remaining / (1000 * 60 * 60));
@@ -40,7 +44,7 @@ function UsageResetCountdown({ periodEnd }: { periodEnd: number }) {
       setTimeRemaining(`Resets in ${hours}h ${minutes}m`);
     };
     update();
-    const interval = setInterval(update, 60000); // Update every minute
+    const interval = setInterval(update, 5000);
     return () => clearInterval(interval);
   }, [periodEnd]);
 
@@ -56,7 +60,6 @@ function UpgradeSuccessBanner() {
     if (searchParams.get("upgraded") === "true") {
       setShow(true);
       trackUpgradeCompleted();
-      // Remove the query parameter from URL
       const url = new URL(window.location.href);
       url.searchParams.delete("upgraded");
       router.replace(url.pathname, { scroll: false });
@@ -66,7 +69,7 @@ function UpgradeSuccessBanner() {
   if (!show) return null;
 
   return (
-    <div className="rounded-md bg-green-500/10 border border-green-500/20 p-4 mb-4">
+    <div className="rounded-md border border-green-500/20 bg-green-500/10 p-4 mb-4">
       <div className="flex items-center gap-3">
         <CheckCircle className="h-5 w-5 text-green-500 flex-shrink-0" />
         <div>
@@ -84,22 +87,108 @@ function UpgradeSuccessBanner() {
 }
 
 export default function AccountPage() {
-  const user = useQuery(api.users.current);
-  const apiKeys = useQuery(api.apiKeys.list);
-  const authProviders = useQuery(api.users.getAuthProviders);
-  const revokeApiKey = useMutation(api.apiKeys.revoke);
-  const deleteAccountMutation = useMutation(api.users.deleteAccount);
-  const { signOut } = useAuthActions();
+  const { user: authUser, session, isLoading: authLoading } = useAuth();
+  const [profile, setProfile] = useState<AccountProfile | null>(null);
+  const [profileLoading, setProfileLoading] = useState(true);
+  const [nowMs, setNowMs] = useState(() => Date.now());
+  const [apiKeys, setApiKeys] = useState<ApiKeyEntry[]>([]);
+  const [deletingKeyId, setDeletingKeyId] = useState<string | null>(null);
   const router = useRouter();
-  const [isDeleting, setIsDeleting] = useState(false);
-  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
-  const [confirmDialogOpen, setConfirmDialogOpen] = useState(false);
-  const [revokeKeyId, setRevokeKeyId] = useState<Id<"apiKeys"> | null>(null);
-  const [revoking, setRevoking] = useState(false);
-  const [revokeError, setRevokeError] = useState<string | null>(null);
-  const [deleteError, setDeleteError] = useState<string | null>(null);
 
-  if (user === undefined) {
+  const refreshProfile = useCallback(async () => {
+    if (!authUser) {
+      setProfile(null);
+      setProfileLoading(false);
+      return;
+    }
+
+    const supabase = createClient();
+    const { data, error } = await supabase
+      .from("users")
+      .select(ACCOUNT_PROFILE_SELECT)
+      .eq("id", authUser.id)
+      .single<AccountProfile>();
+
+    if (error) {
+      console.error("Failed to fetch user profile:", error);
+    }
+
+    setProfile(data ?? null);
+    setProfileLoading(false);
+  }, [authUser]);
+
+  useEffect(() => {
+    if (!authUser) {
+      setProfile(null);
+      setProfileLoading(false);
+      return;
+    }
+
+    setProfileLoading(true);
+    void refreshProfile();
+  }, [authUser, refreshProfile]);
+
+  useEffect(() => {
+    if (!authUser) {
+      return;
+    }
+
+    return subscribeToUserRow(authUser.id, (row) => {
+      setProfile(row ? (row as AccountProfile) : null);
+      setProfileLoading(false);
+    });
+  }, [authUser]);
+
+  const refreshApiKeys = useCallback(async () => {
+    if (!session?.access_token) return;
+    try {
+      const response = await fetch("/api/api-keys", {
+        headers: { Authorization: `Bearer ${session.access_token}` },
+      });
+      if (response.ok) {
+        setApiKeys((await response.json()) as ApiKeyEntry[]);
+      }
+    } catch {
+      // silent — non-critical
+    }
+  }, [session?.access_token]);
+
+  useEffect(() => {
+    void refreshApiKeys();
+  }, [refreshApiKeys]);
+
+  const handleDeleteKey = async (keyId: string) => {
+    if (!session?.access_token) return;
+    setDeletingKeyId(keyId);
+    try {
+      await fetch(`/api/api-keys?id=${keyId}`, {
+        method: "DELETE",
+        headers: { Authorization: `Bearer ${session.access_token}` },
+      });
+      setApiKeys((prev) => prev.filter((k) => k.id !== keyId));
+    } catch {
+      // silent
+    } finally {
+      setDeletingKeyId(null);
+    }
+  };
+
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setNowMs(Date.now());
+    }, 5000);
+
+    return () => clearInterval(interval);
+  }, []);
+
+  const handleSignOut = async () => {
+    const supabase = createClient();
+    resetUser();
+    await supabase.auth.signOut();
+    router.push("/");
+  };
+
+  if (authLoading || profileLoading) {
     return (
       <main className="container mx-auto px-4 py-8 max-w-2xl">
         <div className="animate-pulse text-muted-foreground">Loading...</div>
@@ -107,7 +196,7 @@ export default function AccountPage() {
     );
   }
 
-  if (user === null) {
+  if (!profile) {
     return (
       <main className="container mx-auto px-4 py-8 max-w-2xl">
         <p className="text-muted-foreground">User not found</p>
@@ -115,72 +204,42 @@ export default function AccountPage() {
     );
   }
 
+  const providers =
+    authUser?.identities?.map((identity) => identity.provider).filter(Boolean) ?? [];
+
+  const periodEndMs = profile.period_end ? Date.parse(profile.period_end) : NaN;
+  const freePeriodExpired =
+    profile.plan === "free" && Number.isFinite(periodEndMs) && periodEndMs <= nowMs;
+  const displayedRequestsUsed = freePeriodExpired ? 0 : profile.requests_used;
   const usagePercent =
-    user.requestLimit > 0 ? Math.min((user.requestsUsed / user.requestLimit) * 100, 100) : 0;
+    profile.request_limit > 0
+      ? Math.min((displayedRequestsUsed / profile.request_limit) * 100, 100)
+      : 0;
   const isNearLimit = usagePercent > 80;
-
-  const handleRevoke = async () => {
-    if (!revokeKeyId) return;
-    setRevoking(true);
-    setRevokeError(null);
-    try {
-      await revokeApiKey({ id: revokeKeyId });
-      setRevokeKeyId(null);
-    } catch (error) {
-      console.error("Failed to revoke API key:", error);
-      setRevokeError("Failed to revoke API key. Please try again.");
-    } finally {
-      setRevoking(false);
-    }
-  };
-
-  const handleFirstDeleteConfirm = () => {
-    setDeleteDialogOpen(false);
-    setConfirmDialogOpen(true);
-  };
-
-  const handleDeleteAccount = async () => {
-    setIsDeleting(true);
-    setDeleteError(null);
-    // Keep dialog open during operation so user can see errors
-    try {
-      await deleteAccountMutation({});
-      trackAccountDeleted();
-      resetUser();
-      setConfirmDialogOpen(false);
-      await signOut();
-      router.push("/");
-    } catch (error) {
-      console.error("Failed to delete account:", error);
-      setDeleteError("Failed to delete account. Please try again.");
-      setIsDeleting(false);
-      // Dialog remains open so user can see the error
-    }
-  };
+  const accessToken = session?.access_token ?? null;
 
   return (
     <main className="container mx-auto px-4 py-8 max-w-2xl space-y-8">
-      {/* Success/Warning Banners */}
       <Suspense fallback={null}>
         <UpgradeSuccessBanner />
       </Suspense>
-      <PastDueBanner />
 
-      {/* Account Info */}
+      <PastDueBanner subscriptionStatus={profile.subscription_status} />
+
       <section className="space-y-4">
         <h1 className="text-2xl font-bold">Account</h1>
 
         <div className="border rounded-lg p-6 space-y-4 bg-card">
           <div className="flex items-center justify-between">
             <div>
-              <p className="font-medium">{user.name || user.email}</p>
-              <p className="text-sm text-muted-foreground">{user.email}</p>
+              <p className="font-medium">{profile.name || profile.email}</p>
+              <p className="text-sm text-muted-foreground">{profile.email}</p>
             </div>
             <div className="flex items-center gap-2">
-              <Badge variant={user.plan === "pro" ? "default" : "secondary"}>
-                {user.plan === "pro" ? "Pro" : "Free"}
+              <Badge variant={profile.plan === "pro" ? "default" : "secondary"}>
+                {profile.plan === "pro" ? "Pro" : "Free"}
               </Badge>
-              {authProviders?.map((provider) => (
+              {providers.map((provider) => (
                 <Badge key={provider} variant="outline" className="capitalize">
                   {provider === "github" ? (
                     <span className="flex items-center gap-1">
@@ -219,17 +278,15 @@ export default function AccountPage() {
         </div>
       </section>
 
-      {/* Billing & Usage */}
       <section className="space-y-4">
         <h2 className="text-lg font-semibold">Billing & Usage</h2>
 
         <div className="border rounded-lg p-6 space-y-4 bg-card">
-          {/* Usage meter */}
           <div className="space-y-2">
             <div className="flex justify-between text-sm">
-              <span>{user.plan === "free" ? "Requests today" : "Requests this period"}</span>
+              <span>{profile.plan === "free" ? "Requests today" : "Requests this period"}</span>
               <span className={isNearLimit ? "text-destructive font-medium" : "font-medium"}>
-                {user.requestsUsed.toLocaleString()} / {user.requestLimit.toLocaleString()}
+                {displayedRequestsUsed.toLocaleString()} / {profile.request_limit.toLocaleString()}
               </span>
             </div>
 
@@ -239,7 +296,7 @@ export default function AccountPage() {
               aria-valuenow={usagePercent}
               aria-valuemin={0}
               aria-valuemax={100}
-              aria-label={`Usage: ${user.requestsUsed.toLocaleString()} of ${user.requestLimit.toLocaleString()} requests`}
+              aria-label={`Usage: ${displayedRequestsUsed.toLocaleString()} of ${profile.request_limit.toLocaleString()} requests`}
             >
               <div
                 className={`h-full transition-all ${isNearLimit ? "bg-destructive" : "bg-primary"}`}
@@ -247,37 +304,36 @@ export default function AccountPage() {
               />
             </div>
 
-            {user.periodEnd && (
+            {profile.period_end && (
               <p className="text-xs text-muted-foreground">
-                {user.plan === "free" ? (
-                  <UsageResetCountdown periodEnd={user.periodEnd} />
+                {profile.plan === "free" ? (
+                  <UsageResetCountdown periodEnd={profile.period_end} />
                 ) : (
-                  `Resets ${new Date(user.periodEnd).toLocaleDateString()}`
+                  `Resets ${new Date(profile.period_end).toLocaleDateString()}`
                 )}
               </p>
             )}
-            {user.plan === "free" && !user.periodEnd && (
-              <p className="text-xs text-muted-foreground">Resets on first request</p>
+            {profile.plan === "free" && !profile.period_end && (
+              <p className="text-xs text-muted-foreground">
+                Your 24h period starts on first request
+              </p>
             )}
           </div>
 
-          {/* Plan info and actions */}
-          {user.plan === "free" ? (
+          {profile.plan === "free" ? (
             <div className="pt-2 border-t space-y-3">
-              <div className="flex items-center justify-between">
+              <div className="flex items-center justify-between gap-4">
                 <div>
                   <p className="font-medium">Free Plan</p>
                   <p className="text-sm text-muted-foreground">
                     50 requests/day, 7-day data retention
                   </p>
                 </div>
+                <UpgradeButton accessToken={accessToken} />
               </div>
-              <div>
-                <UpgradeButton />
-                <p className="text-sm text-muted-foreground mt-2">
-                  Get 100,000 requests/month and 30-day data retention for $8/month
-                </p>
-              </div>
+              <p className="text-sm text-muted-foreground">
+                Upgrade to Pro for 100,000 requests/month and 30-day data retention ($8/month).
+              </p>
             </div>
           ) : (
             <div className="pt-2 border-t space-y-3">
@@ -290,63 +346,59 @@ export default function AccountPage() {
                 </div>
                 <p className="font-medium">$8/month</p>
               </div>
-              {user.cancelAtPeriodEnd && (
+              <ManageSubscriptionDialog
+                accessToken={accessToken}
+                profile={profile}
+                onUpdated={refreshProfile}
+              />
+              {profile.cancel_at_period_end && profile.period_end && (
                 <div className="rounded-md bg-muted p-3 text-sm">
                   Your subscription will end on{" "}
-                  {user.periodEnd
-                    ? new Date(user.periodEnd).toLocaleDateString("en-US", {
-                        month: "long",
-                        day: "numeric",
-                        year: "numeric",
-                      })
-                    : "the end of your billing period"}
+                  {new Date(profile.period_end).toLocaleDateString("en-US", {
+                    month: "long",
+                    day: "numeric",
+                    year: "numeric",
+                  })}
                   . You&apos;ll be downgraded to the free tier after this date.
                 </div>
               )}
-              <ManageSubscriptionDialog />
             </div>
           )}
         </div>
       </section>
 
-      {/* API Keys */}
       <section className="space-y-4">
         <div className="flex items-center justify-between">
           <h2 className="text-lg font-semibold">API Keys</h2>
-          <ApiKeyDialog />
+          <ApiKeyDialog accessToken={accessToken} onCreated={refreshApiKeys} />
         </div>
-
-        <div className="border rounded-lg divide-y bg-card">
-          {apiKeys === undefined ? (
-            <div className="p-4 text-muted-foreground">Loading...</div>
-          ) : apiKeys.length === 0 ? (
-            <div className="p-6 text-center text-muted-foreground">
-              <p>No API keys yet</p>
-              <p className="text-sm mt-1">
-                Create an API key to access webhooks.cc programmatically
+        <div className="border rounded-lg bg-card divide-y">
+          {apiKeys.length === 0 ? (
+            <div className="p-6">
+              <p className="text-sm text-muted-foreground">
+                No API keys yet. Create one to use the CLI, SDK, or MCP server.
               </p>
             </div>
           ) : (
             apiKeys.map((key) => (
-              <div key={key._id} className="p-4 flex items-center justify-between">
-                <div>
-                  <p className="font-medium">{key.name}</p>
-                  <p className="text-sm text-muted-foreground font-mono">{key.keyPrefix}...</p>
-                  <p className="text-xs text-muted-foreground mt-1">
-                    Created {new Date(key.createdAt).toLocaleDateString()}
-                    {key.lastUsedAt && (
-                      <> &middot; Last used {new Date(key.lastUsedAt).toLocaleDateString()}</>
-                    )}
+              <div key={key.id} className="p-4 flex items-center justify-between gap-4">
+                <div className="min-w-0">
+                  <p className="font-medium truncate">{key.name}</p>
+                  <p className="text-xs text-muted-foreground font-mono">{key.key_prefix}...</p>
+                  <p className="text-xs text-muted-foreground">
+                    Created {new Date(key.created_at).toLocaleDateString()}
+                    {key.last_used_at &&
+                      ` \u00b7 Last used ${new Date(key.last_used_at).toLocaleDateString()}`}
                   </p>
                 </div>
                 <Button
                   variant="ghost"
                   size="icon"
-                  onClick={() => setRevokeKeyId(key._id)}
-                  className="text-muted-foreground hover:text-destructive"
-                  aria-label={`Revoke API key ${key.name}`}
+                  onClick={() => handleDeleteKey(key.id)}
+                  disabled={deletingKeyId === key.id}
+                  title="Delete key"
                 >
-                  <Trash2 className="h-4 w-4" />
+                  <Trash2 className="h-4 w-4 text-destructive" />
                 </Button>
               </div>
             ))
@@ -354,105 +406,22 @@ export default function AccountPage() {
         </div>
       </section>
 
-      {/* Delete Account */}
       <section className="space-y-4">
-        <h2 className="text-lg font-semibold text-destructive">Delete Account</h2>
-
-        <div className="border border-destructive/20 rounded-lg p-6 bg-card">
+        <h2 className="text-lg font-semibold text-destructive">Danger Zone</h2>
+        <div className="border rounded-lg p-6 bg-card space-y-2">
           <p className="text-sm text-muted-foreground">
-            Permanently delete your account and all associated data including endpoints, requests,
-            and API keys. This action cannot be undone.
+            Permanently delete your account and all captured request data.
           </p>
-          <Button
-            variant="destructive"
-            className="mt-4"
-            onClick={() => setDeleteDialogOpen(true)}
-            disabled={isDeleting}
-          >
-            {isDeleting ? "Deleting..." : "Delete Account"}
-          </Button>
-          {deleteError && <p className="text-sm text-destructive mt-2">{deleteError}</p>}
+          <DeleteAccountDialog accessToken={accessToken} />
         </div>
       </section>
 
-      {/* Revoke API Key Dialog */}
-      <AlertDialog
-        open={revokeKeyId !== null}
-        onOpenChange={(open) => !open && !revoking && setRevokeKeyId(null)}
-      >
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Revoke API Key</AlertDialogTitle>
-            <AlertDialogDescription>
-              Are you sure you want to revoke this API key? Any applications using this key will no
-              longer be able to access webhooks.cc.
-            </AlertDialogDescription>
-            {revokeError && (
-              <p className="text-sm text-destructive mt-2" role="alert" aria-live="polite">
-                {revokeError}
-              </p>
-            )}
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel disabled={revoking} onClick={() => setRevokeError(null)}>
-              Cancel
-            </AlertDialogCancel>
-            <AlertDialogAction onClick={handleRevoke} disabled={revoking}>
-              {revoking ? "Revoking..." : "Revoke"}
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
-
-      {/* Delete Account - First Confirmation */}
-      <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Delete Account</AlertDialogTitle>
-            <AlertDialogDescription>
-              Are you sure you want to delete your account? This action cannot be undone. All your
-              endpoints, requests, and API keys will be permanently deleted.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction
-              onClick={handleFirstDeleteConfirm}
-              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-            >
-              Continue
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
-
-      {/* Delete Account - Final Confirmation */}
-      <AlertDialog open={confirmDialogOpen} onOpenChange={setConfirmDialogOpen}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Final Confirmation</AlertDialogTitle>
-            <AlertDialogDescription>
-              This is your last chance. Are you ABSOLUTELY sure you want to delete your account?
-              This action is irreversible.
-            </AlertDialogDescription>
-            {deleteError && (
-              <p className="text-sm text-destructive mt-2" role="alert" aria-live="polite">
-                {deleteError}
-              </p>
-            )}
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel disabled={isDeleting}>Cancel</AlertDialogCancel>
-            <AlertDialogAction
-              onClick={handleDeleteAccount}
-              disabled={isDeleting}
-              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-            >
-              {isDeleting ? "Deleting..." : "Delete My Account"}
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+      <section className="space-y-4">
+        <Button variant="outline" onClick={handleSignOut} className="flex items-center gap-2">
+          <LogOut className="h-4 w-4" />
+          Sign Out
+        </Button>
+      </section>
     </main>
   );
 }

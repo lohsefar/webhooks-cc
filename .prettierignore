@@ -10,7 +10,6 @@ dist/
 apps/receiver-rs/target/
 
 # Generated files
-convex/_generated/
 pnpm-lock.yaml
 
 # Go files (use gofmt instead)

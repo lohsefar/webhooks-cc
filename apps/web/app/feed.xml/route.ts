@@ -1,6 +1,5 @@
-import { getConvexClient } from "@/lib/convex-client";
-import { api } from "@convex/_generated/api";
 import { SITE_NAME, SITE_URL } from "@/lib/seo";
+import { listPublishedBlogPosts } from "@/lib/supabase/blog-posts";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 3600;
@@ -15,8 +14,7 @@ function xmlEscape(value: string): string {
 }
 
 export async function GET() {
-  const convex = getConvexClient();
-  const posts = await convex.query(api.blogPosts.listPublished);
+  const posts = await listPublishedBlogPosts();
 
   const lastBuildDate = posts[0]
     ? new Date(posts[0].updatedAt).toUTCString()

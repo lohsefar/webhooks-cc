@@ -2,14 +2,13 @@
 
 import { useState } from "react";
 import { Copy, Check } from "lucide-react";
-import { Id } from "@convex/_generated/dataModel";
 import { EndpointSettingsDialog } from "./endpoint-settings-dialog";
 import { SendWebhookDialog } from "./send-webhook-dialog";
 import { copyToClipboard } from "@/lib/clipboard";
 import { WEBHOOK_BASE_URL } from "@/lib/constants";
 
 interface UrlBarProps {
-  endpointId: Id<"endpoints">;
+  endpointId: string;
   endpointName: string;
   slug: string;
   mockResponse?: {

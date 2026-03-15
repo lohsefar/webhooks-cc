@@ -1,168 +1,83 @@
-import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
+import { beforeEach, describe, expect, test, vi } from "vitest";
 
 const mockFns = vi.hoisted(() => ({
   extractBearerToken: vi.fn(),
-  validateApiKeyWithPlan: vi.fn(),
-  publicEnv: vi.fn(),
-  serverEnv: vi.fn(),
+  validateBearerTokenWithPlan: vi.fn(),
   checkRateLimitByKey: vi.fn(),
-  convexSetAuth: vi.fn(),
-  convexQuery: vi.fn(),
+  countSearchRequestsForUser: vi.fn(),
 }));
 
 vi.mock("@/lib/api-auth", () => ({
   extractBearerToken: mockFns.extractBearerToken,
-  validateApiKeyWithPlan: mockFns.validateApiKeyWithPlan,
-}));
-
-vi.mock("@/lib/env", () => ({
-  publicEnv: mockFns.publicEnv,
-  serverEnv: mockFns.serverEnv,
+  validateBearerTokenWithPlan: mockFns.validateBearerTokenWithPlan,
 }));
 
 vi.mock("@/lib/rate-limit", () => ({
   checkRateLimitByKey: mockFns.checkRateLimitByKey,
 }));
 
-vi.mock("convex/browser", () => ({
-  ConvexHttpClient: class MockConvexHttpClient {
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    constructor(_url: string) {}
-
-    setAuth(token: string) {
-      mockFns.convexSetAuth(token);
-    }
-
-    query(ref: unknown) {
-      return mockFns.convexQuery(ref);
-    }
-  },
-}));
-
-vi.mock("@convex/_generated/api", () => ({
-  api: {
-    users: {
-      current: { _mock: "users.current" },
-    },
-  },
+vi.mock("@/lib/supabase/search", () => ({
+  countSearchRequestsForUser: mockFns.countSearchRequestsForUser,
 }));
 
 describe("GET /api/search/requests/count", () => {
   beforeEach(() => {
     vi.resetModules();
     vi.clearAllMocks();
-
-    mockFns.publicEnv.mockReturnValue({
-      NEXT_PUBLIC_CONVEX_URL: "https://convex-public.example",
-      NEXT_PUBLIC_WEBHOOK_URL: "https://go.webhooks.cc",
-      NEXT_PUBLIC_APP_URL: "https://webhooks.cc",
-    });
-    mockFns.serverEnv.mockReturnValue({
-      CONVEX_SITE_URL: "https://convex-site.example",
-      CAPTURE_SHARED_SECRET: "shared-secret",
-    });
     mockFns.checkRateLimitByKey.mockReturnValue(null);
   });
 
-  afterEach(() => {
-    vi.unstubAllGlobals();
-  });
-
-  test("forwards free plan for dashboard JWT requests to receiver count endpoint", async () => {
-    mockFns.extractBearerToken.mockReturnValue("jwt-token");
-    mockFns.convexQuery.mockResolvedValue({
-      _id: "user_free_123",
-      plan: "free",
+  test("returns a retained search count for a validated bearer token", async () => {
+    mockFns.extractBearerToken.mockReturnValue("token");
+    mockFns.validateBearerTokenWithPlan.mockResolvedValue({
+      userId: "user_123",
+      plan: "pro",
     });
-
-    const fetchMock = vi.fn(async () => {
-      return new Response(JSON.stringify({ count: 42 }), {
-        status: 200,
-        headers: { "Content-Type": "application/json" },
-      });
-    });
-    vi.stubGlobal("fetch", fetchMock);
+    mockFns.countSearchRequestsForUser.mockResolvedValue(42);
 
     const { GET } = await import("./route");
     const response = await GET(
-      new Request("https://webhooks.cc/api/search/requests/count?slug=demo&method=POST")
+      new Request("https://webhooks.cc/api/search/requests/count?slug=demo&method=POST&q=foo")
     );
 
     expect(response.status).toBe(200);
     await expect(response.json()).resolves.toEqual({ count: 42 });
-
-    const [url] = fetchMock.mock.calls[0] as unknown as [string | URL | Request, RequestInit];
-    const proxiedUrl = new URL(String(url));
-    expect(proxiedUrl.pathname).toBe("/search/count");
-    expect(proxiedUrl.searchParams.get("user_id")).toBe("user_free_123");
-    expect(proxiedUrl.searchParams.get("plan")).toBe("free");
-    expect(proxiedUrl.searchParams.get("slug")).toBe("demo");
-    expect(proxiedUrl.searchParams.get("method")).toBe("POST");
-  });
-
-  test("forwards API key requests to receiver count endpoint", async () => {
-    mockFns.extractBearerToken.mockReturnValue("whcc_test_api_key");
-    mockFns.validateApiKeyWithPlan.mockResolvedValue({
-      userId: "user_api_123",
+    expect(mockFns.countSearchRequestsForUser).toHaveBeenCalledWith({
+      userId: "user_123",
       plan: "pro",
+      slug: "demo",
+      method: "POST",
+      q: "foo",
+      from: undefined,
+      to: undefined,
     });
-
-    const fetchMock = vi.fn(async () => {
-      return new Response(JSON.stringify({ count: 7 }), {
-        status: 200,
-        headers: { "Content-Type": "application/json" },
-      });
-    });
-    vi.stubGlobal("fetch", fetchMock);
-
-    const { GET } = await import("./route");
-    const response = await GET(
-      new Request("https://webhooks.cc/api/search/requests/count?slug=demo-api")
-    );
-
-    expect(response.status).toBe(200);
-    await expect(response.json()).resolves.toEqual({ count: 7 });
-
-    const [url] = fetchMock.mock.calls[0] as unknown as [string | URL | Request, RequestInit];
-    const proxiedUrl = new URL(String(url));
-    expect(proxiedUrl.pathname).toBe("/search/count");
-    expect(proxiedUrl.searchParams.get("user_id")).toBe("user_api_123");
-    expect(proxiedUrl.searchParams.get("plan")).toBe("pro");
   });
 
-  test("returns 401 for invalid API key", async () => {
-    mockFns.extractBearerToken.mockReturnValue("whcc_bad_key");
-    mockFns.validateApiKeyWithPlan.mockResolvedValue(null);
+  test("returns 401 for invalid bearer tokens", async () => {
+    mockFns.extractBearerToken.mockReturnValue("token");
+    mockFns.validateBearerTokenWithPlan.mockResolvedValue(null);
 
     const { GET } = await import("./route");
     const response = await GET(new Request("https://webhooks.cc/api/search/requests/count"));
 
     expect(response.status).toBe(401);
-    await expect(response.json()).resolves.toEqual({ error: "Invalid API key" });
+    await expect(response.json()).resolves.toEqual({ error: "Invalid token" });
   });
 
-  test("returns 502 when receiver count response shape is invalid", async () => {
-    mockFns.extractBearerToken.mockReturnValue("whcc_test_api_key");
-    mockFns.validateApiKeyWithPlan.mockResolvedValue({
-      userId: "user_api_123",
+  test("returns 400 for invalid numeric params", async () => {
+    mockFns.extractBearerToken.mockReturnValue("token");
+    mockFns.validateBearerTokenWithPlan.mockResolvedValue({
+      userId: "user_123",
       plan: "free",
     });
 
-    vi.stubGlobal(
-      "fetch",
-      vi.fn(
-        async () =>
-          new Response(JSON.stringify({ nope: true }), {
-            status: 200,
-            headers: { "Content-Type": "application/json" },
-          })
-      )
+    const { GET } = await import("./route");
+    const response = await GET(
+      new Request("https://webhooks.cc/api/search/requests/count?from=oops")
     );
 
-    const { GET } = await import("./route");
-    const response = await GET(new Request("https://webhooks.cc/api/search/requests/count"));
-
-    expect(response.status).toBe(502);
-    await expect(response.json()).resolves.toEqual({ error: "Unexpected response format" });
+    expect(response.status).toBe(400);
+    await expect(response.json()).resolves.toEqual({ error: "invalid_from" });
+    expect(mockFns.countSearchRequestsForUser).not.toHaveBeenCalled();
   });
 });

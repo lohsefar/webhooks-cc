@@ -1,20 +1,13 @@
+import { createServerClient } from "@supabase/ssr";
 import { NextRequest, NextResponse } from "next/server";
 
 /**
- * Security headers middleware.
+ * Middleware: Supabase session refresh + security headers.
  *
- * Sets Content-Security-Policy and related headers on every response.
- * CSP allows Convex cloud/site domains for API and WebSocket connections.
- *
- * Trade-offs:
- * - script-src 'unsafe-inline': Required by Next.js for inline hydration scripts
- *   and the theme-detection script in layout.tsx. Nonce support would require deep
- *   Next.js configuration changes. Mitigated by strict connect-src/object-src.
- * - style-src 'unsafe-inline': Required by Tailwind CSS for inline styles.
- * - connect-src is restricted to self + Convex + webhook receiver domains. The
- *   web replay dialog (which fetches arbitrary user-provided URLs) will be blocked
- *   for external targets — use the CLI `whk replay` command for cross-origin replay.
+ * 1. Refreshes the Supabase JWT on every request so server components get fresh cookies.
+ * 2. Sets Content-Security-Policy and related headers on every response.
  */
+
 function sanitizeCspOrigin(raw: string | undefined, fallback: string): string {
   const value = raw || fallback;
   try {
@@ -27,32 +20,59 @@ function sanitizeCspOrigin(raw: string | undefined, fallback: string): string {
 
 function shouldNoIndexPath(pathname: string): boolean {
   if (pathname === "/login") return true;
-
   const privatePrefixes = ["/dashboard", "/account", "/endpoints", "/api", "/cli/verify"];
   return privatePrefixes.some((prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`));
 }
 
-export function middleware(request: NextRequest) {
-  const response = NextResponse.next();
+export async function middleware(request: NextRequest) {
+  // --- Supabase session refresh ---
+  let supabaseResponse = NextResponse.next({ request });
+
+  const supabase = createServerClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    {
+      cookies: {
+        getAll() {
+          return request.cookies.getAll();
+        },
+        setAll(cookiesToSet) {
+          cookiesToSet.forEach(({ name, value }) => request.cookies.set(name, value));
+          supabaseResponse = NextResponse.next({ request });
+          cookiesToSet.forEach(({ name, value, options }) =>
+            supabaseResponse.cookies.set(name, value, options)
+          );
+        },
+      },
+    }
+  );
+
+  // Refresh session (skip for static assets and auth callback)
   const pathname = request.nextUrl.pathname;
+  if (!pathname.startsWith("/_next") && !pathname.startsWith("/auth/callback")) {
+    await supabase.auth.getUser();
+  }
+
+  // --- Security headers ---
+  const response = supabaseResponse;
 
   const webhookOrigin = sanitizeCspOrigin(
     process.env.NEXT_PUBLIC_WEBHOOK_URL,
     "https://go.webhooks.cc"
   );
 
-  const convexOrigin = sanitizeCspOrigin(
-    process.env.NEXT_PUBLIC_CONVEX_URL,
-    "https://api.webhooks.cc"
+  const supabaseOrigin = sanitizeCspOrigin(
+    process.env.NEXT_PUBLIC_SUPABASE_URL,
+    "https://api1.webhooks.cc"
   );
 
-  // Build WebSocket origin from Convex URL (wss:// version)
-  let convexWsOrigin: string;
+  // WebSocket origin from Supabase URL for Realtime
+  let supabaseWsOrigin: string;
   try {
-    const url = new URL(convexOrigin);
-    convexWsOrigin = `wss://${url.host}`;
+    const url = new URL(supabaseOrigin);
+    supabaseWsOrigin = `${url.protocol === "https:" ? "wss:" : "ws:"}//${url.host}`;
   } catch {
-    convexWsOrigin = "wss://api.webhooks.cc";
+    supabaseWsOrigin = "wss://api1.webhooks.cc";
   }
 
   const isDev = process.env.NODE_ENV === "development";
@@ -64,7 +84,7 @@ export function middleware(request: NextRequest) {
     "style-src 'self' 'unsafe-inline'",
     "img-src 'self' data: blob:",
     "font-src 'self'",
-    `connect-src 'self' https://*.convex.cloud https://*.convex.site wss://*.convex.cloud ${convexOrigin} ${convexWsOrigin} ${webhookOrigin} https://eu-assets.i.posthog.com https://f.webhooks.cc`,
+    `connect-src 'self' ${supabaseOrigin} ${supabaseWsOrigin} ${webhookOrigin} https://eu-assets.i.posthog.com https://f.webhooks.cc`,
     "object-src 'none'",
     "worker-src 'self'",
     "frame-ancestors 'none'",
@@ -101,12 +121,6 @@ export function middleware(request: NextRequest) {
 
 export const config = {
   matcher: [
-    /*
-     * Match all request paths except:
-     * - _next/static (static files)
-     * - _next/image (image optimization)
-     * - favicon.ico, robots.txt, sitemap.xml, sitemap-index.xml (well-known files)
-     */
     "/((?!_next/static|_next/image|favicon\\.ico|robots\\.txt|sitemap\\.xml|sitemap-index\\.xml).*)",
   ],
 };
