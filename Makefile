@@ -2,8 +2,7 @@
 
 # Development
 dev:
-	@echo "Starting development servers..."
-	@make -j3 dev-web dev-convex dev-receiver
+	mprocs --config mprocs-dev.yaml
 
 dev-web:
 	pnpm --filter web dev

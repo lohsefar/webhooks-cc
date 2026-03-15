@@ -1,0 +1,5 @@
+procs:
+  web:
+    shell: "pnpm --filter web dev"
+  receiver:
+    shell: "set -a && . ./.env.local && set +a && cd apps/receiver-rs && $HOME/.cargo/bin/cargo run"
