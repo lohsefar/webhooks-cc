@@ -22,26 +22,48 @@ pub struct AppState {
     pub config: Config,
 }
 
+/// Initialize the OpenTelemetry tracing pipeline.
+/// Returns `Some(provider)` when a collector URL is configured, `None` otherwise.
+fn init_otel(
+    collector_url: &str,
+) -> Option<opentelemetry_sdk::trace::SdkTracerProvider> {
+    use opentelemetry_otlp::SpanExporter;
+    use opentelemetry_otlp::WithExportConfig;
+    use opentelemetry_sdk::trace::SdkTracerProvider;
+
+    let exporter = SpanExporter::builder()
+        .with_http()
+        .with_endpoint(format!("{collector_url}/v1/traces"))
+        .build()
+        .expect("failed to create OTLP span exporter");
+
+    let provider = SdkTracerProvider::builder()
+        .with_batch_exporter(exporter)
+        .with_resource(
+            opentelemetry_sdk::Resource::builder()
+                .with_service_name("webhooks-receiver")
+                .build(),
+        )
+        .build();
+
+    Some(provider)
+}
+
 #[tokio::main]
 async fn main() {
     // Load config
     let config = Config::from_env();
 
-    // Initialize Sentry — must be before tracing so the layer can capture events.
-    // When DSN is empty/unset, sentry creates a disabled (no-op) client.
-    let _sentry_guard = sentry::init((
-        config.sentry_dsn.clone().unwrap_or_default(),
-        sentry::ClientOptions {
-            release: sentry::release_name!(),
-            environment: Some("production".into()),
-            ..Default::default()
-        },
-    ));
+    // Initialize OTel pipeline (no-op when collector URL is unset)
+    let _otel_provider = config
+        .otel_collector_url
+        .as_deref()
+        .and_then(init_otel);
 
-    // Initialize tracing — stdout + rotating log file + Sentry
+    // Initialize tracing — stdout + rotating log file + optional OTel
     let log_level = if config.debug { "debug" } else { "info" };
     let env_filter = tracing_subscriber::EnvFilter::try_from_default_env().unwrap_or_else(|_| {
-        format!("webhooks_receiver={log_level},tower_http=info").into()
+        format!("webhooks_receiver={log_level},tower_http={log_level}").into()
     });
 
     let log_dir = std::path::Path::new(&config.log_dir);
@@ -51,18 +73,7 @@ async fn main() {
     use tracing_subscriber::layer::SubscriberExt;
     use tracing_subscriber::util::SubscriberInitExt;
 
-    // Sentry layer: captures WARN and ERROR as Sentry events, INFO+ as breadcrumbs.
-    let sentry_layer =
-        sentry::integrations::tracing::layer().event_filter(|md: &tracing::Metadata<'_>| {
-            match *md.level() {
-                tracing::Level::ERROR | tracing::Level::WARN => {
-                    sentry::integrations::tracing::EventFilter::Event
-                }
-                _ => sentry::integrations::tracing::EventFilter::Breadcrumb,
-            }
-        });
-
-    tracing_subscriber::registry()
+    let registry = tracing_subscriber::registry()
         .with(env_filter)
         .with(tracing_subscriber::fmt::layer().with_target(false))
         .with(
@@ -70,9 +81,17 @@ async fn main() {
                 .json()
                 .with_target(false)
                 .with_writer(file_appender),
-        )
-        .with(sentry_layer)
-        .init();
+        );
+
+    // Add OTel layer only when provider is active
+    if let Some(ref provider) = _otel_provider {
+        use opentelemetry::trace::TracerProvider;
+        let tracer = provider.tracer("webhooks-receiver");
+        let otel_layer = tracing_opentelemetry::layer().with_tracer(tracer);
+        registry.with(otel_layer).init();
+    } else {
+        registry.with(Option::<tracing_opentelemetry::OpenTelemetryLayer<_, opentelemetry_sdk::trace::Tracer>>::None).init();
+    }
 
     // Connect to Postgres
     let pool = PgPoolOptions::new()
@@ -117,7 +136,7 @@ async fn main() {
             TraceLayer::new_for_http()
                 .on_response(
                     tower_http::trace::DefaultOnResponse::new()
-                        .level(tracing::Level::INFO),
+                        .level(tracing::Level::DEBUG),
                 ),
         )
         .with_state(state);
@@ -135,6 +154,13 @@ async fn main() {
         .with_graceful_shutdown(shutdown_signal())
         .await
         .expect("server error");
+
+    // Flush any remaining OTel spans on shutdown
+    if let Some(provider) = _otel_provider
+        && let Err(e) = provider.shutdown()
+    {
+        eprintln!("OTel shutdown error: {e:?}");
+    }
 }
 
 async fn shutdown_signal() {
