@@ -9,7 +9,7 @@ pub struct Config {
     pub log_dir: String,
     pub pool_min: u32,
     pub pool_max: u32,
-    pub sentry_dsn: Option<String>,
+    pub otel_collector_url: Option<String>,
 }
 
 impl std::fmt::Debug for Config {
@@ -22,7 +22,7 @@ impl std::fmt::Debug for Config {
             .field("log_dir", &self.log_dir)
             .field("pool_min", &self.pool_min)
             .field("pool_max", &self.pool_max)
-            .field("sentry_dsn", &self.sentry_dsn.as_ref().map(|_| "[REDACTED]"))
+            .field("otel_collector_url", &self.otel_collector_url)
             .finish()
     }
 }
@@ -51,7 +51,9 @@ impl Config {
         let log_dir = env::var("RECEIVER_LOG_DIR").unwrap_or_else(|_| "logs".into());
         let pool_min: u32 = parse_env_or("PG_POOL_MIN", 5);
         let pool_max: u32 = parse_env_or("PG_POOL_MAX", 20);
-        let sentry_dsn = env::var("SENTRY_DSN").ok().filter(|v| !v.is_empty());
+        let otel_collector_url = env::var("APPSIGNAL_COLLECTOR_URL")
+            .ok()
+            .filter(|v| !v.is_empty());
 
         Self {
             database_url,
@@ -61,7 +63,7 @@ impl Config {
             log_dir,
             pool_min,
             pool_max,
-            sentry_dsn,
+            otel_collector_url,
         }
     }
 }
