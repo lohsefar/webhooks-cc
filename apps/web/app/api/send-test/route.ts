@@ -42,8 +42,7 @@ export async function POST(request: Request) {
   }
 
   // Sanitize path: block traversal sequences
-  const normalizedPath =
-    !path || path === "/" ? "" : path.startsWith("/") ? path : `/${path}`;
+  const normalizedPath = !path || path === "/" ? "" : path.startsWith("/") ? path : `/${path}`;
   if (normalizedPath.includes("..")) {
     return Response.json({ error: "Invalid path" }, { status: 400 });
   }

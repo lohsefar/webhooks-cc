@@ -1,5 +1,6 @@
 export async function register() {
   if (process.env.NEXT_RUNTIME === "nodejs") {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
     require("source-map-support/register");
 
     const { Appsignal } = await import("@appsignal/nodejs");
@@ -12,11 +13,8 @@ export async function register() {
   }
 }
 
-export async function onRequestError(
-  error: Error,
-  _request: unknown,
-  _context: unknown,
-) {
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+export async function onRequestError(error: Error, request: Request, context: unknown) {
   if (process.env.NEXT_RUNTIME === "nodejs") {
     const { sendError } = await import("@appsignal/nodejs");
     sendError(error);

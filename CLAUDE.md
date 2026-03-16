@@ -102,15 +102,15 @@ cd apps/receiver-rs && cargo clippy     # Rust receiver lint
 
 ### Service Layout
 
-| Service   | Port    | Stack                              | Purpose                                              |
-| --------- | ------- | ---------------------------------- | ---------------------------------------------------- |
-| Web app   | 3000    | Next.js 16, React 19, Tailwind v4  | Dashboard, docs, landing page, API routes            |
-| Receiver  | 3001    | Rust (Axum, Tokio, sqlx/Postgres)  | Captures webhooks at `/w/{slug}`                     |
-| Collector | 8099    | AppSignal Collector (Rust binary)  | Receives OTel traces from receiver, host metrics     |
-| Supabase  | —       | Self-hosted Postgres, Auth, Realtime | Database, auth, real-time subscriptions             |
-| CLI       | n/a     | Go 1.25, Cobra                     | `whk tunnel`, `whk listen`, device auth              |
-| SDK       | n/a     | TypeScript, tsup                   | `@webhooks-cc/sdk` on npm                            |
-| MCP       | n/a     | TypeScript, tsup                   | `@webhooks-cc/mcp` on npm — MCP server for AI agents |
+| Service   | Port | Stack                                | Purpose                                              |
+| --------- | ---- | ------------------------------------ | ---------------------------------------------------- |
+| Web app   | 3000 | Next.js 16, React 19, Tailwind v4    | Dashboard, docs, landing page, API routes            |
+| Receiver  | 3001 | Rust (Axum, Tokio, sqlx/Postgres)    | Captures webhooks at `/w/{slug}`                     |
+| Collector | 8099 | AppSignal Collector (Rust binary)    | Receives OTel traces from receiver, host metrics     |
+| Supabase  | —    | Self-hosted Postgres, Auth, Realtime | Database, auth, real-time subscriptions              |
+| CLI       | n/a  | Go 1.25, Cobra                       | `whk tunnel`, `whk listen`, device auth              |
+| SDK       | n/a  | TypeScript, tsup                     | `@webhooks-cc/sdk` on npm                            |
+| MCP       | n/a  | TypeScript, tsup                     | `@webhooks-cc/mcp` on npm — MCP server for AI agents |
 
 ### Directory Structure
 
@@ -184,16 +184,16 @@ The Rust receiver (`apps/receiver-rs/`) handles all webhook ingestion. It connec
 
 **Receiver env vars:**
 
-| Variable                | Required | Default | Purpose                                         |
-| ----------------------- | -------- | ------- | ----------------------------------------------- |
-| `DATABASE_URL`          | yes      |         | Postgres connection string (use session pooler) |
-| `CAPTURE_SHARED_SECRET` | yes      |         | Shared secret (kept for future internal auth)   |
-| `PORT`                  | no       | 3001    | Listen port                                     |
-| `RECEIVER_DEBUG`        | no       |         | Enable debug logging                            |
-| `RECEIVER_LOG_DIR`      | no       | logs/   | Rolling JSON log file directory                 |
-| `PG_POOL_MIN`           | no       | 5       | Min Postgres pool connections                   |
-| `PG_POOL_MAX`           | no       | 20      | Max Postgres pool connections                   |
-| `APPSIGNAL_COLLECTOR_URL` | no     |         | OTLP endpoint for AppSignal collector (e.g. `http://localhost:8099`) |
+| Variable                  | Required | Default | Purpose                                                              |
+| ------------------------- | -------- | ------- | -------------------------------------------------------------------- |
+| `DATABASE_URL`            | yes      |         | Postgres connection string (use session pooler)                      |
+| `CAPTURE_SHARED_SECRET`   | yes      |         | Shared secret (kept for future internal auth)                        |
+| `PORT`                    | no       | 3001    | Listen port                                                          |
+| `RECEIVER_DEBUG`          | no       |         | Enable debug logging                                                 |
+| `RECEIVER_LOG_DIR`        | no       | logs/   | Rolling JSON log file directory                                      |
+| `PG_POOL_MIN`             | no       | 5       | Min Postgres pool connections                                        |
+| `PG_POOL_MAX`             | no       | 20      | Max Postgres pool connections                                        |
+| `APPSIGNAL_COLLECTOR_URL` | no       |         | OTLP endpoint for AppSignal collector (e.g. `http://localhost:8099`) |
 
 ### CLI Commands
 
@@ -350,14 +350,14 @@ const req = await client.requests.waitFor(endpoint.slug, {
 
 ### Optional
 
-| Variable                                | Purpose                                          |
-| --------------------------------------- | ------------------------------------------------ |
-| `APPSIGNAL_PUSH_API_KEY`                | AppSignal API key (web app)                      |
-| `APPSIGNAL_APP_NAME`                    | AppSignal app name (default: `webhooks-cc-web`)  |
-| `APPSIGNAL_COLLECTOR_URL`               | OTel collector URL for receiver                  |
-| `RECEIVER_DEBUG`                        | Enable receiver debug logging                    |
-| `WHK_DEBUG`                             | Enable CLI debug logging                         |
-| `PG_POOL_MIN` / `PG_POOL_MAX`           | Receiver connection pool sizing                  |
+| Variable                      | Purpose                                         |
+| ----------------------------- | ----------------------------------------------- |
+| `APPSIGNAL_PUSH_API_KEY`      | AppSignal API key (web app)                     |
+| `APPSIGNAL_APP_NAME`          | AppSignal app name (default: `webhooks-cc-web`) |
+| `APPSIGNAL_COLLECTOR_URL`     | OTel collector URL for receiver                 |
+| `RECEIVER_DEBUG`              | Enable receiver debug logging                   |
+| `WHK_DEBUG`                   | Enable CLI debug logging                        |
+| `PG_POOL_MIN` / `PG_POOL_MAX` | Receiver connection pool sizing                 |
 
 ## CI/CD & Releases
 
