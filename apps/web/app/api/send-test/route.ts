@@ -50,10 +50,18 @@ export async function POST(request: Request) {
   // Build the receiver URL (internal, bypassing Cloudflare which intercepts 5xx)
   const url = `${serverEnv().RECEIVER_INTERNAL_URL}/w/${slug}${normalizedPath}`;
 
+  // Forward the caller's real IP so the receiver stores it on the request
+  const clientIp =
+    request.headers.get("cf-connecting-ip") ||
+    request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ||
+    request.headers.get("x-real-ip") ||
+    "";
+
   // Forward to the receiver
   const fetchHeaders: Record<string, string> = {
     ...headers,
     "X-Webhooks-CC-Test-Send": "1",
+    ...(clientIp && { "X-Real-Ip": clientIp }),
   };
 
   try {

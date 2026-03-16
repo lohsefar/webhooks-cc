@@ -4,4 +4,4 @@ procs:
   receiver:
     cmd: ["journalctl", "--user", "-u", "webhooks-receiver", "-f", "--no-hostname", "-o", "cat"]
   collector:
-    cmd: ["journalctl", "--user", "-u", "webhooks-collector", "-f", "--no-hostname", "-o", "cat"]
+    cmd: ["sudo", "journalctl", "-u", "appsignal-collector", "-f", "--no-hostname", "-o", "cat"]

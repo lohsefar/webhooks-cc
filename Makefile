@@ -20,18 +20,22 @@ dev-cli:
 # Production (systemd services + mprocs log viewer)
 prod:
 	@echo "Ensuring services are running..."
-	@systemctl --user start webhooks-web webhooks-receiver webhooks-collector
+	@systemctl --user start webhooks-web webhooks-receiver
+	@sudo systemctl start appsignal-collector
 	@echo "Opening log viewer (mprocs)..."
 	mprocs --config mprocs.yaml
 
 prod-status:
-	@systemctl --user status webhooks-web webhooks-receiver webhooks-collector
+	@systemctl --user status webhooks-web webhooks-receiver
+	@sudo systemctl status appsignal-collector
 
 prod-stop:
-	@systemctl --user stop webhooks-web webhooks-receiver webhooks-collector
+	@systemctl --user stop webhooks-web webhooks-receiver
+	@sudo systemctl stop appsignal-collector
 
 prod-restart:
-	@systemctl --user restart webhooks-web webhooks-receiver webhooks-collector
+	@systemctl --user restart webhooks-web webhooks-receiver
+	@sudo systemctl restart appsignal-collector
 
 # Build
 build:
@@ -62,7 +66,7 @@ deploy-web:
 
 deploy-collector:
 	@echo "Restarting collector..."
-	@systemctl --user restart webhooks-collector
+	@sudo systemctl restart appsignal-collector
 	@echo "Collector restarted."
 
 deploy-all: deploy-receiver deploy-web

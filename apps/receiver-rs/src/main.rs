@@ -26,7 +26,9 @@ pub struct AppState {
 /// Returns `None` on failure so the receiver can continue without tracing (fail-open).
 fn init_otel(
     collector_url: &str,
+    push_api_key: Option<&str>,
 ) -> Option<opentelemetry_sdk::trace::SdkTracerProvider> {
+    use opentelemetry::KeyValue;
     use opentelemetry_otlp::SpanExporter;
     use opentelemetry_otlp::WithExportConfig;
     use opentelemetry_sdk::trace::SdkTracerProvider;
@@ -43,11 +45,26 @@ fn init_otel(
         }
     };
 
+    let hostname = gethostname::gethostname()
+        .to_string_lossy()
+        .into_owned();
+
+    let mut attrs = vec![
+        KeyValue::new("service.name", "webhooks-receiver"),
+        KeyValue::new("appsignal.config.name", "webhooks-cc-receiver"),
+        KeyValue::new("appsignal.config.environment", "production"),
+        KeyValue::new("appsignal.config.language_integration", "rust"),
+        KeyValue::new("host.name", hostname),
+    ];
+    if let Some(key) = push_api_key {
+        attrs.push(KeyValue::new("appsignal.config.push_api_key", key.to_string()));
+    }
+
     let provider = SdkTracerProvider::builder()
         .with_batch_exporter(exporter)
         .with_resource(
             opentelemetry_sdk::Resource::builder()
-                .with_service_name("webhooks-receiver")
+                .with_attributes(attrs)
                 .build(),
         )
         .build();
@@ -64,7 +81,7 @@ async fn main() {
     let otel_provider = config
         .otel_collector_url
         .as_deref()
-        .and_then(init_otel);
+        .and_then(|url| init_otel(url, config.appsignal_push_api_key.as_deref()));
 
     // Initialize tracing — stdout + rotating log file + optional OTel
     let log_level = if config.debug { "debug" } else { "info" };

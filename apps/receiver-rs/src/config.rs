@@ -10,6 +10,7 @@ pub struct Config {
     pub pool_min: u32,
     pub pool_max: u32,
     pub otel_collector_url: Option<String>,
+    pub appsignal_push_api_key: Option<String>,
 }
 
 impl std::fmt::Debug for Config {
@@ -23,6 +24,7 @@ impl std::fmt::Debug for Config {
             .field("pool_min", &self.pool_min)
             .field("pool_max", &self.pool_max)
             .field("otel_collector_url", &self.otel_collector_url.as_ref().map(|_| "[REDACTED]"))
+            .field("appsignal_push_api_key", &self.appsignal_push_api_key.as_ref().map(|_| "[REDACTED]"))
             .finish()
     }
 }
@@ -54,6 +56,9 @@ impl Config {
         let otel_collector_url = env::var("APPSIGNAL_COLLECTOR_URL")
             .ok()
             .filter(|v| !v.is_empty());
+        let appsignal_push_api_key = env::var("APPSIGNAL_PUSH_API_KEY")
+            .ok()
+            .filter(|v| !v.is_empty());
 
         Self {
             database_url,
@@ -64,6 +69,7 @@ impl Config {
             pool_min,
             pool_max,
             otel_collector_url,
+            appsignal_push_api_key,
         }
     }
 }
