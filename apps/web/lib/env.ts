@@ -31,6 +31,7 @@ const serverEnvSchema = z.object({
   SENTRY_DSN: z.string().optional(),
   SUPABASE_URL: z.string().url(),
   SUPABASE_SERVICE_ROLE_KEY: z.string().min(1),
+  RECEIVER_INTERNAL_URL: z.string().url(),
 });
 
 /** Validated public env vars (available in both server and client). */
@@ -63,6 +64,7 @@ export function serverEnv() {
       SENTRY_DSN: process.env.SENTRY_DSN,
       SUPABASE_URL: process.env.SUPABASE_URL,
       SUPABASE_SERVICE_ROLE_KEY: process.env.SUPABASE_SERVICE_ROLE_KEY,
+      RECEIVER_INTERNAL_URL: process.env.RECEIVER_INTERNAL_URL,
     });
   }
   return _serverEnv;

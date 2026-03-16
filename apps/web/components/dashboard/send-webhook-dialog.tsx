@@ -13,6 +13,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Send } from "lucide-react";
+import { useAuth } from "@/components/providers/supabase-auth-provider";
 import { WEBHOOK_BASE_URL } from "@/lib/constants";
 import {
   buildTemplateRequest,
@@ -34,8 +35,6 @@ interface TemplateSelectionByProvider {
   shopify: string;
   twilio: string;
 }
-
-const INTERNAL_TEST_SEND_HEADER = "X-Webhooks-CC-Test-Send";
 
 function defaultTemplateSelection(): TemplateSelectionByProvider {
   return {
@@ -66,6 +65,7 @@ function parseHeaders(raw: string): Record<string, string> {
 }
 
 export function SendWebhookDialog({ slug }: SendWebhookDialogProps) {
+  const { session } = useAuth();
   const [open, setOpen] = useState(false);
   const [mode, setMode] = useState<SendMode>("manual");
   const [templates, setTemplates] = useState<TemplateSelectionByProvider>(defaultTemplateSelection);
@@ -152,29 +152,40 @@ export function SendWebhookDialog({ slug }: SendWebhookDialogProps) {
     }
 
     try {
-      const response = await fetch(url, {
-        method: requestMethod,
-        headers: {
-          ...requestHeaders,
-          [INTERNAL_TEST_SEND_HEADER]: "1",
-        },
-        body: requestBody,
-      });
-      setStatus("sent");
-      setStatusText(`${response.status} ${response.statusText}`.trim());
-    } catch (error) {
-      // Browser CORS can hide response details even if request reached receiver.
-      const message = error instanceof Error ? error.message : "";
-      const likelyCorsOpaque =
-        error instanceof TypeError &&
-        /Failed to fetch|Load failed|NetworkError/i.test(message || "Failed to fetch");
-
-      if (likelyCorsOpaque) {
-        setStatus("sent");
-        setStatusText("Request sent (response unavailable due to browser restrictions)");
+      const accessToken = session?.access_token;
+      if (!accessToken) {
+        setStatus("error");
+        setStatusText("Not authenticated");
         return;
       }
 
+      const response = await fetch("/api/send-test", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${accessToken}`,
+        },
+        body: JSON.stringify({
+          method: requestMethod,
+          slug,
+          path: normalizedPath,
+          headers: requestHeaders,
+          body: requestBody,
+        }),
+      });
+
+      const result = await response.json();
+
+      if (!response.ok) {
+        setStatus("error");
+        setStatusText(result.error || `Proxy error: ${response.status}`);
+        return;
+      }
+
+      setStatus("sent");
+      setStatusText(`${result.status} ${result.statusText}`.trim());
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "";
       setStatus("error");
       setStatusText(message || "Request failed");
     }
