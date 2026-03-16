@@ -12,7 +12,8 @@
     "format:check": "prettier --check .",
     "test": "turbo test",
     "typecheck": "turbo typecheck",
-    "cli": "cd apps/cli && go run ./cmd/whk"
+    "cli": "cd apps/cli && go run ./cmd/whk",
+    "start": "mprocs --config mprocs.yaml"
   },
   "devDependencies": {
     "@edge-runtime/vm": "^5.0.0",
