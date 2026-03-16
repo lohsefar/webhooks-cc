@@ -20,18 +20,18 @@ dev-cli:
 # Production (systemd services + mprocs log viewer)
 prod:
 	@echo "Ensuring services are running..."
-	@systemctl --user start webhooks-web webhooks-receiver
+	@systemctl --user start webhooks-web webhooks-receiver webhooks-collector
 	@echo "Opening log viewer (mprocs)..."
 	mprocs --config mprocs.yaml
 
 prod-status:
-	@systemctl --user status webhooks-web webhooks-receiver
+	@systemctl --user status webhooks-web webhooks-receiver webhooks-collector
 
 prod-stop:
-	@systemctl --user stop webhooks-web webhooks-receiver
+	@systemctl --user stop webhooks-web webhooks-receiver webhooks-collector
 
 prod-restart:
-	@systemctl --user restart webhooks-web webhooks-receiver
+	@systemctl --user restart webhooks-web webhooks-receiver webhooks-collector
 
 # Build
 build:
@@ -59,6 +59,11 @@ deploy-web:
 	@echo "Restarting web server..."
 	@systemctl --user restart webhooks-web
 	@echo "Web deployed."
+
+deploy-collector:
+	@echo "Restarting collector..."
+	@systemctl --user restart webhooks-collector
+	@echo "Collector restarted."
 
 deploy-all: deploy-receiver deploy-web
 
