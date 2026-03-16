@@ -1,6 +1,6 @@
 # AGENTS.md
 
-Guidance for Codex when working in this repository.
+Guidance for coding agents (Codex, Copilot, Devin, etc.) working in this repository. See also `CLAUDE.md` for Claude Code-specific instructions.
 
 ## Project Overview
 
@@ -32,13 +32,15 @@ make build-receiver       # Build Rust receiver (release) to dist/receiver
 make build-cli            # Build CLI with goreleaser
 ```
 
-**CRITICAL**: After `make build-receiver`, you MUST restart the systemd service:
+**CRITICAL**: After building, you MUST restart the service. Use the deploy targets which build + restart atomically:
 
 ```bash
-make build-receiver && sudo systemctl restart webhooks-receiver
+make deploy-receiver    # Build Rust receiver + restart service
+make deploy-web         # Build Next.js + restart service
+make deploy-all         # Deploy both
 ```
 
-Without this step the old binary continues running and code changes have no effect.
+Without restarting, the old binary/build continues running and code changes have no effect.
 
 ### Test
 
@@ -59,14 +61,33 @@ psql "$SUPABASE_DB_URL" -f supabase/migrations/00010_capture_webhook.sql
 
 ### Systemd Services
 
-The receiver runs as a systemd service. The service runs the Rust binary at `dist/receiver`.
+Both the web app and receiver run as **user** systemd services (no `sudo` needed). Service files live at `~/.config/systemd/user/webhooks-{web,receiver}.service`.
 
 ```bash
-sudo systemctl restart webhooks-receiver                      # Restart (applies rebuild)
-sudo systemctl status webhooks-receiver                       # Check status
-sudo journalctl -u webhooks-receiver -f                       # Follow logs
-sudo journalctl -u webhooks-receiver --since "5 minutes ago"  # Recent logs
+# Manage services
+make prod-status                  # Check both services
+make prod-restart                 # Restart both services
+make prod-stop                    # Stop both services
+
+# Individual service control
+systemctl --user restart webhooks-receiver
+systemctl --user restart webhooks-web
+systemctl --user status webhooks-receiver webhooks-web
+
+# Logs
+journalctl --user -u webhooks-receiver -f                       # Follow receiver logs
+journalctl --user -u webhooks-web -f                            # Follow web logs
+journalctl --user -u webhooks-receiver --since "5 minutes ago"  # Recent logs
 ```
+
+### Production Log Viewer
+
+```bash
+make prod                 # Ensure services are running + open mprocs log viewer
+pnpm start                # Same via pnpm (mprocs --config mprocs.yaml)
+```
+
+`mprocs.yaml` tails both service journals side-by-side. It is a **log viewer only** — it does not manage the processes.
 
 ### Lint & Format
 
@@ -85,7 +106,7 @@ cd apps/receiver-rs && cargo clippy     # Rust receiver lint
 | -------- | ------- | --------------------------------- | ---------------------------------------------------- |
 | Web app  | 3000    | Next.js 16, React 19, Tailwind v4 | Dashboard, docs, landing page, API routes            |
 | Receiver | 3001    | Rust (Axum, Tokio, sqlx/Postgres) | Captures webhooks at `/w/{slug}`                     |
-| Supabase | managed | Postgres, Supabase Auth, Realtime | Database, auth, real-time subscriptions              |
+| Supabase | —       | Self-hosted Postgres, Auth, Realtime | Database, auth, real-time subscriptions           |
 | CLI      | n/a     | Go 1.25, Cobra                    | `whk tunnel`, `whk listen`, device auth              |
 | SDK      | n/a     | TypeScript, tsup                  | `@webhooks-cc/sdk` on npm                            |
 | MCP      | n/a     | TypeScript, tsup                  | `@webhooks-cc/mcp` on npm — MCP server for AI agents |
