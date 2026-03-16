@@ -2,7 +2,6 @@ import { checkRateLimit } from "@/lib/rate-limit";
 import { parseJsonBody } from "@/lib/request-validation";
 import { createClient } from "@/lib/supabase/server";
 import { authorizeDeviceCodeForUser } from "@/lib/supabase/device-auth";
-import * as Sentry from "@sentry/nextjs";
 
 export async function POST(request: Request) {
   const rateLimited = checkRateLimit(request, 10);
@@ -39,7 +38,7 @@ export async function POST(request: Request) {
       return Response.json({ error: error.message }, { status: 400 });
     }
 
-    Sentry.captureException(error);
+    console.error(error);
     return Response.json({ error: "Internal server error" }, { status: 500 });
   }
 }

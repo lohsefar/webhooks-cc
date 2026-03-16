@@ -1,6 +1,5 @@
 import { checkRateLimit } from "@/lib/rate-limit";
 import { createDeviceCodeRecord } from "@/lib/supabase/device-auth";
-import * as Sentry from "@sentry/nextjs";
 
 export async function POST(request: Request) {
   const rateLimited = checkRateLimit(request, 10);
@@ -21,7 +20,7 @@ export async function POST(request: Request) {
     if (err instanceof Error && err.message.includes("Too many pending device codes")) {
       return Response.json({ error: err.message }, { status: 429 });
     }
-    Sentry.captureException(err);
+    console.error(err);
     return Response.json({ error: "Internal server error" }, { status: 500 });
   }
 }

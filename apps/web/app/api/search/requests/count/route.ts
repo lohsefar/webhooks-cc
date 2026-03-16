@@ -1,7 +1,6 @@
 import { extractBearerToken, validateBearerTokenWithPlan } from "@/lib/api-auth";
 import { checkRateLimitByKey } from "@/lib/rate-limit";
 import { countSearchRequestsForUser } from "@/lib/supabase/search";
-import * as Sentry from "@sentry/nextjs";
 
 function parseOptionalInteger(
   searchParams: URLSearchParams,
@@ -61,7 +60,6 @@ export async function GET(request: Request) {
 
     return Response.json({ count });
   } catch (err) {
-    Sentry.captureException(err);
     console.error("Search count API route error:", err);
     return Response.json({ error: "Internal server error" }, { status: 500 });
   }
