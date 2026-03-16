@@ -38,7 +38,8 @@
     "onlyBuiltDependencies": [
       "esbuild",
       "sharp",
-      "@sentry/cli"
+      "@sentry/cli",
+      "@appsignal/nodejs"
     ],
     "overrides": {
       "ajv@^6.12.4": "6.14.0",
