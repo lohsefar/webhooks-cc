@@ -130,8 +130,12 @@ function EndpointSettingsForm() {
           : null,
       });
       trackEndpointSaved(
-        { name: endpoint.name || "", mockStatus: endpoint.mockResponse?.status?.toString() || "200", mockBody: endpoint.mockResponse?.body || "" },
-        { name, mockStatus, mockBody },
+        {
+          name: endpoint.name || "",
+          mockStatus: endpoint.mockResponse?.status?.toString() || "200",
+          mockBody: endpoint.mockResponse?.body || "",
+        },
+        { name, mockStatus, mockBody }
       );
 
       router.push(`/dashboard?endpoint=${slug}`);

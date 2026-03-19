@@ -163,6 +163,7 @@ export function RequestDetail({ request }: RequestDetailProps) {
           <button
             key={t}
             onClick={() => {
+              if (tab === t) return;
               setTab(t);
               trackRequestDetailTabChanged(t);
             }}

@@ -119,8 +119,12 @@ export function EndpointSettingsDialog(props: EndpointSettingsDialogProps) {
       setOpen(false);
 
       trackEndpointSaved(
-        { name: endpointName, mockStatus: mockResponse?.status?.toString() || "200", mockBody: mockResponse?.body || "" },
-        { name, mockStatus, mockBody },
+        {
+          name: endpointName,
+          mockStatus: mockResponse?.status?.toString() || "200",
+          mockBody: mockResponse?.body || "",
+        },
+        { name, mockStatus, mockBody }
       );
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to save");

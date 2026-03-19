@@ -83,22 +83,23 @@ export function trackMockResponseConfigured(statusCode: number, hasBody: boolean
 }
 
 /** Compare previous and current endpoint state, fire relevant tracking events. */
-export function trackEndpointSaved(prev: {
-  name: string;
-  mockStatus: string;
-  mockBody: string;
-}, next: {
-  name: string;
-  mockStatus: string;
-  mockBody: string;
-}) {
+export function trackEndpointSaved(
+  prev: {
+    name: string;
+    mockStatus: string;
+    mockBody: string;
+  },
+  next: {
+    name: string;
+    mockStatus: string;
+    mockBody: string;
+  }
+) {
   const changedFields: string[] = [];
   if (next.name !== prev.name) changedFields.push("name");
 
-  const prevHasMock = prev.mockBody || prev.mockStatus !== "200";
-  const nextHasMock = next.mockBody || next.mockStatus !== "200";
-  const mockChanged =
-    next.mockStatus !== prev.mockStatus || next.mockBody !== prev.mockBody;
+  const nextHasMock = Boolean(next.mockBody) || next.mockStatus !== "200";
+  const mockChanged = next.mockStatus !== prev.mockStatus || next.mockBody !== prev.mockBody;
 
   if (mockChanged) changedFields.push("mock_response");
   if (changedFields.length > 0) trackEndpointUpdated(changedFields);
