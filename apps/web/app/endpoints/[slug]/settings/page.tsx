@@ -17,11 +17,7 @@ import {
   type DashboardEndpoint,
   updateDashboardEndpoint,
 } from "@/lib/dashboard-api";
-import {
-  trackEndpointDeleted,
-  trackEndpointUpdated,
-  trackMockResponseConfigured,
-} from "@/lib/analytics";
+import { trackEndpointDeleted, trackEndpointSaved } from "@/lib/analytics";
 import {
   Dialog,
   DialogContent,
@@ -133,11 +129,10 @@ function EndpointSettingsForm() {
             }
           : null,
       });
-      const changedFields: string[] = [];
-      if (name !== (endpoint.name || "")) changedFields.push("name");
-      if (hasCustomMock) changedFields.push("mock_response");
-      if (changedFields.length > 0) trackEndpointUpdated(changedFields);
-      if (hasCustomMock) trackMockResponseConfigured(parseStatusCode(mockStatus, 200), Boolean(mockBody));
+      trackEndpointSaved(
+        { name: endpoint.name || "", mockStatus: endpoint.mockResponse?.status?.toString() || "200", mockBody: endpoint.mockResponse?.body || "" },
+        { name, mockStatus, mockBody },
+      );
 
       router.push(`/dashboard?endpoint=${slug}`);
     } catch (err) {

@@ -13,11 +13,7 @@ import {
   emitDashboardEndpointsChanged,
   updateDashboardEndpoint,
 } from "@/lib/dashboard-api";
-import {
-  trackEndpointDeleted,
-  trackEndpointUpdated,
-  trackMockResponseConfigured,
-} from "@/lib/analytics";
+import { trackEndpointDeleted, trackEndpointSaved } from "@/lib/analytics";
 import {
   Dialog,
   DialogContent,
@@ -122,11 +118,10 @@ export function EndpointSettingsDialog(props: EndpointSettingsDialogProps) {
       emitDashboardEndpointsChanged();
       setOpen(false);
 
-      const changedFields: string[] = [];
-      if (name !== endpointName) changedFields.push("name");
-      if (hasCustomMock) changedFields.push("mock_response");
-      if (changedFields.length > 0) trackEndpointUpdated(changedFields);
-      if (hasCustomMock) trackMockResponseConfigured(parseStatusCode(mockStatus, 200), Boolean(mockBody));
+      trackEndpointSaved(
+        { name: endpointName, mockStatus: mockResponse?.status?.toString() || "200", mockBody: mockResponse?.body || "" },
+        { name, mockStatus, mockBody },
+      );
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to save");
     } finally {

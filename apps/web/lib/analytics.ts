@@ -69,11 +69,6 @@ export function trackRequestDetailTabChanged(tab: string) {
   capture("request_detail_tab_changed", { tab });
 }
 
-// ── Mock response ────────────────────────────────────────────────
-export function trackMockResponseConfigured(statusCode: number, hasBody: boolean) {
-  capture("mock_response_configured", { status_code: statusCode, has_body: hasBody });
-}
-
 // ── Endpoint management ──────────────────────────────────────────
 export function trackEndpointDeleted() {
   capture("endpoint_deleted");
@@ -81,6 +76,35 @@ export function trackEndpointDeleted() {
 
 export function trackEndpointUpdated(fields: string[]) {
   capture("endpoint_updated", { fields });
+}
+
+export function trackMockResponseConfigured(statusCode: number, hasBody: boolean) {
+  capture("mock_response_configured", { status_code: statusCode, has_body: hasBody });
+}
+
+/** Compare previous and current endpoint state, fire relevant tracking events. */
+export function trackEndpointSaved(prev: {
+  name: string;
+  mockStatus: string;
+  mockBody: string;
+}, next: {
+  name: string;
+  mockStatus: string;
+  mockBody: string;
+}) {
+  const changedFields: string[] = [];
+  if (next.name !== prev.name) changedFields.push("name");
+
+  const prevHasMock = prev.mockBody || prev.mockStatus !== "200";
+  const nextHasMock = next.mockBody || next.mockStatus !== "200";
+  const mockChanged =
+    next.mockStatus !== prev.mockStatus || next.mockBody !== prev.mockBody;
+
+  if (mockChanged) changedFields.push("mock_response");
+  if (changedFields.length > 0) trackEndpointUpdated(changedFields);
+  if (mockChanged && nextHasMock) {
+    trackMockResponseConfigured(parseInt(next.mockStatus, 10) || 200, Boolean(next.mockBody));
+  }
 }
 
 // ── Export ────────────────────────────────────────────────────────
