@@ -47,12 +47,12 @@ create(options?: CreateEndpointOptions): Promise<Endpoint>
 
 **MockResponse fields:**
 
-| Field     | Type                     | Required | Description                          |
-| --------- | ------------------------ | -------- | ------------------------------------ |
-| `status`  | `number`                 | yes      | HTTP status code (100-599)           |
-| `body`    | `string`                 | no       | Response body                        |
-| `headers` | `Record<string, string>` | no       | Response headers                     |
-| `delay`   | `number`                 | no       | Response delay in ms (0-30000)       |
+| Field     | Type                     | Required | Description                    |
+| --------- | ------------------------ | -------- | ------------------------------ |
+| `status`  | `number`                 | yes      | HTTP status code (100-599)     |
+| `body`    | `string`                 | no       | Response body                  |
+| `headers` | `Record<string, string>` | no       | Response headers               |
+| `delay`   | `number`                 | no       | Response delay in ms (0-30000) |
 
 </ParamTable>
 </ApiMethod>
@@ -87,11 +87,11 @@ update(slug: string, options: UpdateEndpointOptions): Promise<Endpoint>
 
 <ParamTable>
 
-| Param          | Type             | Required | Description                                                                  |
-| -------------- | ---------------- | -------- | ---------------------------------------------------------------------------- |
-| `slug`         | `string`         | yes      | Endpoint slug                                                                |
-| `name`         | `string`         | no       | New display name                                                             |
-| `mockResponse` | `MockResponse \| null` | no  | Mock response config (see fields above), or `null` to clear |
+| Param          | Type                   | Required | Description                                                 |
+| -------------- | ---------------------- | -------- | ----------------------------------------------------------- |
+| `slug`         | `string`               | yes      | Endpoint slug                                               |
+| `name`         | `string`               | no       | New display name                                            |
+| `mockResponse` | `MockResponse \| null` | no       | Mock response config (see fields above), or `null` to clear |
 
 </ParamTable>
 </ApiMethod>
@@ -396,7 +396,7 @@ List all supported webhook provider templates. No API call made.
 
 ```ts
 listProviders(): TemplateProvider[]
-// Returns: ["stripe", "github", "shopify", "twilio", "slack", "paddle", "linear", "standard-webhooks"]
+// Returns: ["stripe", "github", "shopify", "twilio", "slack", "paddle", "linear", "sendgrid", "clerk", "discord", "vercel", "gitlab", "standard-webhooks"]
 ```
 
 </ApiMethod>
@@ -501,7 +501,11 @@ import {
   isTwilioWebhook, // x-twilio-signature
   isPaddleWebhook, // paddle-signature
   isLinearWebhook, // linear-signature
+  isSendGridWebhook, // user-agent: SendGrid + JSON array body
+  isClerkWebhook, // webhook-id + webhook-timestamp + svix-id
   isDiscordWebhook, // x-signature-ed25519 + x-signature-timestamp
+  isVercelWebhook, // x-vercel-signature
+  isGitLabWebhook, // x-gitlab-event or x-gitlab-token
   isStandardWebhook, // webhook-id + webhook-timestamp + webhook-signature
 } from "@webhooks-cc/sdk";
 ```
@@ -546,7 +550,10 @@ import {
   verifyTwilioSignature,
   verifyPaddleSignature,
   verifyLinearSignature,
+  verifyClerkSignature,
   verifyDiscordSignature,
+  verifyVercelSignature,
+  verifyGitLabSignature,
   verifyStandardWebhookSignature,
 } from "@webhooks-cc/sdk";
 
@@ -630,9 +637,14 @@ type TemplateProvider =
   | "slack"
   | "paddle"
   | "linear"
+  | "sendgrid"
+  | "clerk"
+  | "discord"
+  | "vercel"
+  | "gitlab"
   | "standard-webhooks";
 
-type VerifyProvider = TemplateProvider | "discord";
+type VerifyProvider = TemplateProvider;
 ```
 
 ## Error Classes

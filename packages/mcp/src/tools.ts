@@ -25,11 +25,26 @@ const TEMPLATE_PROVIDER_VALUES = [
   "slack",
   "paddle",
   "linear",
+  "sendgrid",
+  "clerk",
+  "discord",
+  "vercel",
+  "gitlab",
   "standard-webhooks",
 ] as const satisfies readonly TemplateProvider[];
 const VERIFY_PROVIDER_VALUES = [
-  ...TEMPLATE_PROVIDER_VALUES,
+  "stripe",
+  "github",
+  "shopify",
+  "twilio",
+  "slack",
+  "paddle",
+  "linear",
+  "clerk",
   "discord",
+  "vercel",
+  "gitlab",
+  "standard-webhooks",
 ] as const satisfies readonly VerifyProvider[];
 const TIME_SEPARATOR = " — ";
 
@@ -912,8 +927,16 @@ export function registerTools(server: McpServer, client: WebhooksCC): void {
           });
 
           if (shouldVerify) {
+            // Discord uses Ed25519 public keys (not HMAC), so it cannot
+            // be verified through the secret-based flow path.
+            if (provider === "discord") {
+              throw new Error(
+                "test_webhook_flow cannot verify Discord signatures (Ed25519 requires a public key, not a secret)"
+              );
+            }
+
             flow.verifySignature({
-              provider,
+              provider: provider as Exclude<typeof provider, "discord">,
               secret: templateSecret,
             });
           }

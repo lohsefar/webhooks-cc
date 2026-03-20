@@ -1,8 +1,10 @@
 import { describe, expect, it } from "vitest";
 import {
   WebhooksCC,
+  verifyClerkSignature,
   verifyDiscordSignature,
   verifyGitHubSignature,
+  verifyGitLabSignature,
   verifyLinearSignature,
   verifyPaddleSignature,
   verifyShopifySignature,
@@ -11,6 +13,7 @@ import {
   verifyStandardWebhookSignature,
   verifyStripeSignature,
   verifyTwilioSignature,
+  verifyVercelSignature,
 } from "../index";
 
 const client = new WebhooksCC({
@@ -238,6 +241,91 @@ describe("signature verification", () => {
           },
         },
         { provider: "standard-webhooks", secret }
+      )
+    ).resolves.toEqual({ valid: true });
+  });
+
+  it("verifies Clerk signatures via Standard Webhooks (Svix) round-trip", async () => {
+    const secret = `whsec_${Buffer.from("clerk-test-secret").toString("base64")}`;
+    const built = await client.buildRequest("https://example.com/webhooks/clerk", {
+      provider: "clerk",
+      secret,
+      body: { type: "user.created", data: { id: "user_123" } },
+      timestamp: 1700000000,
+    });
+
+    // Clerk uses Svix/Standard Webhooks headers
+    expect(await verifyClerkSignature(built.body, built.headers, secret)).toBe(true);
+    expect(await verifyClerkSignature(built.body, built.headers, "whsec_wrongsecret")).toBe(false);
+
+    // Also verify via the generic verifySignature dispatcher
+    await expect(
+      verifySignature(
+        {
+          body: built.body,
+          headers: {
+            "Webhook-Id": built.headers["webhook-id"],
+            "Webhook-Timestamp": built.headers["webhook-timestamp"],
+            "Webhook-Signature": built.headers["webhook-signature"],
+          },
+        },
+        { provider: "clerk", secret }
+      )
+    ).resolves.toEqual({ valid: true });
+  });
+
+  it("verifies Vercel signatures via HMAC-SHA1 round-trip", async () => {
+    const built = await client.buildRequest("https://example.com/webhooks/vercel", {
+      provider: "vercel",
+      secret: "vercel_secret",
+      body: { type: "deployment.created", payload: { deploymentId: "dpl_123" } },
+    });
+
+    expect(
+      await verifyVercelSignature(built.body, built.headers["x-vercel-signature"], "vercel_secret")
+    ).toBe(true);
+    expect(
+      await verifyVercelSignature(built.body, built.headers["x-vercel-signature"], "wrong_secret")
+    ).toBe(false);
+
+    // Also verify via the generic verifySignature dispatcher
+    await expect(
+      verifySignature(
+        {
+          body: built.body,
+          headers: { "X-Vercel-Signature": built.headers["x-vercel-signature"] },
+        },
+        { provider: "vercel", secret: "vercel_secret" }
+      )
+    ).resolves.toEqual({ valid: true });
+  });
+
+  it("verifies GitLab token matching round-trip", async () => {
+    const built = await client.buildRequest("https://example.com/webhooks/gitlab", {
+      provider: "gitlab",
+      secret: "gitlab_secret_token",
+      body: { object_kind: "push", ref: "refs/heads/main" },
+    });
+
+    expect(
+      await verifyGitLabSignature(
+        built.body,
+        built.headers["x-gitlab-token"],
+        "gitlab_secret_token"
+      )
+    ).toBe(true);
+    expect(
+      await verifyGitLabSignature(built.body, built.headers["x-gitlab-token"], "wrong_secret")
+    ).toBe(false);
+
+    // Also verify via the generic verifySignature dispatcher
+    await expect(
+      verifySignature(
+        {
+          body: built.body,
+          headers: { "X-Gitlab-Token": built.headers["x-gitlab-token"] },
+        },
+        { provider: "gitlab", secret: "gitlab_secret_token" }
       )
     ).resolves.toEqual({ valid: true });
   });

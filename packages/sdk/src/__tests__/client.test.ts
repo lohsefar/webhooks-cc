@@ -197,6 +197,11 @@ describe("WebhooksCC", () => {
         "slack",
         "paddle",
         "linear",
+        "sendgrid",
+        "clerk",
+        "discord",
+        "vercel",
+        "gitlab",
         "standard-webhooks",
       ]);
     });

@@ -32,6 +32,12 @@ export const NAV_SECTIONS: NavSection[] = [
     items: [
       { title: "Endpoints", href: "/docs/endpoints" },
       { title: "Test Webhooks", href: "/docs/endpoints/test-webhooks", depth: 1 },
+      {
+        title: "Provider Templates",
+        href: "/docs/endpoints/provider-templates",
+        depth: 1,
+        isNew: true,
+      },
       { title: "Requests", href: "/docs/requests" },
       { title: "Mock Responses", href: "/docs/mock-responses" },
     ],
