@@ -12,6 +12,10 @@ import {
   isPaddleWebhook,
   isLinearWebhook,
   isDiscordWebhook,
+  isSendGridWebhook,
+  isClerkWebhook,
+  isVercelWebhook,
+  isGitLabWebhook,
   isStandardWebhook,
 } from "../helpers";
 import type { Request } from "../types";
@@ -242,6 +246,72 @@ describe("isDiscordWebhook", () => {
         })
       )
     ).toBe(false);
+  });
+});
+
+describe("isSendGridWebhook", () => {
+  it("returns true when body is a JSON array with sg_event_id field", () => {
+    expect(
+      isSendGridWebhook(
+        makeRequest({
+          body: '[{"sg_event_id":"abc123","event":"delivered","email":"test@example.com"}]',
+        })
+      )
+    ).toBe(true);
+  });
+
+  it("returns false when body is a regular JSON object", () => {
+    expect(
+      isSendGridWebhook(
+        makeRequest({
+          body: '{"sg_event_id":"abc123","event":"delivered"}',
+        })
+      )
+    ).toBe(false);
+  });
+
+  it("returns false when body is empty", () => {
+    expect(isSendGridWebhook(makeRequest())).toBe(false);
+  });
+});
+
+describe("isClerkWebhook", () => {
+  it("returns true when svix-id header is present", () => {
+    expect(isClerkWebhook(makeRequest({ headers: { "svix-id": "msg_abc123" } }))).toBe(true);
+  });
+
+  it("returns false without svix-id header", () => {
+    expect(isClerkWebhook(makeRequest())).toBe(false);
+  });
+});
+
+describe("isVercelWebhook", () => {
+  it("returns true when x-vercel-signature header is present", () => {
+    expect(
+      isVercelWebhook(makeRequest({ headers: { "x-vercel-signature": "abc123" } }))
+    ).toBe(true);
+  });
+
+  it("returns false without x-vercel-signature header", () => {
+    expect(isVercelWebhook(makeRequest())).toBe(false);
+  });
+});
+
+describe("isGitLabWebhook", () => {
+  it("returns true when x-gitlab-event header is present", () => {
+    expect(
+      isGitLabWebhook(makeRequest({ headers: { "x-gitlab-event": "Push Hook" } }))
+    ).toBe(true);
+  });
+
+  it("returns true when x-gitlab-token header is present", () => {
+    expect(
+      isGitLabWebhook(makeRequest({ headers: { "x-gitlab-token": "my-secret-token" } }))
+    ).toBe(true);
+  });
+
+  it("returns false without either header", () => {
+    expect(isGitLabWebhook(makeRequest())).toBe(false);
   });
 });
 
