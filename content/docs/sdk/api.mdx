@@ -45,6 +45,15 @@ create(options?: CreateEndpointOptions): Promise<Endpoint>
 | `expiresIn`    | `string`       | no       | Custom expiry duration |
 | `mockResponse` | `MockResponse` | no       | Mock response config   |
 
+**MockResponse fields:**
+
+| Field     | Type                     | Required | Description                          |
+| --------- | ------------------------ | -------- | ------------------------------------ |
+| `status`  | `number`                 | yes      | HTTP status code (100-599)           |
+| `body`    | `string`                 | no       | Response body                        |
+| `headers` | `Record<string, string>` | no       | Response headers                     |
+| `delay`   | `number`                 | no       | Response delay in ms (0-30000)       |
+
 </ParamTable>
 </ApiMethod>
 
@@ -82,7 +91,7 @@ update(slug: string, options: UpdateEndpointOptions): Promise<Endpoint>
 | -------------- | ---------------- | -------- | ---------------------------------------------------------------------------- |
 | `slug`         | `string`         | yes      | Endpoint slug                                                                |
 | `name`         | `string`         | no       | New display name                                                             |
-| `mockResponse` | `object \| null` | no       | Mock response config `{ status, body, headers, delay? }`, or `null` to clear |
+| `mockResponse` | `MockResponse \| null` | no  | Mock response config (see fields above), or `null` to clear |
 
 </ParamTable>
 </ApiMethod>
@@ -596,6 +605,7 @@ interface MockResponse {
   status: number; // 100-599
   body: string;
   headers: Record<string, string>;
+  delay?: number; // Response delay in ms (0-30000)
 }
 
 interface UsageInfo {

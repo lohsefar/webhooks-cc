@@ -22,7 +22,16 @@ Create a new webhook endpoint. Returns the endpoint slug and full URL.
 | `name`         | `string`  | no       | Display name for the endpoint                                                 |
 | `ephemeral`    | `boolean` | no       | Auto-delete after 12 hours                                                    |
 | `expiresIn`    | `string`  | no       | Custom expiry duration (e.g., `"2h"`, `"7d"`)                                 |
-| `mockResponse` | `object`  | no       | Mock response config with `status`, `body`, `headers`, `delay?` (ms, 0-30000) |
+| `mockResponse` | `object`  | no       | Mock response config (see fields below)                                       |
+
+**mockResponse fields:**
+
+| Field     | Type                     | Required | Description                          |
+| --------- | ------------------------ | -------- | ------------------------------------ |
+| `status`  | `number`                 | yes      | HTTP status code (100-599)           |
+| `body`    | `string`                 | no       | Response body                        |
+| `headers` | `Record<string, string>` | no       | Response headers                     |
+| `delay`   | `number`                 | no       | Response delay in ms (0-30000)       |
 
 ### create_endpoints
 
@@ -55,7 +64,7 @@ Update an endpoint's name or mock response configuration.
 | -------------- | -------- | -------- | ---------------------------------------------------------------------------- |
 | `slug`         | `string` | yes      | Endpoint slug                                                                |
 | `name`         | `string` | no       | New display name                                                             |
-| `mockResponse` | `object` | no       | Mock response config `{ status, body, headers, delay? }`, or `null` to clear |
+| `mockResponse` | `object` | no       | Mock response config (see fields above), or `null` to clear |
 
 ### delete_endpoint
 
