@@ -17,8 +17,8 @@ export const TRACK_LABELS: Record<ChangelogTrack, string> = {
 
 export const APP_VERSION = "0.9.1";
 export const CLI_VERSION = "0.5.3";
-export const SDK_VERSION = "1.0.1";
-export const MCP_VERSION = "1.0.1";
+export const SDK_VERSION = "1.1.0";
+export const MCP_VERSION = "1.1.0";
 
 export const CHANGELOG: ChangelogEntry[] = [
   // ─── Web App ────────────────────────────────────────────────────────
@@ -237,7 +237,7 @@ export const CHANGELOG: ChangelogEntry[] = [
 
   // ─── SDK ────────────────────────────────────────────────────────────
   {
-    version: "1.0.1",
+    version: "1.1.0",
     date: "2026-03-20",
     title: "New Provider Templates",
     track: "sdk",
@@ -249,12 +249,18 @@ export const CHANGELOG: ChangelogEntry[] = [
     ],
   },
   {
+    version: "1.0.1",
+    date: "2026-03-14",
+    title: "Proxy & Delay",
+    track: "sdk",
+    items: ["Mock response delay field support", "Minor type and documentation fixes"],
+  },
+  {
     version: "1.0.0",
     date: "2026-03-10",
     title: "Stable API",
     track: "sdk",
     items: [
-      "Standard Webhooks provider and sendTo method",
       "WebhookFlowBuilder for multi-step test scenarios",
       "Request export (JSON, HAR) and clear methods",
       "Full-text search and count queries",
@@ -263,12 +269,23 @@ export const CHANGELOG: ChangelogEntry[] = [
   {
     version: "0.6.0",
     date: "2026-03-08",
-    title: "Matchers & Templates",
+    title: "Build Request & Fixes",
     track: "sdk",
     items: [
+      "buildRequest method for constructing signed webhook requests",
+      "Fix raw secret detection for Standard Webhooks",
+      "Request diffing (diffRequests)",
+    ],
+  },
+  {
+    version: "0.5.0",
+    date: "2026-03-08",
+    title: "Standard Webhooks & sendTo",
+    track: "sdk",
+    items: [
+      "Standard Webhooks provider and sendTo method",
       "matchContentType, matchQueryParam, matchBodySubset matchers",
       "Provider template sending with signed headers",
-      "Request diffing (diffRequests)",
     ],
   },
   {
@@ -317,7 +334,7 @@ export const CHANGELOG: ChangelogEntry[] = [
 
   // ─── MCP ────────────────────────────────────────────────────────────
   {
-    version: "1.0.1",
+    version: "1.1.0",
     date: "2026-03-20",
     title: "New Provider Templates",
     track: "mcp",
@@ -325,6 +342,13 @@ export const CHANGELOG: ChangelogEntry[] = [
       "Add SendGrid, Clerk, Discord, Vercel, GitLab to template and verify providers",
       "Mock response delay support",
     ],
+  },
+  {
+    version: "1.0.1",
+    date: "2026-03-14",
+    title: "Delay & Fixes",
+    track: "mcp",
+    items: ["Mock response delay support in update_endpoint tool", "Minor schema fixes"],
   },
   {
     version: "1.0.0",

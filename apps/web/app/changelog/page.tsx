@@ -1,6 +1,5 @@
 "use client";
 
-import Link from "next/link";
 import { useState } from "react";
 import {
   APP_VERSION,
@@ -14,6 +13,14 @@ import {
 
 const TRACKS: (ChangelogTrack | "all")[] = ["all", "web", "cli", "sdk", "mcp"];
 
+function formatDate(iso: string): string {
+  return new Date(iso + "T00:00:00").toLocaleDateString("en-US", {
+    year: "numeric",
+    month: "short",
+    day: "numeric",
+  });
+}
+
 export default function ChangelogPage() {
   const [activeTrack, setActiveTrack] = useState<ChangelogTrack | "all">("all");
 
@@ -26,12 +33,6 @@ export default function ChangelogPage() {
     <main className="min-h-screen bg-background">
       <div className="max-w-3xl mx-auto px-4 py-16">
         <div className="mb-8">
-          <Link
-            href="/"
-            className="text-sm text-muted-foreground hover:text-foreground mb-4 inline-block"
-          >
-            &larr; Back to home
-          </Link>
           <h1 className="text-4xl font-bold tracking-tight mb-4">Changelog</h1>
           <div className="flex flex-wrap gap-3 text-sm text-muted-foreground">
             <span>
@@ -86,7 +87,7 @@ export default function ChangelogPage() {
                   dateTime={entry.date}
                   className="text-sm text-muted-foreground whitespace-nowrap"
                 >
-                  {entry.date}
+                  {formatDate(entry.date)}
                 </time>
               </div>
               <ul className="space-y-1.5">

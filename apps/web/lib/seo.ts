@@ -27,6 +27,7 @@ export const PUBLIC_SITEMAP_PAGES: readonly SitemapPageDefinition[] = [
   { path: "/compare/beeceptor", changeFrequency: "monthly", priority: 0.6 },
   // Blog pages are dynamically generated from Supabase in sitemaps/blog.xml
   { path: "/installation", changeFrequency: "monthly", priority: 0.8 },
+  { path: "/changelog", changeFrequency: "weekly", priority: 0.5 },
   { path: "/support", changeFrequency: "monthly", priority: 0.6 },
   { path: "/privacy", changeFrequency: "yearly", priority: 0.3 },
   { path: "/terms", changeFrequency: "yearly", priority: 0.3 },
