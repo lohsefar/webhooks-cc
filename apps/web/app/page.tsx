@@ -394,6 +394,11 @@ export default async function Home() {
                     Dashboard
                   </Link>
                 </li>
+                <li>
+                  <Link href="/changelog" className="text-muted-foreground hover:text-foreground">
+                    Changelog
+                  </Link>
+                </li>
               </ul>
             </div>
             <div>

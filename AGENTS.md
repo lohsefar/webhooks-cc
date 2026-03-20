@@ -307,6 +307,19 @@ const req = await client.requests.waitFor(endpoint.slug, {
 - **MCP publish**: triggered by `mcp-v*` tags, publishes `@webhooks-cc/mcp` to npm
 - **Security**: Dependabot, CodeQL analysis
 
+## Changelog & Versioning
+
+The web app version and changelog live in `apps/web/lib/changelog.ts`. The changelog page is at `/changelog`, linked from the footer and account page.
+
+**When merging a PR to main**, update the changelog:
+
+1. **Bump the version** in `apps/web/lib/changelog.ts` (`APP_VERSION`) and `apps/web/package.json`:
+   - Patch bump (0.9.1 → 0.9.2): bug fixes, small features, doc updates
+   - Minor bump (0.9.x → 0.10.0): significant new features, new integrations
+   - Major bump: reserved for 1.0 launch
+2. **Add a new entry** to the top of the `CHANGELOG` array with version, date, title, and bullet points
+3. Keep entries concise — focus on user-facing changes, not internal refactors
+
 ## Key Gotchas
 
 - The Rust receiver connects directly to Postgres via `DATABASE_URL` — use the Supabase session pooler URL, not the direct connection
