@@ -15,6 +15,8 @@ import { useAuth } from "@/components/providers/supabase-auth-provider";
 import { createClient } from "@/lib/supabase/client";
 import { subscribeToUserRow } from "@/lib/supabase/realtime";
 import { CheckCircle, Github, LogOut, Trash2 } from "lucide-react";
+import Link from "next/link";
+import { APP_VERSION } from "@/lib/changelog";
 
 interface ApiKeyEntry {
   id: string;
@@ -424,11 +426,14 @@ export default function AccountPage() {
         </div>
       </section>
 
-      <section className="space-y-4">
+      <section className="flex items-center justify-between">
         <Button variant="outline" onClick={handleSignOut} className="flex items-center gap-2">
           <LogOut className="h-4 w-4" />
           Sign Out
         </Button>
+        <Link href="/changelog" className="text-xs text-muted-foreground hover:text-foreground">
+          v{APP_VERSION}
+        </Link>
       </section>
     </main>
   );

@@ -1,4 +1,5 @@
-import { Github, Star } from "lucide-react";
+import Link from "next/link";
+import { Github, Star, FileText } from "lucide-react";
 
 const GITHUB_REPO = "kroqdotdev/webhooks-cc";
 const GITHUB_URL = `https://github.com/${GITHUB_REPO}`;
@@ -51,6 +52,13 @@ export function GitHubCard({ stars }: GitHubCardProps) {
           <Star className="h-4 w-4" />
           Star on GitHub
         </a>
+        <Link
+          href="/changelog"
+          className="neo-btn-outline text-sm py-2 text-center flex items-center justify-center gap-2"
+        >
+          <FileText className="h-4 w-4" />
+          View Changelog
+        </Link>
       </div>
     </div>
   );
