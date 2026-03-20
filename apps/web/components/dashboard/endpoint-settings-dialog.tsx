@@ -258,8 +258,9 @@ export function EndpointSettingsDialog(props: EndpointSettingsDialogProps) {
                     value={mockDelay}
                     onChange={(e) => setMockDelay(e.target.value)}
                     onBlur={() => {
+                      if (!mockDelay) return;
                       const n = parseInt(mockDelay, 10);
-                      if (isNaN(n) || n < 0) setMockDelay("0");
+                      if (isNaN(n) || n < 0) setMockDelay("");
                       else if (n > 30000) setMockDelay("30000");
                     }}
                     placeholder="0-30000ms"
