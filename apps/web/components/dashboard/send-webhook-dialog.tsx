@@ -20,6 +20,7 @@ import {
   buildTemplateRequest,
   getDefaultTemplateId,
   getTemplatePresets,
+  isSecretRequired,
   type TemplateProvider,
 } from "@/lib/template-send";
 
@@ -30,12 +31,7 @@ interface SendWebhookDialogProps {
   slug: string;
 }
 
-interface TemplateSelectionByProvider {
-  stripe: string;
-  github: string;
-  shopify: string;
-  twilio: string;
-}
+type TemplateSelectionByProvider = Record<TemplateProvider, string>;
 
 function defaultTemplateSelection(): TemplateSelectionByProvider {
   return {
@@ -43,6 +39,14 @@ function defaultTemplateSelection(): TemplateSelectionByProvider {
     github: getDefaultTemplateId("github"),
     shopify: getDefaultTemplateId("shopify"),
     twilio: getDefaultTemplateId("twilio"),
+    slack: getDefaultTemplateId("slack"),
+    paddle: getDefaultTemplateId("paddle"),
+    linear: getDefaultTemplateId("linear"),
+    sendgrid: getDefaultTemplateId("sendgrid"),
+    clerk: getDefaultTemplateId("clerk"),
+    discord: getDefaultTemplateId("discord"),
+    vercel: getDefaultTemplateId("vercel"),
+    gitlab: getDefaultTemplateId("gitlab"),
   };
 }
 
@@ -228,6 +232,14 @@ export function SendWebhookDialog({ slug }: SendWebhookDialogProps) {
                 <option value="github">GitHub template (signed)</option>
                 <option value="shopify">Shopify template (signed)</option>
                 <option value="twilio">Twilio template (signed)</option>
+                <option value="slack">Slack template (signed)</option>
+                <option value="paddle">Paddle template (signed)</option>
+                <option value="linear">Linear template (signed)</option>
+                <option value="sendgrid">SendGrid template</option>
+                <option value="clerk">Clerk template (signed)</option>
+                <option value="discord">Discord template</option>
+                <option value="vercel">Vercel template (signed)</option>
+                <option value="gitlab">GitLab template (token)</option>
               </select>
             </div>
             {isTemplateMode && (
@@ -250,20 +262,22 @@ export function SendWebhookDialog({ slug }: SendWebhookDialogProps) {
 
           {isTemplateMode && (
             <>
-              <div>
-                <p className="text-xs font-bold uppercase tracking-wide mb-2">
-                  Mock webhook secret
-                </p>
-                <Input
-                  value={mockWebhookSecret}
-                  onChange={(e) => setMockWebhookSecret(e.target.value)}
-                  className="neo-input text-sm"
-                  placeholder="whsec_..."
-                />
-                <p className="mt-2 text-xs text-muted-foreground">
-                  The signing secret your app uses to verify webhook signatures.
-                </p>
-              </div>
+              {isSecretRequired(mode) && (
+                <div>
+                  <p className="text-xs font-bold uppercase tracking-wide mb-2">
+                    Mock webhook secret
+                  </p>
+                  <Input
+                    value={mockWebhookSecret}
+                    onChange={(e) => setMockWebhookSecret(e.target.value)}
+                    className="neo-input text-sm"
+                    placeholder="whsec_..."
+                  />
+                  <p className="mt-2 text-xs text-muted-foreground">
+                    The signing secret your app uses to verify webhook signatures.
+                  </p>
+                </div>
+              )}
 
               <div>
                 <p className="text-xs font-bold uppercase tracking-wide mb-2">
