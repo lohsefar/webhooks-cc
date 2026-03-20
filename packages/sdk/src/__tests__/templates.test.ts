@@ -19,6 +19,20 @@ const ENDPOINT_URL = "https://go.webhooks.cc/w/test-slug";
 
 // ─── Helpers ────────────────────────────────────────────────────────────
 
+/** Wrapper that asserts headers and body are always present (they always are from buildTemplateSendOptions). */
+async function buildTemplate(provider: string, options?: { template?: string; secret?: string }) {
+  const result = await buildTemplateSendOptions(ENDPOINT_URL, {
+    provider: provider as Parameters<typeof buildTemplateSendOptions>[1]["provider"],
+    secret: options?.secret ?? TEST_SECRET,
+    template: options?.template,
+  });
+  return {
+    ...result,
+    headers: result.headers!,
+    body: result.body as string,
+  };
+}
+
 function parseBody(body: string): unknown {
   return JSON.parse(body);
 }
@@ -32,7 +46,8 @@ function parseFormBody(body: string): Record<string, string> {
   return result;
 }
 
-function getHeader(headers: Record<string, string>, name: string): string | undefined {
+function getHeader(headers: Record<string, string> | undefined, name: string): string | undefined {
+  if (!headers) return undefined;
   const target = name.toLowerCase();
   for (const [key, value] of Object.entries(headers)) {
     if (key.toLowerCase() === target) {
@@ -54,22 +69,14 @@ describe("Stripe templates", () => {
   for (const template of STRIPE_TEMPLATES) {
     describe(`template: ${template}`, () => {
       it("produces valid JSON with correct Content-Type", async () => {
-        const result = await buildTemplateSendOptions(ENDPOINT_URL, {
-          provider: "stripe",
-          secret: TEST_SECRET,
-          template,
-        });
+        const result = await buildTemplate("stripe", { template });
         expect(result.headers["content-type"]).toBe("application/json");
-        expect(() => JSON.parse(result.body!)).not.toThrow();
+        expect(() => JSON.parse(result.body)).not.toThrow();
       });
 
       it("has correct Stripe event structure", async () => {
-        const result = await buildTemplateSendOptions(ENDPOINT_URL, {
-          provider: "stripe",
-          secret: TEST_SECRET,
-          template,
-        });
-        const body = parseBody(result.body!) as Record<string, unknown>;
+        const result = await buildTemplate("stripe", { template });
+        const body = parseBody(result.body) as Record<string, unknown>;
 
         // Required Stripe event fields per https://docs.stripe.com/api/events/object
         expect(body).toHaveProperty("id");
@@ -100,22 +107,14 @@ describe("Stripe templates", () => {
       });
 
       it("has stripe-signature header", async () => {
-        const result = await buildTemplateSendOptions(ENDPOINT_URL, {
-          provider: "stripe",
-          secret: TEST_SECRET,
-          template,
-        });
+        const result = await buildTemplate("stripe", { template });
         const sig = getHeader(result.headers, "stripe-signature");
         expect(sig).toBeDefined();
         expect(sig).toMatch(/^t=\d+,v1=[a-f0-9]+$/);
       });
 
       it("signature verifies correctly", async () => {
-        const result = await buildTemplateSendOptions(ENDPOINT_URL, {
-          provider: "stripe",
-          secret: TEST_SECRET,
-          template,
-        });
+        const result = await buildTemplate("stripe", { template });
         const sig = getHeader(result.headers, "stripe-signature")!;
         expect(await verifyStripeSignature(result.body, sig, TEST_SECRET)).toBe(true);
         expect(await verifyStripeSignature(result.body, sig, "wrong_secret")).toBe(false);
@@ -124,12 +123,8 @@ describe("Stripe templates", () => {
   }
 
   it("payment_intent.succeeded data.object has payment_intent fields", async () => {
-    const result = await buildTemplateSendOptions(ENDPOINT_URL, {
-      provider: "stripe",
-      secret: TEST_SECRET,
-      template: "payment_intent.succeeded",
-    });
-    const body = parseBody(result.body!) as Record<string, unknown>;
+    const result = await buildTemplate("stripe", { template: "payment_intent.succeeded" });
+    const body = parseBody(result.body) as Record<string, unknown>;
     const dataObj = (body.data as Record<string, unknown>).object as Record<string, unknown>;
     expect(dataObj.object).toBe("payment_intent");
     expect(dataObj).toHaveProperty("amount");
@@ -140,10 +135,7 @@ describe("Stripe templates", () => {
   });
 
   it("has user-agent header", async () => {
-    const result = await buildTemplateSendOptions(ENDPOINT_URL, {
-      provider: "stripe",
-      secret: TEST_SECRET,
-    });
+    const result = await buildTemplate("stripe");
     expect(getHeader(result.headers, "user-agent")).toMatch(/Stripe/);
   });
 });
@@ -153,22 +145,14 @@ describe("Stripe templates", () => {
 describe("GitHub templates", () => {
   describe("push template", () => {
     it("produces valid JSON with correct Content-Type", async () => {
-      const result = await buildTemplateSendOptions(ENDPOINT_URL, {
-        provider: "github",
-        secret: TEST_SECRET,
-        template: "push",
-      });
+      const result = await buildTemplate("github", { template: "push" });
       expect(result.headers["content-type"]).toBe("application/json");
-      expect(() => JSON.parse(result.body!)).not.toThrow();
+      expect(() => JSON.parse(result.body)).not.toThrow();
     });
 
     it("has correct push payload shape", async () => {
-      const result = await buildTemplateSendOptions(ENDPOINT_URL, {
-        provider: "github",
-        secret: TEST_SECRET,
-        template: "push",
-      });
-      const body = parseBody(result.body!) as Record<string, unknown>;
+      const result = await buildTemplate("github", { template: "push" });
+      const body = parseBody(result.body) as Record<string, unknown>;
 
       expect(body).toHaveProperty("ref");
       expect(typeof body.ref).toBe("string");
@@ -195,11 +179,7 @@ describe("GitHub templates", () => {
     });
 
     it("has x-github-event and x-hub-signature-256 headers", async () => {
-      const result = await buildTemplateSendOptions(ENDPOINT_URL, {
-        provider: "github",
-        secret: TEST_SECRET,
-        template: "push",
-      });
+      const result = await buildTemplate("github", { template: "push" });
       expect(getHeader(result.headers, "x-github-event")).toBe("push");
       expect(getHeader(result.headers, "x-github-delivery")).toBeDefined();
 
@@ -209,11 +189,7 @@ describe("GitHub templates", () => {
     });
 
     it("signature verifies correctly", async () => {
-      const result = await buildTemplateSendOptions(ENDPOINT_URL, {
-        provider: "github",
-        secret: TEST_SECRET,
-        template: "push",
-      });
+      const result = await buildTemplate("github", { template: "push" });
       const sig = getHeader(result.headers, "x-hub-signature-256")!;
       expect(await verifyGitHubSignature(result.body, sig, TEST_SECRET)).toBe(true);
       expect(await verifyGitHubSignature(result.body, sig, "wrong_secret")).toBe(false);
@@ -222,12 +198,8 @@ describe("GitHub templates", () => {
 
   describe("pull_request.opened template", () => {
     it("has correct PR payload shape", async () => {
-      const result = await buildTemplateSendOptions(ENDPOINT_URL, {
-        provider: "github",
-        secret: TEST_SECRET,
-        template: "pull_request.opened",
-      });
-      const body = parseBody(result.body!) as Record<string, unknown>;
+      const result = await buildTemplate("github", { template: "pull_request.opened" });
+      const body = parseBody(result.body) as Record<string, unknown>;
 
       expect(body).toHaveProperty("action");
       expect(body.action).toBe("opened");
@@ -246,20 +218,12 @@ describe("GitHub templates", () => {
     });
 
     it("x-github-event is pull_request (not pull_request.opened)", async () => {
-      const result = await buildTemplateSendOptions(ENDPOINT_URL, {
-        provider: "github",
-        secret: TEST_SECRET,
-        template: "pull_request.opened",
-      });
+      const result = await buildTemplate("github", { template: "pull_request.opened" });
       expect(getHeader(result.headers, "x-github-event")).toBe("pull_request");
     });
 
     it("signature verifies correctly", async () => {
-      const result = await buildTemplateSendOptions(ENDPOINT_URL, {
-        provider: "github",
-        secret: TEST_SECRET,
-        template: "pull_request.opened",
-      });
+      const result = await buildTemplate("github", { template: "pull_request.opened" });
       const sig = getHeader(result.headers, "x-hub-signature-256")!;
       expect(await verifyGitHubSignature(result.body, sig, TEST_SECRET)).toBe(true);
     });
@@ -267,12 +231,8 @@ describe("GitHub templates", () => {
 
   describe("ping template", () => {
     it("has correct ping payload shape", async () => {
-      const result = await buildTemplateSendOptions(ENDPOINT_URL, {
-        provider: "github",
-        secret: TEST_SECRET,
-        template: "ping",
-      });
-      const body = parseBody(result.body!) as Record<string, unknown>;
+      const result = await buildTemplate("github", { template: "ping" });
+      const body = parseBody(result.body) as Record<string, unknown>;
 
       expect(body).toHaveProperty("zen");
       expect(typeof body.zen).toBe("string");
@@ -283,11 +243,7 @@ describe("GitHub templates", () => {
     });
 
     it("signature verifies correctly", async () => {
-      const result = await buildTemplateSendOptions(ENDPOINT_URL, {
-        provider: "github",
-        secret: TEST_SECRET,
-        template: "ping",
-      });
+      const result = await buildTemplate("github", { template: "ping" });
       const sig = getHeader(result.headers, "x-hub-signature-256")!;
       expect(await verifyGitHubSignature(result.body, sig, TEST_SECRET)).toBe(true);
     });
@@ -299,22 +255,14 @@ describe("GitHub templates", () => {
 describe("Shopify templates", () => {
   describe("orders/create template", () => {
     it("produces valid JSON with correct Content-Type", async () => {
-      const result = await buildTemplateSendOptions(ENDPOINT_URL, {
-        provider: "shopify",
-        secret: TEST_SECRET,
-        template: "orders/create",
-      });
+      const result = await buildTemplate("shopify", { template: "orders/create" });
       expect(result.headers["content-type"]).toBe("application/json");
-      expect(() => JSON.parse(result.body!)).not.toThrow();
+      expect(() => JSON.parse(result.body)).not.toThrow();
     });
 
     it("has correct order payload shape", async () => {
-      const result = await buildTemplateSendOptions(ENDPOINT_URL, {
-        provider: "shopify",
-        secret: TEST_SECRET,
-        template: "orders/create",
-      });
-      const body = parseBody(result.body!) as Record<string, unknown>;
+      const result = await buildTemplate("shopify", { template: "orders/create" });
+      const body = parseBody(result.body) as Record<string, unknown>;
 
       expect(body).toHaveProperty("id");
       expect(typeof body.id).toBe("number");
@@ -334,11 +282,7 @@ describe("Shopify templates", () => {
     });
 
     it("has x-shopify-topic and x-shopify-hmac-sha256 headers", async () => {
-      const result = await buildTemplateSendOptions(ENDPOINT_URL, {
-        provider: "shopify",
-        secret: TEST_SECRET,
-        template: "orders/create",
-      });
+      const result = await buildTemplate("shopify", { template: "orders/create" });
       expect(getHeader(result.headers, "x-shopify-topic")).toBe("orders/create");
       expect(getHeader(result.headers, "x-shopify-hmac-sha256")).toBeDefined();
       expect(getHeader(result.headers, "x-shopify-shop-domain")).toBeDefined();
@@ -347,11 +291,7 @@ describe("Shopify templates", () => {
     });
 
     it("signature verifies correctly", async () => {
-      const result = await buildTemplateSendOptions(ENDPOINT_URL, {
-        provider: "shopify",
-        secret: TEST_SECRET,
-        template: "orders/create",
-      });
+      const result = await buildTemplate("shopify", { template: "orders/create" });
       const sig = getHeader(result.headers, "x-shopify-hmac-sha256")!;
       expect(await verifyShopifySignature(result.body, sig, TEST_SECRET)).toBe(true);
       expect(await verifyShopifySignature(result.body, sig, "wrong_secret")).toBe(false);
@@ -360,13 +300,9 @@ describe("Shopify templates", () => {
 
   for (const template of ["orders/paid", "products/update", "app/uninstalled"] as const) {
     it(`${template} template produces valid signed JSON`, async () => {
-      const result = await buildTemplateSendOptions(ENDPOINT_URL, {
-        provider: "shopify",
-        secret: TEST_SECRET,
-        template,
-      });
+      const result = await buildTemplate("shopify", { template });
       expect(result.headers["content-type"]).toBe("application/json");
-      expect(() => JSON.parse(result.body!)).not.toThrow();
+      expect(() => JSON.parse(result.body)).not.toThrow();
       const sig = getHeader(result.headers, "x-shopify-hmac-sha256")!;
       expect(await verifyShopifySignature(result.body, sig, TEST_SECRET)).toBe(true);
     });
@@ -385,25 +321,17 @@ describe("Twilio templates", () => {
   for (const template of TWILIO_TEMPLATES) {
     describe(`template: ${template}`, () => {
       it("produces form-encoded body with correct Content-Type", async () => {
-        const result = await buildTemplateSendOptions(ENDPOINT_URL, {
-          provider: "twilio",
-          secret: TEST_SECRET,
-          template,
-        });
+        const result = await buildTemplate("twilio", { template });
         expect(result.headers["content-type"]).toBe("application/x-www-form-urlencoded");
 
         // Should be parseable as URL params
-        const params = parseFormBody(result.body!);
+        const params = parseFormBody(result.body);
         expect(Object.keys(params).length).toBeGreaterThan(0);
       });
 
       it("has required Twilio fields", async () => {
-        const result = await buildTemplateSendOptions(ENDPOINT_URL, {
-          provider: "twilio",
-          secret: TEST_SECRET,
-          template,
-        });
-        const params = parseFormBody(result.body!);
+        const result = await buildTemplate("twilio", { template });
+        const params = parseFormBody(result.body);
 
         // All Twilio webhooks include AccountSid
         expect(params).toHaveProperty("AccountSid");
@@ -415,21 +343,13 @@ describe("Twilio templates", () => {
       });
 
       it("has x-twilio-signature header", async () => {
-        const result = await buildTemplateSendOptions(ENDPOINT_URL, {
-          provider: "twilio",
-          secret: TEST_SECRET,
-          template,
-        });
+        const result = await buildTemplate("twilio", { template });
         const sig = getHeader(result.headers, "x-twilio-signature");
         expect(sig).toBeDefined();
       });
 
       it("signature verifies correctly", async () => {
-        const result = await buildTemplateSendOptions(ENDPOINT_URL, {
-          provider: "twilio",
-          secret: TEST_SECRET,
-          template,
-        });
+        const result = await buildTemplate("twilio", { template });
         const sig = getHeader(result.headers, "x-twilio-signature")!;
         expect(await verifyTwilioSignature(ENDPOINT_URL, result.body, sig, TEST_SECRET)).toBe(true);
         expect(await verifyTwilioSignature(ENDPOINT_URL, result.body, sig, "wrong_secret")).toBe(
@@ -440,24 +360,16 @@ describe("Twilio templates", () => {
   }
 
   it("messaging.inbound has MessageSid, Body fields", async () => {
-    const result = await buildTemplateSendOptions(ENDPOINT_URL, {
-      provider: "twilio",
-      secret: TEST_SECRET,
-      template: "messaging.inbound",
-    });
-    const params = parseFormBody(result.body!);
+    const result = await buildTemplate("twilio", { template: "messaging.inbound" });
+    const params = parseFormBody(result.body);
     expect(params).toHaveProperty("MessageSid");
     expect(params.MessageSid).toMatch(/^SM[a-f0-9]+$/);
     expect(params).toHaveProperty("Body");
   });
 
   it("voice.incoming_call has CallSid, CallStatus fields", async () => {
-    const result = await buildTemplateSendOptions(ENDPOINT_URL, {
-      provider: "twilio",
-      secret: TEST_SECRET,
-      template: "voice.incoming_call",
-    });
-    const params = parseFormBody(result.body!);
+    const result = await buildTemplate("twilio", { template: "voice.incoming_call" });
+    const params = parseFormBody(result.body);
     expect(params).toHaveProperty("CallSid");
     expect(params.CallSid).toMatch(/^CA[a-f0-9]+$/);
     expect(params).toHaveProperty("CallStatus");
@@ -469,22 +381,14 @@ describe("Twilio templates", () => {
 describe("Slack templates", () => {
   describe("event_callback template", () => {
     it("produces valid JSON with correct Content-Type", async () => {
-      const result = await buildTemplateSendOptions(ENDPOINT_URL, {
-        provider: "slack",
-        secret: TEST_SECRET,
-        template: "event_callback",
-      });
+      const result = await buildTemplate("slack", { template: "event_callback" });
       expect(result.headers["content-type"]).toBe("application/json");
-      expect(() => JSON.parse(result.body!)).not.toThrow();
+      expect(() => JSON.parse(result.body)).not.toThrow();
     });
 
     it("has correct event_callback payload shape", async () => {
-      const result = await buildTemplateSendOptions(ENDPOINT_URL, {
-        provider: "slack",
-        secret: TEST_SECRET,
-        template: "event_callback",
-      });
-      const body = parseBody(result.body!) as Record<string, unknown>;
+      const result = await buildTemplate("slack", { template: "event_callback" });
+      const body = parseBody(result.body) as Record<string, unknown>;
 
       expect(body.type).toBe("event_callback");
       expect(body).toHaveProperty("team_id");
@@ -500,11 +404,7 @@ describe("Slack templates", () => {
     });
 
     it("has x-slack-signature and x-slack-request-timestamp headers", async () => {
-      const result = await buildTemplateSendOptions(ENDPOINT_URL, {
-        provider: "slack",
-        secret: TEST_SECRET,
-        template: "event_callback",
-      });
+      const result = await buildTemplate("slack", { template: "event_callback" });
       const sig = getHeader(result.headers, "x-slack-signature");
       expect(sig).toBeDefined();
       expect(sig).toMatch(/^v0=[a-f0-9]+$/);
@@ -512,11 +412,7 @@ describe("Slack templates", () => {
     });
 
     it("signature verifies correctly", async () => {
-      const result = await buildTemplateSendOptions(ENDPOINT_URL, {
-        provider: "slack",
-        secret: TEST_SECRET,
-        template: "event_callback",
-      });
+      const result = await buildTemplate("slack", { template: "event_callback" });
       expect(await verifySlackSignature(result.body, result.headers, TEST_SECRET)).toBe(true);
       expect(await verifySlackSignature(result.body, result.headers, "wrong_secret")).toBe(false);
     });
@@ -524,14 +420,10 @@ describe("Slack templates", () => {
 
   describe("slash_command template", () => {
     it("produces form-encoded body with correct Content-Type", async () => {
-      const result = await buildTemplateSendOptions(ENDPOINT_URL, {
-        provider: "slack",
-        secret: TEST_SECRET,
-        template: "slash_command",
-      });
+      const result = await buildTemplate("slack", { template: "slash_command" });
       expect(result.headers["content-type"]).toBe("application/x-www-form-urlencoded");
 
-      const params = parseFormBody(result.body!);
+      const params = parseFormBody(result.body);
       expect(params).toHaveProperty("command");
       expect(params).toHaveProperty("text");
       expect(params).toHaveProperty("team_id");
@@ -541,23 +433,15 @@ describe("Slack templates", () => {
     });
 
     it("signature verifies correctly for form-encoded body", async () => {
-      const result = await buildTemplateSendOptions(ENDPOINT_URL, {
-        provider: "slack",
-        secret: TEST_SECRET,
-        template: "slash_command",
-      });
+      const result = await buildTemplate("slack", { template: "slash_command" });
       expect(await verifySlackSignature(result.body, result.headers, TEST_SECRET)).toBe(true);
     });
   });
 
   describe("url_verification template", () => {
     it("has correct url_verification payload", async () => {
-      const result = await buildTemplateSendOptions(ENDPOINT_URL, {
-        provider: "slack",
-        secret: TEST_SECRET,
-        template: "url_verification",
-      });
-      const body = parseBody(result.body!) as Record<string, unknown>;
+      const result = await buildTemplate("slack", { template: "url_verification" });
+      const body = parseBody(result.body) as Record<string, unknown>;
       expect(body.type).toBe("url_verification");
       expect(body).toHaveProperty("challenge");
       expect(body).toHaveProperty("token");
@@ -577,22 +461,14 @@ describe("Paddle templates", () => {
   for (const template of PADDLE_TEMPLATES) {
     describe(`template: ${template}`, () => {
       it("produces valid JSON with correct Content-Type", async () => {
-        const result = await buildTemplateSendOptions(ENDPOINT_URL, {
-          provider: "paddle",
-          secret: TEST_SECRET,
-          template,
-        });
+        const result = await buildTemplate("paddle", { template });
         expect(result.headers["content-type"]).toBe("application/json");
-        expect(() => JSON.parse(result.body!)).not.toThrow();
+        expect(() => JSON.parse(result.body)).not.toThrow();
       });
 
       it("has correct Paddle event structure", async () => {
-        const result = await buildTemplateSendOptions(ENDPOINT_URL, {
-          provider: "paddle",
-          secret: TEST_SECRET,
-          template,
-        });
-        const body = parseBody(result.body!) as Record<string, unknown>;
+        const result = await buildTemplate("paddle", { template });
+        const body = parseBody(result.body) as Record<string, unknown>;
 
         expect(body).toHaveProperty("event_id");
         expect(typeof body.event_id).toBe("string");
@@ -610,22 +486,14 @@ describe("Paddle templates", () => {
       });
 
       it("has paddle-signature header", async () => {
-        const result = await buildTemplateSendOptions(ENDPOINT_URL, {
-          provider: "paddle",
-          secret: TEST_SECRET,
-          template,
-        });
+        const result = await buildTemplate("paddle", { template });
         const sig = getHeader(result.headers, "paddle-signature");
         expect(sig).toBeDefined();
         expect(sig).toMatch(/^ts=\d+;h1=[a-f0-9]+$/);
       });
 
       it("signature verifies correctly", async () => {
-        const result = await buildTemplateSendOptions(ENDPOINT_URL, {
-          provider: "paddle",
-          secret: TEST_SECRET,
-          template,
-        });
+        const result = await buildTemplate("paddle", { template });
         const sig = getHeader(result.headers, "paddle-signature")!;
         expect(await verifyPaddleSignature(result.body, sig, TEST_SECRET)).toBe(true);
         expect(await verifyPaddleSignature(result.body, sig, "wrong_secret")).toBe(false);
@@ -642,22 +510,14 @@ describe("Linear templates", () => {
   for (const template of LINEAR_TEMPLATES) {
     describe(`template: ${template}`, () => {
       it("produces valid JSON with correct Content-Type", async () => {
-        const result = await buildTemplateSendOptions(ENDPOINT_URL, {
-          provider: "linear",
-          secret: TEST_SECRET,
-          template,
-        });
+        const result = await buildTemplate("linear", { template });
         expect(result.headers["content-type"]).toBe("application/json");
-        expect(() => JSON.parse(result.body!)).not.toThrow();
+        expect(() => JSON.parse(result.body)).not.toThrow();
       });
 
       it("has correct Linear event structure", async () => {
-        const result = await buildTemplateSendOptions(ENDPOINT_URL, {
-          provider: "linear",
-          secret: TEST_SECRET,
-          template,
-        });
-        const body = parseBody(result.body!) as Record<string, unknown>;
+        const result = await buildTemplate("linear", { template });
+        const body = parseBody(result.body) as Record<string, unknown>;
 
         expect(body).toHaveProperty("action");
         expect(typeof body.action).toBe("string");
@@ -673,22 +533,14 @@ describe("Linear templates", () => {
       });
 
       it("has linear-signature header", async () => {
-        const result = await buildTemplateSendOptions(ENDPOINT_URL, {
-          provider: "linear",
-          secret: TEST_SECRET,
-          template,
-        });
+        const result = await buildTemplate("linear", { template });
         const sig = getHeader(result.headers, "linear-signature");
         expect(sig).toBeDefined();
         expect(sig).toMatch(/^sha256=[a-f0-9]+$/);
       });
 
       it("signature verifies correctly", async () => {
-        const result = await buildTemplateSendOptions(ENDPOINT_URL, {
-          provider: "linear",
-          secret: TEST_SECRET,
-          template,
-        });
+        const result = await buildTemplate("linear", { template });
         const sig = getHeader(result.headers, "linear-signature")!;
         expect(await verifyLinearSignature(result.body, sig, TEST_SECRET)).toBe(true);
         expect(await verifyLinearSignature(result.body, sig, "wrong_secret")).toBe(false);
@@ -697,12 +549,8 @@ describe("Linear templates", () => {
   }
 
   it("issue.create has Issue type", async () => {
-    const result = await buildTemplateSendOptions(ENDPOINT_URL, {
-      provider: "linear",
-      secret: TEST_SECRET,
-      template: "issue.create",
-    });
-    const body = parseBody(result.body!) as Record<string, unknown>;
+    const result = await buildTemplate("linear", { template: "issue.create" });
+    const body = parseBody(result.body) as Record<string, unknown>;
     expect(body.type).toBe("Issue");
     expect(body.action).toBe("create");
     const data = body.data as Record<string, unknown>;
@@ -712,12 +560,8 @@ describe("Linear templates", () => {
   });
 
   it("comment.create has Comment type", async () => {
-    const result = await buildTemplateSendOptions(ENDPOINT_URL, {
-      provider: "linear",
-      secret: TEST_SECRET,
-      template: "comment.create",
-    });
-    const body = parseBody(result.body!) as Record<string, unknown>;
+    const result = await buildTemplate("linear", { template: "comment.create" });
+    const body = parseBody(result.body) as Record<string, unknown>;
     expect(body.type).toBe("Comment");
     expect(body.action).toBe("create");
     const data = body.data as Record<string, unknown>;
@@ -735,33 +579,21 @@ describe("SendGrid templates", () => {
   for (const template of SENDGRID_TEMPLATES) {
     describe(`template: ${template}`, () => {
       it("produces valid JSON with correct Content-Type", async () => {
-        const result = await buildTemplateSendOptions(ENDPOINT_URL, {
-          provider: "sendgrid",
-          secret: TEST_SECRET,
-          template,
-        });
+        const result = await buildTemplate("sendgrid", { template });
         expect(result.headers["content-type"]).toBe("application/json");
-        expect(() => JSON.parse(result.body!)).not.toThrow();
+        expect(() => JSON.parse(result.body)).not.toThrow();
       });
 
       it("body is a JSON array (not object)", async () => {
-        const result = await buildTemplateSendOptions(ENDPOINT_URL, {
-          provider: "sendgrid",
-          secret: TEST_SECRET,
-          template,
-        });
-        const body = parseBody(result.body!);
+        const result = await buildTemplate("sendgrid", { template });
+        const body = parseBody(result.body);
         expect(Array.isArray(body)).toBe(true);
         expect((body as unknown[]).length).toBeGreaterThan(0);
       });
 
       it("each event has required SendGrid fields", async () => {
-        const result = await buildTemplateSendOptions(ENDPOINT_URL, {
-          provider: "sendgrid",
-          secret: TEST_SECRET,
-          template,
-        });
-        const events = parseBody(result.body!) as Record<string, unknown>[];
+        const result = await buildTemplate("sendgrid", { template });
+        const events = parseBody(result.body) as Record<string, unknown>[];
         for (const event of events) {
           expect(event).toHaveProperty("email");
           expect(typeof event.email).toBe("string");
@@ -778,11 +610,7 @@ describe("SendGrid templates", () => {
       });
 
       it("has NO signature headers (SendGrid is unsigned)", async () => {
-        const result = await buildTemplateSendOptions(ENDPOINT_URL, {
-          provider: "sendgrid",
-          secret: TEST_SECRET,
-          template,
-        });
+        const result = await buildTemplate("sendgrid", { template });
         // SendGrid should not have any signature-related headers
         expect(getHeader(result.headers, "x-twilio-email-event-webhook-signature")).toBeUndefined();
         expect(getHeader(result.headers, "stripe-signature")).toBeUndefined();
@@ -807,22 +635,14 @@ describe("Clerk templates", () => {
   for (const template of CLERK_TEMPLATES) {
     describe(`template: ${template}`, () => {
       it("produces valid JSON with correct Content-Type", async () => {
-        const result = await buildTemplateSendOptions(ENDPOINT_URL, {
-          provider: "clerk",
-          secret: CLERK_SECRET,
-          template,
-        });
+        const result = await buildTemplate("clerk", { secret: CLERK_SECRET, template });
         expect(result.headers["content-type"]).toBe("application/json");
-        expect(() => JSON.parse(result.body!)).not.toThrow();
+        expect(() => JSON.parse(result.body)).not.toThrow();
       });
 
       it("has correct Clerk event structure", async () => {
-        const result = await buildTemplateSendOptions(ENDPOINT_URL, {
-          provider: "clerk",
-          secret: CLERK_SECRET,
-          template,
-        });
-        const body = parseBody(result.body!) as Record<string, unknown>;
+        const result = await buildTemplate("clerk", { secret: CLERK_SECRET, template });
+        const body = parseBody(result.body) as Record<string, unknown>;
 
         expect(body).toHaveProperty("data");
         expect(typeof body.data).toBe("object");
@@ -837,11 +657,7 @@ describe("Clerk templates", () => {
       });
 
       it("has both svix-* and webhook-* headers", async () => {
-        const result = await buildTemplateSendOptions(ENDPOINT_URL, {
-          provider: "clerk",
-          secret: CLERK_SECRET,
-          template,
-        });
+        const result = await buildTemplate("clerk", { secret: CLERK_SECRET, template });
 
         // Svix headers
         expect(getHeader(result.headers, "svix-id")).toBeDefined();
@@ -864,11 +680,7 @@ describe("Clerk templates", () => {
       });
 
       it("signature verifies correctly via verifyClerkSignature", async () => {
-        const result = await buildTemplateSendOptions(ENDPOINT_URL, {
-          provider: "clerk",
-          secret: CLERK_SECRET,
-          template,
-        });
+        const result = await buildTemplate("clerk", { secret: CLERK_SECRET, template });
         expect(await verifyClerkSignature(result.body, result.headers, CLERK_SECRET)).toBe(true);
         expect(await verifyClerkSignature(result.body, result.headers, "whsec_wrongsecret")).toBe(
           false
@@ -876,11 +688,7 @@ describe("Clerk templates", () => {
       });
 
       it("signature verifies correctly via verifySignature dispatcher", async () => {
-        const result = await buildTemplateSendOptions(ENDPOINT_URL, {
-          provider: "clerk",
-          secret: CLERK_SECRET,
-          template,
-        });
+        const result = await buildTemplate("clerk", { secret: CLERK_SECRET, template });
         const verification = await verifySignature(
           { body: result.body, headers: result.headers },
           { provider: "clerk", secret: CLERK_SECRET }
@@ -891,12 +699,8 @@ describe("Clerk templates", () => {
   }
 
   it("user.created data has user object shape", async () => {
-    const result = await buildTemplateSendOptions(ENDPOINT_URL, {
-      provider: "clerk",
-      secret: CLERK_SECRET,
-      template: "user.created",
-    });
-    const body = parseBody(result.body!) as Record<string, unknown>;
+    const result = await buildTemplate("clerk", { secret: CLERK_SECRET, template: "user.created" });
+    const body = parseBody(result.body) as Record<string, unknown>;
     const data = body.data as Record<string, unknown>;
     expect(data.object).toBe("user");
     expect(data).toHaveProperty("id");
@@ -912,22 +716,14 @@ describe("Clerk templates", () => {
 describe("Discord templates", () => {
   describe("interaction_create template", () => {
     it("produces valid JSON with correct Content-Type", async () => {
-      const result = await buildTemplateSendOptions(ENDPOINT_URL, {
-        provider: "discord",
-        secret: TEST_SECRET,
-        template: "interaction_create",
-      });
+      const result = await buildTemplate("discord", { template: "interaction_create" });
       expect(result.headers["content-type"]).toBe("application/json");
-      expect(() => JSON.parse(result.body!)).not.toThrow();
+      expect(() => JSON.parse(result.body)).not.toThrow();
     });
 
     it("has correct interaction payload shape", async () => {
-      const result = await buildTemplateSendOptions(ENDPOINT_URL, {
-        provider: "discord",
-        secret: TEST_SECRET,
-        template: "interaction_create",
-      });
-      const body = parseBody(result.body!) as Record<string, unknown>;
+      const result = await buildTemplate("discord", { template: "interaction_create" });
+      const body = parseBody(result.body) as Record<string, unknown>;
 
       // APPLICATION_COMMAND type is 2
       expect(body.type).toBe(2);
@@ -941,11 +737,7 @@ describe("Discord templates", () => {
     });
 
     it("has NO signature headers (Discord uses Ed25519, not HMAC)", async () => {
-      const result = await buildTemplateSendOptions(ENDPOINT_URL, {
-        provider: "discord",
-        secret: TEST_SECRET,
-        template: "interaction_create",
-      });
+      const result = await buildTemplate("discord", { template: "interaction_create" });
       // Discord templates should NOT have HMAC signature headers
       // Discord uses Ed25519 which requires a key pair, not a shared secret
       expect(getHeader(result.headers, "x-signature-ed25519")).toBeUndefined();
@@ -959,12 +751,8 @@ describe("Discord templates", () => {
 
   describe("ping template", () => {
     it("has type 1 (ping)", async () => {
-      const result = await buildTemplateSendOptions(ENDPOINT_URL, {
-        provider: "discord",
-        secret: TEST_SECRET,
-        template: "ping",
-      });
-      const body = parseBody(result.body!) as Record<string, unknown>;
+      const result = await buildTemplate("discord", { template: "ping" });
+      const body = parseBody(result.body) as Record<string, unknown>;
       expect(body.type).toBe(1);
       expect(body).toHaveProperty("application_id");
     });
@@ -972,12 +760,8 @@ describe("Discord templates", () => {
 
   describe("message_component template", () => {
     it("has type 3 (MESSAGE_COMPONENT)", async () => {
-      const result = await buildTemplateSendOptions(ENDPOINT_URL, {
-        provider: "discord",
-        secret: TEST_SECRET,
-        template: "message_component",
-      });
-      const body = parseBody(result.body!) as Record<string, unknown>;
+      const result = await buildTemplate("discord", { template: "message_component" });
+      const body = parseBody(result.body) as Record<string, unknown>;
       expect(body.type).toBe(3);
       const data = body.data as Record<string, unknown>;
       expect(data).toHaveProperty("custom_id");
@@ -998,22 +782,14 @@ describe("Vercel templates", () => {
   for (const template of VERCEL_TEMPLATES) {
     describe(`template: ${template}`, () => {
       it("produces valid JSON with correct Content-Type", async () => {
-        const result = await buildTemplateSendOptions(ENDPOINT_URL, {
-          provider: "vercel",
-          secret: TEST_SECRET,
-          template,
-        });
+        const result = await buildTemplate("vercel", { template });
         expect(result.headers["content-type"]).toBe("application/json");
-        expect(() => JSON.parse(result.body!)).not.toThrow();
+        expect(() => JSON.parse(result.body)).not.toThrow();
       });
 
       it("has correct Vercel event structure", async () => {
-        const result = await buildTemplateSendOptions(ENDPOINT_URL, {
-          provider: "vercel",
-          secret: TEST_SECRET,
-          template,
-        });
-        const body = parseBody(result.body!) as Record<string, unknown>;
+        const result = await buildTemplate("vercel", { template });
+        const body = parseBody(result.body) as Record<string, unknown>;
 
         expect(body).toHaveProperty("id");
         expect(typeof body.id).toBe("string");
@@ -1035,22 +811,14 @@ describe("Vercel templates", () => {
       });
 
       it("has x-vercel-signature header", async () => {
-        const result = await buildTemplateSendOptions(ENDPOINT_URL, {
-          provider: "vercel",
-          secret: TEST_SECRET,
-          template,
-        });
+        const result = await buildTemplate("vercel", { template });
         const sig = getHeader(result.headers, "x-vercel-signature");
         expect(sig).toBeDefined();
         expect(sig).toMatch(/^[a-f0-9]+$/);
       });
 
       it("signature verifies correctly", async () => {
-        const result = await buildTemplateSendOptions(ENDPOINT_URL, {
-          provider: "vercel",
-          secret: TEST_SECRET,
-          template,
-        });
+        const result = await buildTemplate("vercel", { template });
         const sig = getHeader(result.headers, "x-vercel-signature")!;
         expect(await verifyVercelSignature(result.body, sig, TEST_SECRET)).toBe(true);
         expect(await verifyVercelSignature(result.body, sig, "wrong_secret")).toBe(false);
@@ -1059,12 +827,8 @@ describe("Vercel templates", () => {
   }
 
   it("deployment.error payload has error details", async () => {
-    const result = await buildTemplateSendOptions(ENDPOINT_URL, {
-      provider: "vercel",
-      secret: TEST_SECRET,
-      template: "deployment.error",
-    });
-    const body = parseBody(result.body!) as Record<string, unknown>;
+    const result = await buildTemplate("vercel", { template: "deployment.error" });
+    const body = parseBody(result.body) as Record<string, unknown>;
     const payload = body.payload as Record<string, unknown>;
     const deployment = payload.deployment as Record<string, unknown>;
     expect(deployment).toHaveProperty("readyState", "ERROR");
@@ -1077,22 +841,14 @@ describe("Vercel templates", () => {
 describe("GitLab templates", () => {
   describe("push template", () => {
     it("produces valid JSON with correct Content-Type", async () => {
-      const result = await buildTemplateSendOptions(ENDPOINT_URL, {
-        provider: "gitlab",
-        secret: TEST_SECRET,
-        template: "push",
-      });
+      const result = await buildTemplate("gitlab", { template: "push" });
       expect(result.headers["content-type"]).toBe("application/json");
-      expect(() => JSON.parse(result.body!)).not.toThrow();
+      expect(() => JSON.parse(result.body)).not.toThrow();
     });
 
     it("has correct GitLab push payload shape", async () => {
-      const result = await buildTemplateSendOptions(ENDPOINT_URL, {
-        provider: "gitlab",
-        secret: TEST_SECRET,
-        template: "push",
-      });
-      const body = parseBody(result.body!) as Record<string, unknown>;
+      const result = await buildTemplate("gitlab", { template: "push" });
+      const body = parseBody(result.body) as Record<string, unknown>;
 
       expect(body.object_kind).toBe("push");
 
@@ -1114,21 +870,13 @@ describe("GitLab templates", () => {
     });
 
     it("has x-gitlab-token and x-gitlab-event headers", async () => {
-      const result = await buildTemplateSendOptions(ENDPOINT_URL, {
-        provider: "gitlab",
-        secret: TEST_SECRET,
-        template: "push",
-      });
+      const result = await buildTemplate("gitlab", { template: "push" });
       expect(getHeader(result.headers, "x-gitlab-token")).toBe(TEST_SECRET);
       expect(getHeader(result.headers, "x-gitlab-event")).toBe("Push Hook");
     });
 
     it("signature verifies correctly (token match)", async () => {
-      const result = await buildTemplateSendOptions(ENDPOINT_URL, {
-        provider: "gitlab",
-        secret: TEST_SECRET,
-        template: "push",
-      });
+      const result = await buildTemplate("gitlab", { template: "push" });
       const token = getHeader(result.headers, "x-gitlab-token")!;
       expect(await verifyGitLabSignature(result.body, token, TEST_SECRET)).toBe(true);
       expect(await verifyGitLabSignature(result.body, token, "wrong_secret")).toBe(false);
@@ -1137,12 +885,8 @@ describe("GitLab templates", () => {
 
   describe("merge_request template", () => {
     it("has correct merge_request payload shape", async () => {
-      const result = await buildTemplateSendOptions(ENDPOINT_URL, {
-        provider: "gitlab",
-        secret: TEST_SECRET,
-        template: "merge_request",
-      });
-      const body = parseBody(result.body!) as Record<string, unknown>;
+      const result = await buildTemplate("gitlab", { template: "merge_request" });
+      const body = parseBody(result.body) as Record<string, unknown>;
 
       expect(body.object_kind).toBe("merge_request");
       expect(body).toHaveProperty("object_attributes");
@@ -1155,20 +899,12 @@ describe("GitLab templates", () => {
     });
 
     it("has x-gitlab-event set to Merge Request Hook", async () => {
-      const result = await buildTemplateSendOptions(ENDPOINT_URL, {
-        provider: "gitlab",
-        secret: TEST_SECRET,
-        template: "merge_request",
-      });
+      const result = await buildTemplate("gitlab", { template: "merge_request" });
       expect(getHeader(result.headers, "x-gitlab-event")).toBe("Merge Request Hook");
     });
 
     it("signature verifies correctly", async () => {
-      const result = await buildTemplateSendOptions(ENDPOINT_URL, {
-        provider: "gitlab",
-        secret: TEST_SECRET,
-        template: "merge_request",
-      });
+      const result = await buildTemplate("gitlab", { template: "merge_request" });
       const token = getHeader(result.headers, "x-gitlab-token")!;
       expect(await verifyGitLabSignature(result.body, token, TEST_SECRET)).toBe(true);
     });
@@ -1195,8 +931,7 @@ describe("verifySignature dispatcher for all signed providers", () => {
 
   for (const providerConfig of signedProviders) {
     it(`verifies ${providerConfig.provider} template via generic dispatcher`, async () => {
-      const result = await buildTemplateSendOptions(ENDPOINT_URL, {
-        provider: providerConfig.provider,
+      const result = await buildTemplate(providerConfig.provider, {
         secret: providerConfig.secret,
       });
 
@@ -1241,10 +976,7 @@ describe("cross-cutting template properties", () => {
         provider === "clerk"
           ? `whsec_${Buffer.from("clerk-test").toString("base64")}`
           : TEST_SECRET;
-      const result = await buildTemplateSendOptions(ENDPOINT_URL, {
-        provider,
-        secret,
-      });
+      const result = await buildTemplate(provider, { secret });
       expect(result.method).toBe("POST");
     });
 
@@ -1253,20 +985,14 @@ describe("cross-cutting template properties", () => {
         provider === "clerk"
           ? `whsec_${Buffer.from("clerk-test").toString("base64")}`
           : TEST_SECRET;
-      const result = await buildTemplateSendOptions(ENDPOINT_URL, {
-        provider,
-        secret,
-      });
+      const result = await buildTemplate(provider, { secret });
       expect(getHeader(result.headers, "x-webhooks-cc-template-provider")).toBe(provider);
     });
   }
 
   it("unsigned providers (sendgrid, discord) have no HMAC signature headers", async () => {
     for (const provider of ["sendgrid", "discord"] as const) {
-      const result = await buildTemplateSendOptions(ENDPOINT_URL, {
-        provider,
-        secret: TEST_SECRET,
-      });
+      const result = await buildTemplate(provider);
       // These should NOT have any standard signing headers
       expect(getHeader(result.headers, "stripe-signature")).toBeUndefined();
       expect(getHeader(result.headers, "x-hub-signature-256")).toBeUndefined();
@@ -1285,32 +1011,20 @@ describe("cross-cutting template properties", () => {
 
 describe("template error handling", () => {
   it("rejects unsupported template names", async () => {
-    await expect(
-      buildTemplateSendOptions(ENDPOINT_URL, {
-        provider: "stripe",
-        secret: TEST_SECRET,
-        template: "nonexistent.template",
-      })
-    ).rejects.toThrow(/Unsupported template/);
+    await expect(buildTemplate("stripe", { template: "nonexistent.template" })).rejects.toThrow(
+      /Unsupported template/
+    );
   });
 
   it("rejects unsupported sendgrid template", async () => {
-    await expect(
-      buildTemplateSendOptions(ENDPOINT_URL, {
-        provider: "sendgrid",
-        secret: TEST_SECRET,
-        template: "nonexistent",
-      })
-    ).rejects.toThrow(/Unsupported template/);
+    await expect(buildTemplate("sendgrid", { template: "nonexistent" })).rejects.toThrow(
+      /Unsupported template/
+    );
   });
 
   it("rejects unsupported discord template", async () => {
-    await expect(
-      buildTemplateSendOptions(ENDPOINT_URL, {
-        provider: "discord",
-        secret: TEST_SECRET,
-        template: "nonexistent",
-      })
-    ).rejects.toThrow(/Unsupported template/);
+    await expect(buildTemplate("discord", { template: "nonexistent" })).rejects.toThrow(
+      /Unsupported template/
+    );
   });
 });
