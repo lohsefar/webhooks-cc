@@ -78,6 +78,7 @@ export function EndpointSettingsDialog(props: EndpointSettingsDialogProps) {
   const [mockStatus, setMockStatus] = useState(mockResponse?.status?.toString() || "200");
   const [mockBody, setMockBody] = useState(mockResponse?.body || "");
   const [mockDelay, setMockDelay] = useState(mockResponse?.delay?.toString() || "");
+  const [delayEnabled, setDelayEnabled] = useState(!!mockResponse?.delay);
   const [isSaving, setIsSaving] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
@@ -91,6 +92,7 @@ export function EndpointSettingsDialog(props: EndpointSettingsDialogProps) {
       setMockStatus(mockResponse?.status?.toString() || "200");
       setMockBody(mockResponse?.body || "");
       setMockDelay(mockResponse?.delay?.toString() || "");
+      setDelayEnabled(!!mockResponse?.delay);
       setError(null);
       setConfirmDelete(false);
     }
@@ -107,7 +109,7 @@ export function EndpointSettingsDialog(props: EndpointSettingsDialogProps) {
         throw new Error("Not authenticated");
       }
 
-      const delayMs = mockDelay ? parseInt(mockDelay, 10) : undefined;
+      const delayMs = delayEnabled && mockDelay ? parseInt(mockDelay, 10) : undefined;
       const hasCustomMock = mockBody || mockStatus !== "200" || (delayMs && delayMs > 0);
       await updateDashboardEndpoint(accessToken, slug, {
         name: name || undefined,
@@ -233,23 +235,36 @@ export function EndpointSettingsDialog(props: EndpointSettingsDialogProps) {
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="settings-delay" className="font-bold uppercase tracking-wide text-xs">
-                Response Delay (ms)
-              </Label>
-              <input
-                id="settings-delay"
-                type="number"
-                min="0"
-                max="30000"
-                step="100"
-                value={mockDelay}
-                onChange={(e) => setMockDelay(e.target.value)}
-                placeholder="0"
-                className="neo-input w-full text-sm"
-              />
-              <p className="text-xs text-muted-foreground">
-                Delay before sending the response (max 30s). Useful for testing timeouts.
-              </p>
+              <label className="flex items-center gap-2 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={delayEnabled}
+                  onChange={(e) => {
+                    setDelayEnabled(e.target.checked);
+                    if (!e.target.checked) setMockDelay("");
+                  }}
+                  className="accent-foreground"
+                />
+                <span className="font-bold uppercase tracking-wide text-xs">Response Delay</span>
+              </label>
+              {delayEnabled && (
+                <>
+                  <input
+                    id="settings-delay"
+                    type="number"
+                    min="0"
+                    max="30000"
+                    step="100"
+                    value={mockDelay}
+                    onChange={(e) => setMockDelay(e.target.value)}
+                    placeholder="0-30000ms"
+                    className="neo-input w-full text-sm"
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    Delay before sending the response (max 30s). Useful for testing timeouts.
+                  </p>
+                </>
+              )}
             </div>
           </div>
 
