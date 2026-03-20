@@ -257,6 +257,11 @@ export function EndpointSettingsDialog(props: EndpointSettingsDialogProps) {
                     step="100"
                     value={mockDelay}
                     onChange={(e) => setMockDelay(e.target.value)}
+                    onBlur={() => {
+                      const n = parseInt(mockDelay, 10);
+                      if (isNaN(n) || n < 0) setMockDelay("0");
+                      else if (n > 30000) setMockDelay("30000");
+                    }}
                     placeholder="0-30000ms"
                     className="neo-input w-full text-sm"
                   />
