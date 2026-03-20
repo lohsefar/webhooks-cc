@@ -199,6 +199,52 @@ export function isDiscordWebhook(request: Request): boolean {
 }
 
 /**
+ * Check if a request looks like a SendGrid event webhook.
+ * Matches on the body being a JSON array with an sg_event_id field.
+ */
+export function isSendGridWebhook(request: Request): boolean {
+  if (!request.body) return false;
+  try {
+    const parsed = JSON.parse(request.body);
+    return (
+      Array.isArray(parsed) &&
+      parsed.length > 0 &&
+      typeof parsed[0] === "object" &&
+      parsed[0] !== null &&
+      "sg_event_id" in parsed[0]
+    );
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Check if a request looks like a Clerk webhook.
+ * Matches on the `svix-id` header being present.
+ */
+export function isClerkWebhook(request: Request): boolean {
+  return Object.keys(request.headers).some((k) => k.toLowerCase() === "svix-id");
+}
+
+/**
+ * Check if a request looks like a Vercel webhook.
+ * Matches on the `x-vercel-signature` header being present.
+ */
+export function isVercelWebhook(request: Request): boolean {
+  return Object.keys(request.headers).some((k) => k.toLowerCase() === "x-vercel-signature");
+}
+
+/**
+ * Check if a request looks like a GitLab webhook.
+ * Matches on the `x-gitlab-event` or `x-gitlab-token` header being present.
+ */
+export function isGitLabWebhook(request: Request): boolean {
+  return Object.keys(request.headers).some(
+    (k) => k.toLowerCase() === "x-gitlab-event" || k.toLowerCase() === "x-gitlab-token"
+  );
+}
+
+/**
  * Check if a request looks like a Standard Webhooks request.
  * Matches on the presence of all three Standard Webhooks headers:
  * webhook-id, webhook-timestamp, and webhook-signature.
