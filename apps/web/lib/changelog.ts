@@ -1,54 +1,58 @@
+export type ChangelogTrack = "web" | "cli" | "sdk" | "mcp";
+
 export interface ChangelogEntry {
   version: string;
   date: string;
   title: string;
+  track: ChangelogTrack;
   items: string[];
 }
 
+export const TRACK_LABELS: Record<ChangelogTrack, string> = {
+  web: "Web App",
+  cli: "CLI",
+  sdk: "SDK",
+  mcp: "MCP",
+};
+
 export const APP_VERSION = "0.9.1";
+export const CLI_VERSION = "0.5.3";
+export const SDK_VERSION = "1.0.1";
+export const MCP_VERSION = "1.0.1";
 
 export const CHANGELOG: ChangelogEntry[] = [
+  // ─── Web App ────────────────────────────────────────────────────────
   {
     version: "0.9.1",
     date: "2026-03-20",
     title: "Provider Templates & Mock Response Delay",
+    track: "web",
     items: [
       "Add SendGrid, Clerk, Discord, Vercel, GitLab provider templates (12 total)",
       "Configurable response delay for mock responses (0-30s)",
       "Comprehensive analytics tracking for request and endpoint operations",
       "New provider template reference documentation page",
-      "SDK and MCP bumped to v1.0.1",
     ],
   },
   {
     version: "0.9.0",
     date: "2026-03-16",
     title: "AppSignal & Next.js 16 Proxy",
+    track: "web",
     items: [
       "Replace Sentry with AppSignal for EU data residency compliance",
       "OpenTelemetry tracing pipeline for Rust receiver",
       "Migrate Next.js middleware.ts to proxy.ts (Next.js 16)",
       "Proxy test webhook sends through server-side API route",
-      "Fix hono prototype pollution vulnerability (CVE)",
-    ],
-  },
-  {
-    version: "0.8.1",
-    date: "2026-03-14",
-    title: "CLI Improvements",
-    items: [
-      "Support base path in tunnel target (e.g. whk tunnel 8080/api/webhooks)",
-      "Fix TUI tunnel input swallowing shortcut-bound keys",
-      "Environment-controlled maintenance banner",
     ],
   },
   {
     version: "0.8.0",
     date: "2026-03-10",
-    title: "Docs Overhaul & SDK/MCP 1.0",
+    title: "Docs Overhaul",
+    track: "web",
     items: [
       "14 new documentation pages with MDX pipeline",
-      "SDK v1.0.0 and MCP v1.0.0 (stable API)",
       "Standard Webhooks provider and sendTo method",
       "Dynamic blog system with API publishing",
       "PostHog analytics integration",
@@ -60,15 +64,16 @@ export const CHANGELOG: ChangelogEntry[] = [
     version: "0.7.4",
     date: "2026-02-27",
     title: "SEO & Navigation Refresh",
+    track: "web",
     items: ["Refresh site metadata and navigation layout", "Fix sitemap response content"],
   },
   {
     version: "0.7.3",
     date: "2026-02-22",
     title: "Webhook Templates & Retention",
+    track: "web",
     items: [
       "Signed webhook templates (Stripe, GitHub, Shopify, Twilio, Slack, Paddle, Linear)",
-      "SDK v0.4.0 and MCP v0.2.0 with signature verification",
       "Request retention policy improvements",
       "Homepage comparison section",
     ],
@@ -77,32 +82,22 @@ export const CHANGELOG: ChangelogEntry[] = [
     version: "0.7.2",
     date: "2026-02-17",
     title: "SEO & Search",
+    track: "web",
     items: [
       "Structured data (JSON-LD), FAQ section, breadcrumbs",
       "Add llms.txt for AI discovery",
       "Full-text search across request body, headers, and path",
       "Paginated request history with retention policies",
-      "Strip proxy/CDN headers from stored requests",
-    ],
-  },
-  {
-    version: "0.7.1",
-    date: "2026-02-14",
-    title: "SDK Streaming & MCP Launch",
-    items: [
-      "SDK v0.3.0: subscribe() SSE streaming, describe() introspection for AI agents",
-      "MCP server v0.1.0 (@webhooks-cc/mcp) with 11 tools for AI coding agents",
-      "Fix SSE abort ReadableStream errors",
     ],
   },
   {
     version: "0.7.0",
     date: "2026-02-10",
     title: "Rust Receiver & CLI TUI",
+    track: "web",
     items: [
       "Rewrite webhook receiver from Go to Rust (Axum + sqlx + Tokio)",
       "Optimize database with stored procedures (capture_webhook())",
-      "CLI TUI mode with real-time SSE subscriptions",
       "Guest live dashboard for unauthenticated users",
       "Strict quota enforcement for all endpoint types",
     ],
@@ -111,40 +106,39 @@ export const CHANGELOG: ChangelogEntry[] = [
     version: "0.6.0",
     date: "2026-02-06",
     title: "Production Hardening",
+    track: "web",
     items: [
       "Six phases of production hardening (abuse protection, CSP, rate limiting)",
       "Integration test suite (42 test cases)",
-      "Go CLI test coverage improvements",
       "SEO metadata, sitemap improvements, crawler exclusions",
     ],
   },
   {
     version: "0.5.0",
     date: "2026-02-05",
-    title: "SDK Launch",
+    title: "Security & Docs",
+    track: "web",
     items: [
-      "TypeScript SDK v0.1.0 (@webhooks-cc/sdk) with endpoints, requests, matchers",
       "Security hardening across backend, API routes, and CLI",
       "Floating navbar, sidebar, and docs improvements",
-      "Cosign keyless signing for CLI releases",
     ],
   },
   {
     version: "0.4.0",
     date: "2026-02-04",
-    title: "CLI Auth & Public Pages",
+    title: "Public Pages",
+    track: "web",
     items: [
-      "CLI device authentication flow (browser-based login)",
       "Installation page with copy-paste commands",
       "Privacy policy and terms of service pages",
       "XML sitemap generation",
-      "whk update self-update command with SHA256 verification",
     ],
   },
   {
     version: "0.3.0",
     date: "2026-02-02",
     title: "Billing & Polish",
+    track: "web",
     items: [
       "Polar.sh subscription management (free/pro tiers)",
       "Request batching and endpoint caching for high-throughput",
@@ -155,10 +149,10 @@ export const CHANGELOG: ChangelogEntry[] = [
     version: "0.2.0",
     date: "2026-01-30",
     title: "CI/CD & Code Quality",
+    track: "web",
     items: [
       "CI pipeline with lint, typecheck, build, and test stages",
       "Dependabot and CodeQL security scanning",
-      "ESLint and Prettier configuration",
       "Input validation, CSP, and rate limiting",
     ],
   },
@@ -166,12 +160,211 @@ export const CHANGELOG: ChangelogEntry[] = [
     version: "0.1.0",
     date: "2026-01-28",
     title: "Initial Release",
+    track: "web",
     items: [
       "Dashboard with webhook capture and real-time inspection",
       "GitHub and Google OAuth authentication",
-      "Go webhook receiver with slug-based routing",
-      "Go CLI with whk tunnel and whk listen",
       "Basic endpoint CRUD and request viewer",
+    ],
+  },
+
+  // ─── CLI ────────────────────────────────────────────────────────────
+  {
+    version: "0.5.3",
+    date: "2026-03-14",
+    title: "Tunnel Base Path & TUI Fixes",
+    track: "cli",
+    items: [
+      "Support base path in tunnel target (e.g. whk tunnel 8080/api/webhooks)",
+      "Fix TUI tunnel input swallowing shortcut-bound keys",
+    ],
+  },
+  {
+    version: "0.5.2",
+    date: "2026-03-14",
+    title: "Custom Headers",
+    track: "cli",
+    items: ["Add -H/--header flag for injecting custom headers in tunnel forwarding"],
+  },
+  {
+    version: "0.5.1",
+    date: "2026-02-19",
+    title: "Replay & Ephemeral",
+    track: "cli",
+    items: [
+      "Add whk replay command to resend captured requests",
+      "Add --ephemeral flag for auto-deleting tunnel endpoints",
+    ],
+  },
+  {
+    version: "0.5.0",
+    date: "2026-02-10",
+    title: "TUI Mode",
+    track: "cli",
+    items: [
+      "Interactive TUI with menu, auth, endpoint listing, and request detail views",
+      "Real-time SSE subscriptions in TUI",
+    ],
+  },
+  {
+    version: "0.4.0",
+    date: "2026-02-06",
+    title: "Device Auth",
+    track: "cli",
+    items: [
+      "Browser-based device authentication flow",
+      "whk update self-update with SHA256 verification",
+    ],
+  },
+  {
+    version: "0.3.0",
+    date: "2026-02-05",
+    title: "Cosign Signing",
+    track: "cli",
+    items: ["Cosign keyless signing for release binaries"],
+  },
+  {
+    version: "0.2.0",
+    date: "2026-02-04",
+    title: "Initial Release",
+    track: "cli",
+    items: [
+      "whk tunnel for forwarding webhooks to localhost",
+      "whk listen for streaming requests to terminal",
+      "whk create, list, delete for endpoint management",
+    ],
+  },
+
+  // ─── SDK ────────────────────────────────────────────────────────────
+  {
+    version: "1.0.1",
+    date: "2026-03-20",
+    title: "New Provider Templates",
+    track: "sdk",
+    items: [
+      "Add SendGrid, Clerk, Discord, Vercel, GitLab provider templates",
+      "Detection helpers: isSendGridWebhook, isClerkWebhook, isVercelWebhook, isGitLabWebhook",
+      "Signature verification: verifyClerkSignature, verifyVercelSignature, verifyGitLabSignature",
+      "Mock response delay field",
+    ],
+  },
+  {
+    version: "1.0.0",
+    date: "2026-03-10",
+    title: "Stable API",
+    track: "sdk",
+    items: [
+      "Standard Webhooks provider and sendTo method",
+      "WebhookFlowBuilder for multi-step test scenarios",
+      "Request export (JSON, HAR) and clear methods",
+      "Full-text search and count queries",
+    ],
+  },
+  {
+    version: "0.6.0",
+    date: "2026-03-08",
+    title: "Matchers & Templates",
+    track: "sdk",
+    items: [
+      "matchContentType, matchQueryParam, matchBodySubset matchers",
+      "Provider template sending with signed headers",
+      "Request diffing (diffRequests)",
+    ],
+  },
+  {
+    version: "0.4.0",
+    date: "2026-02-22",
+    title: "Signature Verification",
+    track: "sdk",
+    items: [
+      "verifySignature for Stripe, GitHub, Shopify, Twilio, Slack, Paddle, Linear",
+      "Webhook templates with realistic payloads",
+    ],
+  },
+  {
+    version: "0.3.0",
+    date: "2026-02-14",
+    title: "SSE Streaming",
+    track: "sdk",
+    items: [
+      "subscribe() SSE async iterator for real-time streaming",
+      "describe() introspection for AI agents",
+    ],
+  },
+  {
+    version: "0.2.0",
+    date: "2026-02-06",
+    title: "Matchers & Helpers",
+    track: "sdk",
+    items: [
+      "Composable request matchers (matchMethod, matchHeader, matchBodyPath, matchAll, matchAny)",
+      "Provider detection helpers (isStripeWebhook, isGitHubWebhook, etc.)",
+      "parseJsonBody, parseFormBody, extractJsonField helpers",
+    ],
+  },
+  {
+    version: "0.1.0",
+    date: "2026-02-05",
+    title: "Initial Release",
+    track: "sdk",
+    items: [
+      "Endpoint CRUD (create, get, list, delete, update)",
+      "Request list, waitFor with timeout and polling",
+      "Replay captured requests to any URL",
+      "Human-readable duration strings (30s, 5m)",
+    ],
+  },
+
+  // ─── MCP ────────────────────────────────────────────────────────────
+  {
+    version: "1.0.1",
+    date: "2026-03-20",
+    title: "New Provider Templates",
+    track: "mcp",
+    items: [
+      "Add SendGrid, Clerk, Discord, Vercel, GitLab to template and verify providers",
+      "Mock response delay support",
+    ],
+  },
+  {
+    version: "1.0.0",
+    date: "2026-03-10",
+    title: "Stable API",
+    track: "mcp",
+    items: [
+      "Standard Webhooks provider support",
+      "Batch endpoint create/delete tools",
+      "Request export, search, and clear tools",
+      "Setup commands for Cursor, VS Code, Windsurf, Claude Desktop, Codex",
+    ],
+  },
+  {
+    version: "0.3.0",
+    date: "2026-03-08",
+    title: "Signature & Templates",
+    track: "mcp",
+    items: [
+      "verify_signature tool for 9 providers",
+      "send_webhook with provider template signing",
+      "compare_requests and extract_from_request tools",
+    ],
+  },
+  {
+    version: "0.2.0",
+    date: "2026-02-22",
+    title: "Webhook Templates",
+    track: "mcp",
+    items: ["Provider template support in send_webhook", "list_provider_templates tool"],
+  },
+  {
+    version: "0.1.0",
+    date: "2026-02-14",
+    title: "Initial Release",
+    track: "mcp",
+    items: [
+      "11 tools: create/list/get/update/delete endpoints, list/get requests, send/wait/replay, describe",
+      "stdio transport via @modelcontextprotocol/sdk",
+      "Setup CLI for Cursor, VS Code, Windsurf, Claude Desktop",
     ],
   },
 ];
