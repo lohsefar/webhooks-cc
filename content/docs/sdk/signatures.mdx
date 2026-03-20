@@ -1,20 +1,20 @@
 ---
 title: "Signature Verification"
-description: "Verify webhook signatures for Stripe, GitHub, Shopify, Twilio, Slack, Paddle, Linear, Discord, and Standard Webhooks using the SDK."
+description: "Verify webhook signatures for Stripe, GitHub, Shopify, Twilio, Slack, Paddle, Linear, Clerk, Discord, Vercel, GitLab, and Standard Webhooks using the SDK."
 section: sdk
 order: 5
-lastUpdated: 2026-03-10
+lastUpdated: 2026-03-20
 schema: faq
 keywords:
   ["webhook signature verification", "HMAC webhook", "verify stripe signature", "webhook security"]
 seo:
   ogTitle: "Webhook Signature Verification — webhooks.cc SDK"
-  ogDescription: "Verify webhook signatures for 9 providers using the webhooks.cc TypeScript SDK. Supports HMAC-SHA256, HMAC-SHA1, and Ed25519."
+  ogDescription: "Verify webhook signatures for 12 providers using the webhooks.cc TypeScript SDK. Supports HMAC-SHA256, HMAC-SHA1, Ed25519, and token comparison."
 ---
 
 ## Overview
 
-Most webhook providers sign payloads so you can verify authenticity before processing. The SDK includes verification functions for 9 providers, plus a generic `verifySignature` that dispatches by provider name.
+Most webhook providers sign payloads so you can verify authenticity before processing. The SDK includes verification functions for 12 providers, plus a generic `verifySignature` that dispatches by provider name.
 
 Generic verifier (works with any supported provider):
 
@@ -33,24 +33,30 @@ import {
   verifySlackSignature,
   verifyPaddleSignature,
   verifyLinearSignature,
+  verifyClerkSignature,
   verifyDiscordSignature,
+  verifyVercelSignature,
+  verifyGitLabSignature,
   verifyStandardWebhookSignature,
 } from "@webhooks-cc/sdk";
 ```
 
 ## Provider reference
 
-| Provider          | Header                                                   | Algorithm            | Secret format      |
-| ----------------- | -------------------------------------------------------- | -------------------- | ------------------ |
-| Stripe            | `stripe-signature`                                       | HMAC-SHA256          | `whsec_...` string |
-| GitHub            | `x-hub-signature-256`                                    | HMAC-SHA256          | Hex string         |
-| Shopify           | `x-shopify-hmac-sha256`                                  | HMAC-SHA256 (base64) | Hex string         |
-| Twilio            | `x-twilio-signature`                                     | HMAC-SHA1            | Auth token         |
-| Slack             | `x-slack-signature` + `x-slack-request-timestamp`        | HMAC-SHA256          | Signing secret     |
-| Paddle            | `paddle-signature` (ts + h1)                             | HMAC-SHA256          | Hex string         |
-| Linear            | `linear-signature`                                       | HMAC-SHA256          | Hex string         |
-| Discord           | `x-signature-ed25519` + `x-signature-timestamp`          | Ed25519              | Hex public key     |
-| Standard Webhooks | `webhook-id` + `webhook-timestamp` + `webhook-signature` | HMAC-SHA256          | `whsec_...` or raw |
+| Provider          | Header                                                   | Algorithm            | Secret format       |
+| ----------------- | -------------------------------------------------------- | -------------------- | ------------------- |
+| Stripe            | `stripe-signature`                                       | HMAC-SHA256          | `whsec_...` string  |
+| GitHub            | `x-hub-signature-256`                                    | HMAC-SHA256          | Hex string          |
+| Shopify           | `x-shopify-hmac-sha256`                                  | HMAC-SHA256 (base64) | Hex string          |
+| Twilio            | `x-twilio-signature`                                     | HMAC-SHA1            | Auth token          |
+| Slack             | `x-slack-signature` + `x-slack-request-timestamp`        | HMAC-SHA256          | Signing secret      |
+| Paddle            | `paddle-signature` (ts + h1)                             | HMAC-SHA256          | Hex string          |
+| Linear            | `linear-signature`                                       | HMAC-SHA256          | Hex string          |
+| Clerk             | `webhook-signature` (Standard Webhooks / Svix)           | HMAC-SHA256          | Svix signing secret |
+| Discord           | `x-signature-ed25519` + `x-signature-timestamp`          | Ed25519              | Hex public key      |
+| Vercel            | `x-vercel-signature`                                     | HMAC-SHA1            | Hex string          |
+| GitLab            | `x-gitlab-token`                                         | Token comparison     | Raw secret token    |
+| Standard Webhooks | `webhook-id` + `webhook-timestamp` + `webhook-signature` | HMAC-SHA256          | `whsec_...` or raw  |
 
 ### Stripe
 
@@ -139,6 +145,39 @@ const result = await verifySignature(request, {
 });
 ```
 
+### Clerk
+
+Clerk uses the Standard Webhooks (Svix) signing format. The SDK provides a dedicated `verifyClerkSignature` that delegates to Standard Webhooks verification using the Clerk-specific headers.
+
+```ts
+const result = await verifySignature(request, {
+  provider: "clerk",
+  secret: process.env.CLERK_WEBHOOK_SECRET!,
+});
+```
+
+### Vercel
+
+Vercel signs deploy hook payloads with HMAC-SHA1 and sends the hex-encoded signature in `x-vercel-signature`.
+
+```ts
+const result = await verifySignature(request, {
+  provider: "vercel",
+  secret: process.env.VERCEL_WEBHOOK_SECRET!,
+});
+```
+
+### GitLab
+
+GitLab uses raw token comparison rather than HMAC. The token you configure in GitLab's webhook settings is sent verbatim in the `x-gitlab-token` header. The SDK compares the header value against your secret using constant-time comparison.
+
+```ts
+const result = await verifySignature(request, {
+  provider: "gitlab",
+  secret: process.env.GITLAB_WEBHOOK_TOKEN!,
+});
+```
+
 ### Discord
 
 <Callout type="warning">
@@ -157,7 +196,7 @@ const result = await verifySignature(request, {
 
 ### Standard Webhooks
 
-Standard Webhooks is used by Polar, Svix, Clerk, and Resend. It sends three headers: `webhook-id`, `webhook-timestamp`, and `webhook-signature`. The signed payload is `{messageId}.{timestamp}.{body}`, hashed with HMAC-SHA256 and base64-encoded.
+Standard Webhooks is used by Polar, Svix, Resend, Liveblocks, and Novu. It sends three headers: `webhook-id`, `webhook-timestamp`, and `webhook-signature`. The signed payload is `{messageId}.{timestamp}.{body}`, hashed with HMAC-SHA256 and base64-encoded. Clerk also uses Standard Webhooks signing but has its own dedicated `verifyClerkSignature` function and `"clerk"` provider name.
 
 Secrets can include the `whsec_` prefix (base64-encoded key after the prefix) or be passed as raw base64.
 
@@ -188,9 +227,9 @@ if (result.valid) {
 The options type is a discriminated union:
 
 ```ts
-// HMAC-based providers (stripe, github, shopify, twilio, slack, paddle, linear, standard-webhooks)
+// HMAC/token-based providers
 {
-  provider: "stripe" | "github" | "shopify" | "twilio" | "slack" | "paddle" | "linear" | "standard-webhooks";
+  provider: "stripe" | "github" | "shopify" | "twilio" | "slack" | "paddle" | "linear" | "sendgrid" | "clerk" | "vercel" | "gitlab" | "standard-webhooks";
   secret: string;
   url?: string;    // Required for twilio
 }

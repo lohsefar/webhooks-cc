@@ -18,22 +18,22 @@ This comparison covers where each tool fits, where they overlap, and when you sh
 
 ## Feature comparison
 
-| Feature                        | webhooks.cc                                      | ngrok                                 |
-| ------------------------------ | ------------------------------------------------ | ------------------------------------- |
-| Expose localhost to internet   | Yes (CLI tunnel)                                 | Yes (core feature)                    |
-| Webhook capture and inspection | Yes (full request details, split-pane dashboard) | Limited (ngrok inspect, general HTTP) |
-| Mock responses                 | Yes (configurable per endpoint)                  | No                                    |
-| Provider signature signing     | Yes (9 providers: Stripe, GitHub, Shopify, etc.) | No                                    |
-| Signature verification         | Yes (SDK, 9 providers)                           | No                                    |
-| Request replay                 | Yes (to any URL, from dashboard or SDK)          | Yes (ngrok inspect)                   |
-| Real-time dashboard            | Yes                                              | Yes (ngrok inspect)                   |
-| CI/CD integration              | Yes (SDK + testing utilities, no tunnel needed)  | Limited (requires running tunnel)     |
-| MCP server for AI agents       | Yes                                              | No                                    |
-| TypeScript SDK                 | Yes (typed client, matchers, test helpers)       | No (REST API only)                    |
-| Ephemeral endpoints            | Yes (12hr, no signup required)                   | No (requires account)                 |
-| Custom domains                 | No                                               | Yes (paid plans)                      |
-| TCP/TLS tunneling              | No (HTTP webhooks only)                          | Yes                                   |
-| WebSocket support              | No                                               | Yes                                   |
+| Feature                        | webhooks.cc                                       | ngrok                                 |
+| ------------------------------ | ------------------------------------------------- | ------------------------------------- |
+| Expose localhost to internet   | Yes (CLI tunnel)                                  | Yes (core feature)                    |
+| Webhook capture and inspection | Yes (full request details, split-pane dashboard)  | Limited (ngrok inspect, general HTTP) |
+| Mock responses                 | Yes (configurable per endpoint)                   | No                                    |
+| Provider signature signing     | Yes (13 providers: Stripe, GitHub, Shopify, etc.) | No                                    |
+| Signature verification         | Yes (SDK, 12 providers)                           | No                                    |
+| Request replay                 | Yes (to any URL, from dashboard or SDK)           | Yes (ngrok inspect)                   |
+| Real-time dashboard            | Yes                                               | Yes (ngrok inspect)                   |
+| CI/CD integration              | Yes (SDK + testing utilities, no tunnel needed)   | Limited (requires running tunnel)     |
+| MCP server for AI agents       | Yes                                               | No                                    |
+| TypeScript SDK                 | Yes (typed client, matchers, test helpers)        | No (REST API only)                    |
+| Ephemeral endpoints            | Yes (12hr, no signup required)                    | No (requires account)                 |
+| Custom domains                 | No                                                | Yes (paid plans)                      |
+| TCP/TLS tunneling              | No (HTTP webhooks only)                           | Yes                                   |
+| WebSocket support              | No                                                | Yes                                   |
 
 ## Webhook capture and inspection
 
@@ -85,21 +85,25 @@ ngrok does not offer programmatic testing tools. To test webhooks with ngrok, yo
 
 ## Signing and verification
 
-webhooks.cc signs payloads for 9 providers so your handler's signature verification works during testing without modification. The signing happens locally in the SDK -- no request to external servers.
+webhooks.cc signs payloads for 13 providers so your handler's signature verification works during testing without modification. The signing happens locally in the SDK -- no request to external servers.
 
 Supported providers and their signing algorithms:
 
-| Provider          | Algorithm            | Signature header                                 |
-| ----------------- | -------------------- | ------------------------------------------------ |
-| Stripe            | HMAC-SHA256          | `stripe-signature` (with timestamp)              |
-| GitHub            | HMAC-SHA256          | `x-hub-signature-256`                            |
-| Shopify           | HMAC-SHA256 (base64) | `x-shopify-hmac-sha256`                          |
-| Twilio            | HMAC-SHA1            | `x-twilio-signature`                             |
-| Slack             | HMAC-SHA256          | `x-slack-signature` (with timestamp)             |
-| Paddle            | HMAC-SHA256          | `paddle-signature` (with timestamp)              |
-| Linear            | HMAC-SHA256          | `linear-signature`                               |
-| Discord           | Ed25519              | `x-signature-ed25519`                            |
-| Standard Webhooks | HMAC-SHA256          | `webhook-signature` (Polar, Svix, Clerk, Resend) |
+| Provider          | Algorithm            | Signature header                                             |
+| ----------------- | -------------------- | ------------------------------------------------------------ |
+| Stripe            | HMAC-SHA256          | `stripe-signature` (with timestamp)                          |
+| GitHub            | HMAC-SHA256          | `x-hub-signature-256`                                        |
+| Shopify           | HMAC-SHA256 (base64) | `x-shopify-hmac-sha256`                                      |
+| Twilio            | HMAC-SHA1            | `x-twilio-signature`                                         |
+| Slack             | HMAC-SHA256          | `x-slack-signature` (with timestamp)                         |
+| Paddle            | HMAC-SHA256          | `paddle-signature` (with timestamp)                          |
+| Linear            | HMAC-SHA256          | `linear-signature`                                           |
+| SendGrid          | None (unsigned)      | Templates only, no signing                                   |
+| Clerk             | HMAC-SHA256          | `webhook-signature` (Standard Webhooks / Svix)               |
+| Discord           | Ed25519              | `x-signature-ed25519` (verification only, unsigned template) |
+| Vercel            | HMAC-SHA1            | `x-vercel-signature`                                         |
+| GitLab            | Token comparison     | `x-gitlab-token`                                             |
+| Standard Webhooks | HMAC-SHA256          | `webhook-signature` (Polar, Svix, Resend)                    |
 
 With ngrok, you need the real provider to send webhooks -- or you disable signature verification in your test environment. Disabling verification is common but risky: it means your tests do not cover the verification code path, and you might deploy a handler that fails signature checks in production.
 

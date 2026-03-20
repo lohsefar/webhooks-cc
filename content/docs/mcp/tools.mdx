@@ -17,21 +17,21 @@ seo:
 
 Create a new webhook endpoint. Returns the endpoint slug and full URL.
 
-| Parameter      | Type      | Required | Description                                                                   |
-| -------------- | --------- | -------- | ----------------------------------------------------------------------------- |
-| `name`         | `string`  | no       | Display name for the endpoint                                                 |
-| `ephemeral`    | `boolean` | no       | Auto-delete after 12 hours                                                    |
-| `expiresIn`    | `string`  | no       | Custom expiry duration (e.g., `"2h"`, `"7d"`)                                 |
-| `mockResponse` | `object`  | no       | Mock response config (see fields below)                                       |
+| Parameter      | Type      | Required | Description                                   |
+| -------------- | --------- | -------- | --------------------------------------------- |
+| `name`         | `string`  | no       | Display name for the endpoint                 |
+| `ephemeral`    | `boolean` | no       | Auto-delete after 12 hours                    |
+| `expiresIn`    | `string`  | no       | Custom expiry duration (e.g., `"2h"`, `"7d"`) |
+| `mockResponse` | `object`  | no       | Mock response config (see fields below)       |
 
 **mockResponse fields:**
 
-| Field     | Type                     | Required | Description                          |
-| --------- | ------------------------ | -------- | ------------------------------------ |
-| `status`  | `number`                 | yes      | HTTP status code (100-599)           |
-| `body`    | `string`                 | no       | Response body                        |
-| `headers` | `Record<string, string>` | no       | Response headers                     |
-| `delay`   | `number`                 | no       | Response delay in ms (0-30000)       |
+| Field     | Type                     | Required | Description                    |
+| --------- | ------------------------ | -------- | ------------------------------ |
+| `status`  | `number`                 | yes      | HTTP status code (100-599)     |
+| `body`    | `string`                 | no       | Response body                  |
+| `headers` | `Record<string, string>` | no       | Response headers               |
+| `delay`   | `number`                 | no       | Response delay in ms (0-30000) |
 
 ### create_endpoints
 
@@ -60,10 +60,10 @@ Get details for an endpoint by slug.
 
 Update an endpoint's name or mock response configuration.
 
-| Parameter      | Type     | Required | Description                                                                  |
-| -------------- | -------- | -------- | ---------------------------------------------------------------------------- |
-| `slug`         | `string` | yes      | Endpoint slug                                                                |
-| `name`         | `string` | no       | New display name                                                             |
+| Parameter      | Type     | Required | Description                                                 |
+| -------------- | -------- | -------- | ----------------------------------------------------------- |
+| `slug`         | `string` | yes      | Endpoint slug                                               |
+| `name`         | `string` | no       | New display name                                            |
 | `mockResponse` | `object` | no       | Mock response config (see fields above), or `null` to clear |
 
 ### delete_endpoint
@@ -88,16 +88,16 @@ Delete 1--100 endpoints in a single call.
 
 Send a test webhook to a hosted webhooks.cc endpoint. Supports manual payloads and provider-signed templates.
 
-| Parameter  | Type     | Required                | Description                                                                                                      |
-| ---------- | -------- | ----------------------- | ---------------------------------------------------------------------------------------------------------------- |
-| `slug`     | `string` | yes                     | Endpoint slug                                                                                                    |
-| `method`   | `string` | no                      | HTTP method (default: `"POST"`)                                                                                  |
-| `headers`  | `object` | no                      | HTTP headers to include                                                                                          |
-| `body`     | `any`    | no                      | Request body                                                                                                     |
-| `provider` | `string` | no                      | Provider for signing (`stripe`, `github`, `shopify`, `twilio`, `slack`, `paddle`, `linear`, `standard-webhooks`) |
-| `template` | `string` | no                      | Template name (e.g., `checkout.session.completed`)                                                               |
-| `event`    | `string` | no                      | Event type override                                                                                              |
-| `secret`   | `string` | yes (if `provider` set) | Signing secret                                                                                                   |
+| Parameter  | Type     | Required                | Description                                                                                                                                                          |
+| ---------- | -------- | ----------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `slug`     | `string` | yes                     | Endpoint slug                                                                                                                                                        |
+| `method`   | `string` | no                      | HTTP method (default: `"POST"`)                                                                                                                                      |
+| `headers`  | `object` | no                      | HTTP headers to include                                                                                                                                              |
+| `body`     | `any`    | no                      | Request body                                                                                                                                                         |
+| `provider` | `string` | no                      | Provider for signing (`stripe`, `github`, `shopify`, `twilio`, `slack`, `paddle`, `linear`, `sendgrid`, `clerk`, `discord`, `vercel`, `gitlab`, `standard-webhooks`) |
+| `template` | `string` | no                      | Template name (e.g., `checkout.session.completed`)                                                                                                                   |
+| `event`    | `string` | no                      | Event type override                                                                                                                                                  |
+| `secret`   | `string` | yes (if `provider` set) | Signing secret                                                                                                                                                       |
 
 ### send_to
 
@@ -258,13 +258,13 @@ Extract specific JSON fields from a captured request body using dot-notation pat
 
 Verify the webhook signature on a captured request.
 
-| Parameter   | Type     | Required | Description                                                                                                          |
-| ----------- | -------- | -------- | -------------------------------------------------------------------------------------------------------------------- |
-| `requestId` | `string` | yes      | Request ID                                                                                                           |
-| `provider`  | `string` | yes      | Provider name (`stripe`, `github`, `shopify`, `twilio`, `slack`, `paddle`, `linear`, `discord`, `standard-webhooks`) |
-| `secret`    | `string` | no       | Signing secret (required for HMAC-based providers)                                                                   |
-| `publicKey` | `string` | no       | Public key (required for Discord Ed25519 verification)                                                               |
-| `url`       | `string` | no       | Request URL (required for Twilio signature verification)                                                             |
+| Parameter   | Type     | Required | Description                                                                                                                                                   |
+| ----------- | -------- | -------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `requestId` | `string` | yes      | Request ID                                                                                                                                                    |
+| `provider`  | `string` | yes      | Provider name (`stripe`, `github`, `shopify`, `twilio`, `slack`, `paddle`, `linear`, `sendgrid`, `clerk`, `discord`, `vercel`, `gitlab`, `standard-webhooks`) |
+| `secret`    | `string` | no       | Signing secret (required for HMAC-based providers)                                                                                                            |
+| `publicKey` | `string` | no       | Public key (required for Discord Ed25519 verification)                                                                                                        |
+| `url`       | `string` | no       | Request URL (required for Twilio signature verification)                                                                                                      |
 
 ## Utilities
 
