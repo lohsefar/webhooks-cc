@@ -332,6 +332,53 @@ export async function verifyLinearSignature(
 }
 
 /**
+ * Verify a Vercel webhook signature against the raw request body.
+ * Vercel signs with HMAC-SHA1 and sends the hex-encoded signature in x-vercel-signature.
+ */
+export async function verifyVercelSignature(
+  body: string | undefined,
+  signatureHeader: string | null | undefined,
+  secret: string
+): Promise<boolean> {
+  requireSecret(secret, "verifyVercelSignature");
+  if (!signatureHeader) {
+    return false;
+  }
+
+  const expected = toHex(await hmacSign("SHA-1", secret, normalizeBody(body))).toLowerCase();
+  return timingSafeEqual(signatureHeader.trim().toLowerCase(), expected);
+}
+
+/**
+ * Verify a GitLab webhook token against the x-gitlab-token header.
+ * GitLab sends the raw secret in the header — no HMAC involved.
+ */
+export async function verifyGitLabSignature(
+  _body: string | undefined,
+  tokenHeader: string | null | undefined,
+  secret: string
+): Promise<boolean> {
+  requireSecret(secret, "verifyGitLabSignature");
+  if (!tokenHeader) {
+    return false;
+  }
+
+  return timingSafeEqual(tokenHeader, secret);
+}
+
+/**
+ * Verify a Clerk webhook signature using Standard Webhooks (Svix) signing.
+ * Delegates to verifyStandardWebhookSignature.
+ */
+export async function verifyClerkSignature(
+  body: string | undefined,
+  headers: Record<string, string>,
+  secret: string
+): Promise<boolean> {
+  return verifyStandardWebhookSignature(body, headers, secret);
+}
+
+/**
  * Verify a Discord interaction signature using the application's Ed25519 public key.
  */
 export async function verifyDiscordSignature(
@@ -468,6 +515,26 @@ export async function verifySignature(
     valid = await verifyLinearSignature(
       request.body,
       getHeader(request.headers, "linear-signature"),
+      options.secret
+    );
+  }
+
+  if (options.provider === "clerk") {
+    valid = await verifyClerkSignature(request.body, request.headers, options.secret);
+  }
+
+  if (options.provider === "vercel") {
+    valid = await verifyVercelSignature(
+      request.body,
+      getHeader(request.headers, "x-vercel-signature"),
+      options.secret
+    );
+  }
+
+  if (options.provider === "gitlab") {
+    valid = await verifyGitLabSignature(
+      request.body,
+      getHeader(request.headers, "x-gitlab-token"),
       options.secret
     );
   }

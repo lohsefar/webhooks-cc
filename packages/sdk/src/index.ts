@@ -19,6 +19,10 @@ export {
   isPaddleWebhook,
   isLinearWebhook,
   isDiscordWebhook,
+  isSendGridWebhook,
+  isClerkWebhook,
+  isVercelWebhook,
+  isGitLabWebhook,
   isStandardWebhook,
   matchJsonField,
 } from "./helpers";
@@ -48,6 +52,9 @@ export {
   verifyPaddleSignature,
   verifyLinearSignature,
   verifyDiscordSignature,
+  verifyClerkSignature,
+  verifyVercelSignature,
+  verifyGitLabSignature,
   verifyStandardWebhookSignature,
 } from "./verify";
 export type { SSEFrame } from "./sse";
