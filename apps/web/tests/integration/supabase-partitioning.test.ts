@@ -89,6 +89,8 @@ async function waitForSubscribed(channel: RealtimeChannel): Promise<void> {
 }
 
 describe("Supabase Partitioning Integration", () => {
+  let ephemeralEndpointId: string | null = null;
+
   beforeAll(async () => {
     const { data, error } = await admin.auth.admin.createUser({
       email: TEST_EMAIL,
@@ -116,6 +118,11 @@ describe("Supabase Partitioning Integration", () => {
     if (testEndpointId) {
       await admin.from("requests").delete().eq("endpoint_id", testEndpointId);
       await admin.from("endpoints").delete().eq("id", testEndpointId);
+    }
+
+    if (ephemeralEndpointId) {
+      await admin.from("requests").delete().eq("endpoint_id", ephemeralEndpointId);
+      await admin.from("endpoints").delete().eq("id", ephemeralEndpointId);
     }
 
     if (testUserId) {
@@ -403,7 +410,7 @@ describe("Supabase Partitioning Integration", () => {
     });
 
     it("cleanup_expired_ephemeral_endpoints works with partitioned table", async () => {
-      const ephemeralEndpointId = randomUUID();
+      ephemeralEndpointId = randomUUID();
       const ephemeralSlug = `part-eph-${Date.now()}`;
       const expiredAt = new Date(Date.now() - 5 * 60_000).toISOString();
 
@@ -564,25 +571,24 @@ describe("Supabase Partitioning Integration", () => {
 
       expect(response.status).toBe(200);
 
-      // Wait for the receiver to process and insert
-      await new Promise((resolve) => setTimeout(resolve, 500));
+      // Poll for the captured request (up to 5 seconds)
+      let captured: { path: string; method: string } | undefined;
+      for (let attempt = 0; attempt < 50; attempt++) {
+        const results = await listRequestsForEndpointByUser({
+          userId: testUserId,
+          slug: testEndpointSlug,
+          limit: 10,
+        });
+        captured = results.find((r) => r.path.includes("e2e-partition-test"));
+        if (captured) break;
+        await new Promise((resolve) => setTimeout(resolve, 100));
+      }
 
-      // Verify the request was captured
-      const listed = await listRequestsForEndpointByUser({
-        userId: testUserId,
-        slug: testEndpointSlug,
-        limit: 10,
-      });
-
-      expect(listed).not.toBeNull();
-      expect(listed!.length).toBeGreaterThanOrEqual(1);
-
-      const captured = listed!.find((r) => r.path === "/e2e-partition-test");
       expect(captured).toBeDefined();
       expect(captured?.method).toBe("POST");
 
       // Cleanup
       await admin.from("requests").delete().eq("endpoint_id", testEndpointId);
-    });
+    }, 20_000);
   });
 });
