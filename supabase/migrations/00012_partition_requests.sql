@@ -63,6 +63,10 @@ CREATE INDEX requests_user_time ON public.requests(user_id, received_at DESC)
 CREATE INDEX requests_received_at ON public.requests(received_at);
 CREATE INDEX requests_id ON public.requests(id);
 
+-- Explicit grants on parent (child partitions inherit, but being explicit)
+GRANT ALL ON public.requests TO postgres, service_role;
+GRANT SELECT ON public.requests TO authenticated, anon;
+
 -- ============================================================================
 -- 3. CREATE INITIAL PARTITIONS
 -- ============================================================================
@@ -238,9 +242,14 @@ BEGIN
         'WITH moved AS (
            DELETE FROM public.requests_default
             WHERE received_at >= %L AND received_at < %L
-           RETURNING *
+           RETURNING id, endpoint_id, user_id, method, path, headers, body,
+                     query_params, content_type, ip, size, received_at
          )
-         INSERT INTO public.%I SELECT * FROM moved',
+         INSERT INTO public.%I (id, endpoint_id, user_id, method, path, headers, body,
+                                query_params, content_type, ip, size, received_at)
+         SELECT id, endpoint_id, user_id, method, path, headers, body,
+                query_params, content_type, ip, size, received_at
+         FROM moved',
         starts[i], ends[i], partitions_to_create[i]
       );
     END LOOP;
