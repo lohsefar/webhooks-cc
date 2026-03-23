@@ -70,6 +70,7 @@ CREATE INDEX requests_id ON public.requests(id);
 -- Daily partitions: 45 days in the past through 7 days in the future.
 
 CREATE TABLE public.requests_default PARTITION OF public.requests DEFAULT;
+ALTER TABLE public.requests_default ENABLE ROW LEVEL SECURITY;
 GRANT ALL ON public.requests_default TO postgres, service_role;
 GRANT SELECT ON public.requests_default TO authenticated, anon;
 
@@ -97,6 +98,7 @@ BEGIN
       partition_name, start_ts, end_ts
     );
 
+    EXECUTE format('ALTER TABLE public.%I ENABLE ROW LEVEL SECURITY', partition_name);
     EXECUTE format('GRANT ALL ON public.%I TO postgres, service_role', partition_name);
     EXECUTE format('GRANT SELECT ON public.%I TO authenticated, anon', partition_name);
   END LOOP;
@@ -246,9 +248,10 @@ BEGIN
     -- Reattach default partition once
     ALTER TABLE public.requests ATTACH PARTITION public.requests_default DEFAULT;
 
-    -- Grant permissions on each new partition
+    -- Enable RLS and grant permissions on each new partition
     FOR i IN 1 .. array_length(partitions_to_create, 1)
     LOOP
+      EXECUTE format('ALTER TABLE public.%I ENABLE ROW LEVEL SECURITY', partitions_to_create[i]);
       EXECUTE format('GRANT ALL ON public.%I TO postgres, service_role', partitions_to_create[i]);
       EXECUTE format('GRANT SELECT ON public.%I TO authenticated, anon', partitions_to_create[i]);
     END LOOP;
