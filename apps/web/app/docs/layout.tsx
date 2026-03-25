@@ -8,10 +8,12 @@ export default function DocsLayout({ children }: { children: React.ReactNode }) 
   return (
     <div className="min-h-screen">
       <FloatingNavbar>
-        <BackButton />
-        <span className="text-xs font-bold uppercase tracking-wide text-muted-foreground border-2 border-foreground px-2 py-0.5">
-          Docs
-        </span>
+        <div className="hidden md:flex items-center gap-4">
+          <BackButton />
+          <span className="text-xs font-bold uppercase tracking-wide text-muted-foreground border-2 border-foreground px-2 py-0.5">
+            Docs
+          </span>
+        </div>
       </FloatingNavbar>
 
       {/* Sidebar + Content - mx-4 matches navbar's left-4/right-4 */}

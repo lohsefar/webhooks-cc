@@ -79,7 +79,7 @@ function MobileToc({ headings, activeId }: { headings: TocItem[]; activeId: stri
   if (headings.length < 3) return null;
 
   return (
-    <div className="xl:hidden mb-6 border-2 border-foreground bg-card">
+    <div className="hidden md:block xl:hidden mb-6 border-2 border-foreground bg-card">
       <button
         onClick={() => setOpen(!open)}
         type="button"

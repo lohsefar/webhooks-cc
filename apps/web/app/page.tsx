@@ -5,8 +5,11 @@ import { Zap, Eye, Terminal, ArrowRight, Check, Bot } from "lucide-react";
 import { GitHubCard } from "@/components/landing/github-card";
 import { InstallCards } from "@/components/landing/install-cards";
 import { FAQAccordion } from "@/components/landing/faq-accordion";
+import { PricingCTA } from "@/components/landing/pricing-cta";
+import { LivePreview } from "@/components/landing/live-preview";
 import { createPageMetadata } from "@/lib/seo";
 import { JsonLd, softwareApplicationSchema, faqSchema, type FAQItem } from "@/lib/schemas";
+import { createClient } from "@supabase/supabase-js";
 
 export const metadata = createPageMetadata({
   title: "Webhook Testing Platform: CLI, SDK & MCP",
@@ -27,6 +30,42 @@ async function getStarCount(): Promise<number | null> {
     if (!res.ok) return null;
     const data = (await res.json()) as GitHubRepoResponse;
     return typeof data?.stargazers_count === "number" ? data.stargazers_count : null;
+  } catch {
+    return null;
+  }
+}
+
+interface SiteStats {
+  total_webhooks: number;
+  total_endpoints: number;
+  total_users: number;
+}
+
+// Untyped client for site_stats (not in generated Database type yet).
+// Cached at module scope so it's reused across renders.
+let _statsClient: ReturnType<typeof createClient> | null = null;
+function getStatsClient() {
+  if (_statsClient) return _statsClient;
+  const url = process.env.SUPABASE_URL;
+  const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  if (!url || !key) return null;
+  _statsClient = createClient(url, key, {
+    auth: { autoRefreshToken: false, persistSession: false },
+  });
+  return _statsClient;
+}
+
+async function getSiteStats(): Promise<SiteStats | null> {
+  try {
+    const supabase = getStatsClient();
+    if (!supabase) return null;
+    const { data, error } = await supabase
+      .from("site_stats")
+      .select("total_webhooks, total_endpoints, total_users")
+      .eq("id", 1)
+      .single();
+    if (error || !data) return null;
+    return data as SiteStats;
   } catch {
     return null;
   }
@@ -71,7 +110,7 @@ const LANDING_FAQ: FAQItem[] = [
 ];
 
 export default async function Home() {
-  const stars = await getStarCount();
+  const [stars, stats] = await Promise.all([getStarCount(), getSiteStats()]);
 
   return (
     <main className="min-h-screen">
@@ -87,27 +126,60 @@ export default async function Home() {
           <div className="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-8">
             <div className="max-w-3xl">
               <div className="inline-block neo-btn-secondary text-sm py-1 px-3 mb-6">
-                Webhook Testing Tools
+                Free forever &middot; No credit card
               </div>
-              <h1 className="text-5xl md:text-7xl font-bold tracking-tight mb-6 leading-[1.1]">
-                Inspect webhooks{" "}
-                <span className="bg-primary text-primary-foreground px-2">instantly</span>
+              <h1 className="text-5xl md:text-7xl font-bold tracking-tight mb-6 leading-[1.2]">
+                See every webhook
+                <br />
+                <span className="bg-primary text-primary-foreground px-2">as it arrives</span>
               </h1>
               <p className="text-xl md:text-2xl text-muted-foreground mb-8 max-w-2xl leading-relaxed">
-                Get a URL, send a webhook, inspect it instantly. Send signed Stripe, GitHub,
-                Shopify, and Twilio templates from the dashboard. Forward to localhost with the CLI,
-                test in CI with the SDK, and use MCP with your AI coding agent.
+                Get a URL, send a webhook, see it arrive. Forward to localhost with the CLI, test in
+                CI with the SDK, or let your AI agent handle it with MCP.
               </p>
-              <p className="text-lg font-semibold mb-8">Start free. No credit card required.</p>
               <HeroCTA />
+
+              {/* Social proof — near the CTA for maximum impact */}
+              {stats && (
+                <div className="mt-6 flex flex-wrap items-center gap-x-5 gap-y-2 text-sm text-muted-foreground">
+                  {stats.total_users > 0 ? (
+                    <span className="font-semibold">
+                      <span className="text-foreground">{stats.total_users.toLocaleString()}</span>{" "}
+                      developers
+                    </span>
+                  ) : null}
+                  {stats.total_endpoints > 0 ? (
+                    <span className="font-semibold">
+                      <span className="text-foreground">
+                        {stats.total_endpoints.toLocaleString()}
+                      </span>{" "}
+                      endpoints created
+                    </span>
+                  ) : null}
+                  {stats.total_webhooks > 0 ? (
+                    <span className="font-semibold">
+                      <span className="text-foreground">
+                        {stats.total_webhooks.toLocaleString()}
+                      </span>{" "}
+                      webhooks captured
+                    </span>
+                  ) : null}
+                  <span className="font-semibold">Open source</span>
+                </div>
+              )}
             </div>
 
-            {/* GitHub */}
-            <GitHubCard stars={stars} />
+            {/* GitHub — hidden on mobile to keep CTA above the fold */}
+            <div className="hidden lg:block">
+              <GitHubCard stars={stars} />
+            </div>
           </div>
 
           {/* Install */}
           <InstallCards />
+
+          {/* Live preview */}
+          <LivePreview />
 
           {/* Code preview */}
           <div className="mt-6 neo-code overflow-x-auto">
@@ -156,8 +228,46 @@ export default async function Home() {
         </div>
       </section>
 
-      {/* Features */}
+      {/* How it works */}
       <section className="py-20 px-4 bg-muted">
+        <div className="max-w-6xl mx-auto">
+          <h2 className="text-3xl md:text-4xl font-bold mb-12">How it works</h2>
+          <div className="grid md:grid-cols-3 gap-8">
+            {[
+              {
+                step: "1",
+                title: "Get a URL",
+                description: "Create an endpoint in one click. You get a unique public URL.",
+              },
+              {
+                step: "2",
+                title: "Point your service",
+                description:
+                  "Configure Stripe, GitHub, or any service to send webhooks to your URL.",
+              },
+              {
+                step: "3",
+                title: "See what arrives",
+                description:
+                  "Headers, body, query params — live. Forward to localhost or assert in tests.",
+              },
+            ].map((item) => (
+              <div key={item.step} className="flex gap-4">
+                <div className="w-10 h-10 border-2 border-foreground bg-primary text-primary-foreground flex items-center justify-center font-bold text-lg shrink-0 shadow-neo-sm">
+                  {item.step}
+                </div>
+                <div>
+                  <h3 className="font-bold text-lg mb-1">{item.title}</h3>
+                  <p className="text-muted-foreground text-sm">{item.description}</p>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* Features */}
+      <section className="py-20 px-4">
         <div className="max-w-6xl mx-auto">
           <h2 className="text-3xl md:text-4xl font-bold mb-4">
             Webhook tools that fit how you build
@@ -171,10 +281,10 @@ export default async function Home() {
               <div className="w-12 h-12 border-2 border-foreground bg-primary flex items-center justify-center mb-4 shadow-neo-sm">
                 <Eye className="h-6 w-6 text-primary-foreground" />
               </div>
-              <h3 className="font-bold text-xl mb-2">Capture & inspect</h3>
+              <h3 className="font-bold text-xl mb-2">See requests the moment they arrive</h3>
               <p className="text-muted-foreground">
-                See requests the moment they arrive. Headers, body, query params — formatted and
-                searchable. Export as JSON or CSV.
+                Headers, body, query params — formatted, searchable, and exportable as JSON or CSV.
+                Live updates, no refresh needed.
               </p>
             </div>
 
@@ -182,10 +292,10 @@ export default async function Home() {
               <div className="w-12 h-12 border-2 border-foreground bg-secondary flex items-center justify-center mb-4 shadow-neo-sm">
                 <Zap className="h-6 w-6 text-secondary-foreground" />
               </div>
-              <h3 className="font-bold text-xl mb-2">Send signed templates</h3>
+              <h3 className="font-bold text-xl mb-2">Test Stripe, GitHub, and Shopify webhooks</h3>
               <p className="text-muted-foreground">
-                Send realistic Stripe, GitHub, Shopify, and Twilio webhooks from the dashboard.
-                Signature headers are generated for each provider.
+                Send signed provider templates from the dashboard. Realistic payloads with correct
+                signature headers — test your verification code end-to-end.
               </p>
             </div>
 
@@ -193,11 +303,11 @@ export default async function Home() {
               <div className="w-12 h-12 border-2 border-foreground bg-accent flex items-center justify-center mb-4 shadow-neo-sm">
                 <Terminal className="h-6 w-6 text-accent-foreground" />
               </div>
-              <h3 className="font-bold text-xl mb-2">CLI & TypeScript SDK</h3>
+              <h3 className="font-bold text-xl mb-2">Forward to localhost. Assert in CI.</h3>
               <p className="text-muted-foreground">
-                Forward webhooks to localhost with{" "}
-                <code className="font-mono font-bold">whk tunnel</code>. Write test assertions with
-                composable matchers. Run in CI with GitHub Actions.
+                <code className="font-mono font-bold">whk tunnel</code> forwards webhooks to your
+                local port. The TypeScript SDK waits for events and asserts payload shape in your
+                test suite.
               </p>
             </div>
 
@@ -205,10 +315,10 @@ export default async function Home() {
               <div className="w-12 h-12 border-2 border-foreground bg-foreground flex items-center justify-center mb-4 shadow-neo-sm">
                 <Bot className="h-6 w-6 text-background" />
               </div>
-              <h3 className="font-bold text-xl mb-2">MCP server for AI agents</h3>
+              <h3 className="font-bold text-xl mb-2">Let your AI agent debug webhooks</h3>
               <p className="text-muted-foreground">
-                Connect Claude Code, Cursor, VS Code, or Codex. Your AI agent creates endpoints,
-                sends test webhooks, and replays requests — in natural language.
+                Connect Claude Code, Cursor, VS Code, or Codex via MCP. Your agent creates
+                endpoints, sends tests, and inspects requests — through natural language.
               </p>
             </div>
           </div>
@@ -246,9 +356,7 @@ export default async function Home() {
                   </li>
                 ))}
               </ul>
-              <Link href="/login" className="neo-btn-outline w-full text-center block">
-                Get started
-              </Link>
+              <PricingCTA />
             </div>
 
             {/* Pro Plan */}
@@ -276,9 +384,10 @@ export default async function Home() {
                   </li>
                 ))}
               </ul>
-              <Link href="/login" className="neo-btn-primary w-full text-center block">
-                Upgrade to Pro
-              </Link>
+              <p className="text-sm text-muted-foreground mb-3 text-center">
+                Start free, upgrade later
+              </p>
+              <PricingCTA />
             </div>
           </div>
         </div>
@@ -348,12 +457,11 @@ export default async function Home() {
               Your next webhook is one URL away
             </h2>
             <p className="text-xl opacity-80 mb-8 max-w-xl mx-auto">
-              Create an endpoint, point your service at it, and see what arrives. Takes 10 seconds.
+              Create an endpoint, point your service at it, and see what arrives.
             </p>
-            <Link href="/go" className="neo-btn bg-background text-foreground">
-              Try it free
-              <ArrowRight className="inline-block ml-2 h-5 w-5" />
-            </Link>
+            <div className="flex justify-center">
+              <PricingCTA />
+            </div>
           </div>
         </div>
       </section>

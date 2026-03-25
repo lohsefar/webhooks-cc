@@ -19,9 +19,9 @@ import {
   type GuestEndpointRecord,
 } from "@/lib/go-dashboard";
 import { parseStoredDemoEndpoint } from "@/lib/go-demo-storage";
-import { subscribeToEndpointRow } from "@/lib/supabase/realtime";
+import { subscribeToEndpointRow, subscribeToEndpointRequestInserts } from "@/lib/supabase/realtime";
 import type { Request, RequestSummary } from "@/types/request";
-import { ArrowRight, Bot, Check, Circle, Copy, Eye, Plus, Send, Terminal } from "lucide-react";
+import { Check, Circle, Copy, Send } from "lucide-react";
 
 const REQUEST_LIMIT = 25;
 const BACKGROUND_SYNC_INTERVAL_MS = 2000;
@@ -33,50 +33,26 @@ const EXPIRY_MS = 12 * 60 * 60 * 1000;
 const COPY_FEEDBACK_MS = 2000;
 const SEND_FEEDBACK_MS = 3000;
 const DEMO_ENDPOINT_STORAGE_KEY = "demo_endpoint";
-const WEBHOOK_SITE_DIFF_ROWS = [
-  ["Core webhook inspection", "Yes", "Yes"],
-  ["CLI tunnel to localhost", "Yes", "Yes"],
-  ["TypeScript SDK for automated tests", "Yes", "No first-party SDK"],
-  ["MCP server for AI coding agents", "Yes", "No first-party server"],
-  ["Pricing model", "Core features on every tier", "Feature-gated tiers"],
-] as const;
-const FREE_ACCOUNT_FEATURES = [
-  "50 requests/day",
-  "7-day data retention",
-  "Unlimited endpoints",
-  "CLI, SDK & MCP access",
-] as const;
-const GO_LANDING_FEATURES = [
-  {
-    title: "Inspect live payloads",
-    description:
-      "See method, headers, query params, and body in real time while your integration runs.",
-    Icon: Eye,
+const PROVIDER_PAYLOADS: Record<string, Record<string, unknown>> = {
+  stripe: {
+    id: "evt_1Example",
+    type: "checkout.session.completed",
+    data: {
+      object: { id: "cs_test_123", amount_total: 4999, currency: "usd", status: "complete" },
+    },
   },
-  {
-    title: "Tunnel with the CLI",
-    description:
-      "Forward webhooks to localhost with `whk tunnel` so you can debug handlers on your local app.",
-    Icon: Terminal,
+  github: {
+    action: "opened",
+    pull_request: { number: 42, title: "Add webhook handler", user: { login: "octocat" } },
   },
-  {
-    title: "Assert with the SDK",
-    description:
-      "Use the TypeScript SDK in test suites to wait for webhook events and assert payload shape.",
-    Icon: Check,
+  shopify: {
+    topic: "orders/create",
+    id: "820982911946154508",
+    total_price: "59.99",
+    currency: "USD",
+    line_items: [{ title: "Widget", quantity: 2, price: "29.99" }],
   },
-  {
-    title: "Automate with MCP",
-    description:
-      "Let AI coding agents create endpoints, send tests, inspect requests, and replay events.",
-    Icon: Bot,
-  },
-] as const;
-const GO_VALUE_PILLS = [
-  "No signup to start",
-  "50 requests/day on free",
-  "CLI, SDK, and MCP included",
-] as const;
+};
 
 const RequestList = dynamic(
   () => import("@/components/dashboard/request-list").then((module) => module.RequestList),
@@ -167,6 +143,7 @@ function GuestLiveDashboardInner() {
   const [debouncedSearch, setDebouncedSearch] = useState("");
 
   const prevRequestCount = useRef(0);
+  const [upgradeDismissed, setUpgradeDismissed] = useState(false);
 
   // Debounce search to avoid unnecessary filtering work while typing
   const searchDebounceRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
@@ -326,10 +303,17 @@ function GuestLiveDashboardInner() {
       void refreshRequests(endpointSlug);
     });
 
+    // Subscribe to request INSERTs directly for faster updates
+    const unsubscribeRequests = subscribeToEndpointRequestInserts(endpoint.id, () => {
+      void refreshRequests(endpointSlug);
+      void refreshEndpoint(endpointSlug);
+    });
+
     return () => {
       unsubscribeEndpoint();
+      unsubscribeRequests();
     };
-  }, [clearDemoEndpoint, endpoint?.id, endpointSlug, refreshRequests]);
+  }, [clearDemoEndpoint, endpoint?.id, endpointSlug, refreshRequests, refreshEndpoint]);
 
   useEffect(() => {
     if (!endpoint?.id || !endpointSlug) {
@@ -477,7 +461,7 @@ function GuestLiveDashboardInner() {
     setDebouncedSearch("");
   }, [currentEndpointId]);
 
-  const handleCreateEndpoint = async () => {
+  const handleCreateEndpoint = useCallback(async () => {
     setIsCreating(true);
     setCreateError(null);
     setEndpointLoadError(null);
@@ -509,7 +493,17 @@ function GuestLiveDashboardInner() {
     } finally {
       setIsCreating(false);
     }
-  };
+  }, []);
+
+  // Auto-create endpoint when visiting /go with no stored endpoint.
+  // The ref gates this to a single attempt — handleCreateEndpoint is stable (useCallback, []).
+  const autoCreateAttempted = useRef(false);
+  useEffect(() => {
+    if (!storageReady || endpointSlug || autoCreateAttempted.current) return;
+    if (isAuthenticated) return;
+    autoCreateAttempted.current = true;
+    void handleCreateEndpoint();
+  }, [storageReady, endpointSlug, isAuthenticated, handleCreateEndpoint]);
 
   const handleSelect = useCallback((id: string) => {
     setSelectedId(id);
@@ -530,6 +524,14 @@ function GuestLiveDashboardInner() {
     setNewCount(0);
   }, [requests]);
 
+  const handleDismissUpgrade = useCallback(() => setUpgradeDismissed(true), []);
+
+  const handleRetryCreate = useCallback(() => {
+    autoCreateAttempted.current = true; // keep true so the effect doesn't also fire
+    setCreateError(null);
+    void handleCreateEndpoint();
+  }, [handleCreateEndpoint]);
+
   const endpointUrl = endpointSlug ? getWebhookUrl(endpointSlug) : null;
 
   if (!storageReady) {
@@ -544,14 +546,42 @@ function GuestLiveDashboardInner() {
   }
 
   if (!endpointSlug) {
+    // Show error fallback with retry if auto-create failed
+    if (createError) {
+      return (
+        <div className="h-screen flex flex-col overflow-hidden">
+          <GoHeader isAuthenticated={isAuthenticated} isLoading={isLoading} />
+          <div className="flex-1 flex items-center justify-center p-8">
+            <div className="neo-card neo-card-static max-w-md w-full text-center space-y-4">
+              <div className="space-y-2">
+                <h2 className="text-xl font-bold">Couldn&apos;t create your test endpoint</h2>
+                <p className="text-sm text-muted-foreground">{createError}</p>
+              </div>
+              <div className="flex items-center justify-center gap-3">
+                <button
+                  onClick={handleRetryCreate}
+                  disabled={isCreating}
+                  className="neo-btn-primary"
+                >
+                  {isCreating ? "Creating..." : "Try again"}
+                </button>
+                <Link href="/login" className="neo-btn-outline">
+                  Sign in instead
+                </Link>
+              </div>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    // Auto-create in progress — show loading state
     return (
       <div className="h-screen flex flex-col overflow-hidden">
         <GoHeader isAuthenticated={isAuthenticated} isLoading={isLoading} />
-        <GoPreCreateLanding
-          isCreating={isCreating}
-          createError={createError}
-          onCreateEndpoint={handleCreateEndpoint}
-        />
+        <div className="flex-1 flex items-center justify-center p-8">
+          <p className="text-muted-foreground animate-pulse">Creating test endpoint...</p>
+        </div>
       </div>
     );
   }
@@ -632,6 +662,10 @@ function GuestLiveDashboardInner() {
           remainingRequests={remainingRequests}
         />
 
+        {!upgradeDismissed && hasRequests && (
+          <UpgradePrompt requestCount={requestCount} onDismiss={handleDismissUpgrade} />
+        )}
+
         {hasRequests ? (
           <>
             <div className="hidden md:flex flex-1 overflow-hidden">
@@ -705,187 +739,52 @@ function GuestLiveDashboardInner() {
             <p className="text-muted-foreground animate-pulse">Loading captured request...</p>
           </div>
         ) : (
-          <DemoWaitingState url={endpointUrl} />
+          <DemoWaitingState
+            url={endpointUrl}
+            onSent={() => {
+              if (endpointSlug) void refreshRequests(endpointSlug);
+            }}
+          />
         )}
       </ErrorBoundary>
     </div>
   );
 }
 
-function GoPreCreateLanding({
-  isCreating,
-  createError,
-  onCreateEndpoint,
+function UpgradePrompt({
+  requestCount,
+  onDismiss,
 }: {
-  isCreating: boolean;
-  createError: string | null;
-  onCreateEndpoint: () => Promise<void>;
+  requestCount: number;
+  onDismiss: () => void;
 }) {
+  const isUrgent = requestCount >= 20;
+  const message = isUrgent
+    ? `You've used ${requestCount} of 25 guest requests. Create a free account for 50/day.`
+    : "Webhook received! Create a free account to keep your endpoints and get 50 requests/day.";
+
   return (
-    <div className="flex-1 overflow-auto">
-      <section className="px-4 pt-8 md:pt-12 pb-8 md:pb-10">
-        <div className="max-w-7xl mx-auto grid gap-6 lg:grid-cols-[minmax(0,1.35fr)_minmax(0,0.95fr)]">
-          <div className="neo-card neo-card-static space-y-6">
-            <p className="text-xs font-bold uppercase tracking-wide text-muted-foreground">
-              Webhook testing workspace
-            </p>
-            <h1 className="text-3xl md:text-5xl font-bold leading-tight max-w-4xl">
-              Test webhooks live, then scale with CLI, SDK, and MCP
-            </h1>
-            <p className="text-base md:text-lg text-muted-foreground leading-relaxed max-w-2xl">
-              Create a temporary endpoint in one click and inspect real webhook payloads instantly.
-              When you are ready, move to a free account for permanent endpoints and full developer
-              tooling.
-            </p>
-            <div className="flex flex-wrap gap-2">
-              {GO_VALUE_PILLS.map((pill) => (
-                <span
-                  key={pill}
-                  className="border-2 border-foreground/60 px-2.5 py-1 text-xs font-semibold uppercase tracking-wide bg-muted"
-                >
-                  {pill}
-                </span>
-              ))}
-            </div>
-            <div className="flex flex-wrap items-center gap-3">
-              <button
-                onClick={onCreateEndpoint}
-                disabled={isCreating}
-                className="neo-btn-primary disabled:opacity-50 min-w-52"
-              >
-                <Plus className="inline-block mr-2 h-4 w-4" />
-                {isCreating ? "Creating..." : "Create test endpoint"}
-              </button>
-              <Link href="/login" className="neo-btn-outline">
-                Create free account
-              </Link>
-            </div>
-            {createError && (
-              <p role="alert" className="text-sm text-destructive font-medium">
-                {createError}
-              </p>
-            )}
-            <p className="text-sm text-muted-foreground leading-relaxed">
-              Guest endpoints support up to 25 requests and expire after 12 hours.
-            </p>
-          </div>
-
-          <aside className="neo-card space-y-5">
-            <div className="space-y-1.5">
-              <p className="text-xs font-bold uppercase tracking-wide text-muted-foreground">
-                Pricing snapshot
-              </p>
-              <h2 className="text-2xl font-bold leading-tight">Free account includes</h2>
-            </div>
-            <ul className="space-y-2.5">
-              {FREE_ACCOUNT_FEATURES.map((feature) => (
-                <li key={feature} className="flex items-center gap-2">
-                  <Check className="h-4 w-4 text-primary flex-shrink-0" />
-                  <span>{feature}</span>
-                </li>
-              ))}
-            </ul>
-            <p className="text-sm text-muted-foreground leading-relaxed">
-              Start on free with no credit card. Pro is $8/month for 100,000 requests/month and
-              30-day retention.
-            </p>
-            <div className="flex flex-wrap gap-3">
-              <Link href="/compare/webhook-site" className="neo-btn-outline text-sm py-2 px-3">
-                Compare vs Webhook.site
-              </Link>
-              <Link href="/docs/cli" className="neo-btn-outline text-sm py-2 px-3">
-                CLI docs
-              </Link>
-            </div>
-          </aside>
-        </div>
-      </section>
-
-      <section className="px-4 pb-10">
-        <div className="max-w-7xl mx-auto space-y-5">
-          <div className="space-y-2">
-            <p className="text-xs font-bold uppercase tracking-wide text-muted-foreground">
-              Workflow coverage
-            </p>
-            <h2 className="text-2xl md:text-3xl font-bold">
-              One platform for manual tests and automation
-            </h2>
-          </div>
-
-          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-            {GO_LANDING_FEATURES.map((feature) => {
-              const Icon = feature.Icon;
-              return (
-                <article key={feature.title} className="neo-card neo-card-static">
-                  <div className="w-10 h-10 border-2 border-foreground bg-muted flex items-center justify-center mb-3">
-                    <Icon className="h-5 w-5" />
-                  </div>
-                  <h3 className="font-bold text-lg mb-2">{feature.title}</h3>
-                  <p className="text-sm text-muted-foreground">{feature.description}</p>
-                </article>
-              );
-            })}
-          </div>
-        </div>
-      </section>
-
-      <section className="px-4 pb-16">
-        <div className="max-w-7xl mx-auto neo-card neo-card-static space-y-5">
-          <div className="flex flex-wrap items-end justify-between gap-3">
-            <div className="space-y-1.5">
-              <p className="text-xs font-bold uppercase tracking-wide text-muted-foreground">
-                Comparison
-              </p>
-              <h2 className="text-2xl md:text-3xl font-bold">webhooks.cc vs Webhook.site</h2>
-              <p className="text-muted-foreground">
-                Compare request inspection, price model, and workflow support for CLI, SDK, and MCP.
-              </p>
-            </div>
-            <Link href="/compare/webhook-site" className="neo-btn-outline text-sm py-2 px-3">
-              Read full comparison <ArrowRight className="inline h-4 w-4 ml-1" />
-            </Link>
-          </div>
-
-          <div className="neo-code overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b-2 border-foreground">
-                  <th scope="col" className="text-left py-2 pr-3">
-                    Category
-                  </th>
-                  <th scope="col" className="text-left py-2 pr-3">
-                    webhooks.cc
-                  </th>
-                  <th scope="col" className="text-left py-2">
-                    Webhook.site
-                  </th>
-                </tr>
-              </thead>
-              <tbody>
-                {WEBHOOK_SITE_DIFF_ROWS.map(([label, left, right]) => (
-                  <tr key={label} className="border-b border-foreground/20 last:border-0">
-                    <td className="py-2 pr-3 font-semibold">{label}</td>
-                    <td className="py-2 pr-3">{left}</td>
-                    <td className="py-2">{right}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-
-          <div className="flex flex-wrap gap-3">
-            <Link href="/docs/sdk" className="neo-btn-outline text-sm py-2 px-3">
-              SDK docs
-            </Link>
-            <Link href="/docs/mcp" className="neo-btn-outline text-sm py-2 px-3">
-              MCP docs
-            </Link>
-            <Link href="/" className="neo-btn-outline text-sm py-2 px-3">
-              Pricing overview
-            </Link>
-          </div>
-        </div>
-      </section>
+    <div
+      className={cn(
+        "shrink-0 border-b-2 border-foreground px-4 py-2.5 flex items-center justify-between gap-4",
+        isUrgent ? "bg-destructive/15" : "bg-primary/10"
+      )}
+    >
+      <p className="text-sm font-medium">{message}</p>
+      <div className="flex items-center gap-2 shrink-0">
+        <OAuthSignInButtons
+          redirectTo="/dashboard"
+          buttonClassName="h-8 text-xs px-3 w-auto"
+          layout="horizontal"
+        />
+        <button
+          onClick={onDismiss}
+          className="p-1 hover:bg-muted transition-colors text-muted-foreground hover:text-foreground"
+          aria-label="Dismiss"
+        >
+          <span className="text-lg leading-none">&times;</span>
+        </button>
+      </div>
     </div>
   );
 }
@@ -996,30 +895,6 @@ function DemoUrlBar({
         </div>
       </div>
 
-      {/* Sign-up banner */}
-      <div className="border-b-2 border-foreground bg-amber-500/25 px-4 py-1.5 flex items-center justify-between gap-4">
-        <span className="text-xs text-muted-foreground">
-          <span className="hidden md:inline">
-            Guest: <strong className="text-foreground">25 requests</strong>, temporary endpoint.
-            Free account: <strong className="text-foreground">50 requests/day</strong>, permanent
-            endpoints, CLI + SDK.
-          </span>
-          <span className="md:hidden">
-            Free: <strong className="text-foreground">50 requests/day</strong>, permanent endpoints
-          </span>
-        </span>
-        <div className="flex items-center gap-3 shrink-0">
-          <span className="hidden md:inline text-xs text-muted-foreground">
-            Register free, <strong className="text-foreground">no credit card</strong>
-          </span>
-          <OAuthSignInButtons
-            redirectTo="/dashboard"
-            buttonClassName="h-7 text-xs px-3 w-auto"
-            layout="horizontal"
-          />
-        </div>
-      </div>
-
       {/* Mobile-only status row (visible below sm) */}
       <div className="sm:hidden border-b-2 border-foreground bg-card px-4 py-1.5 flex items-center gap-4 text-xs text-muted-foreground">
         <span className="flex items-center gap-1.5">
@@ -1043,7 +918,7 @@ function DemoUrlBar({
   );
 }
 
-function DemoWaitingState({ url }: { url: string }) {
+function DemoWaitingState({ url, onSent }: { url: string; onSent?: () => void }) {
   const [copied, setCopied] = useState(false);
   const [sending, setSending] = useState(false);
   const [sent, setSent] = useState(false);
@@ -1068,31 +943,49 @@ function DemoWaitingState({ url }: { url: string }) {
     copyTimeoutRef.current = setTimeout(() => setCopied(false), COPY_FEEDBACK_MS);
   };
 
-  const handleSendTest = async () => {
-    setSending(true);
+  const sendPayload = useCallback(
+    async (label: string, body: Record<string, unknown>) => {
+      setSending(true);
+      try {
+        await fetch(url, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            [INTERNAL_TEST_SEND_HEADER]: "1",
+          },
+          body: JSON.stringify(body),
+        });
+        setSent(true);
+      } catch {
+        // CORS may block the response but the request still reaches the receiver
+        setSent(true);
+      } finally {
+        if (sentTimeoutRef.current) clearTimeout(sentTimeoutRef.current);
+        sentTimeoutRef.current = setTimeout(() => setSent(false), SEND_FEEDBACK_MS);
+        setSending(false);
+        // Eagerly poll for the new request — don't wait for realtime
+        setTimeout(() => onSent?.(), 150);
+        setTimeout(() => onSent?.(), 500);
+      }
+    },
+    [url, onSent]
+  );
 
-    try {
-      await fetch(url, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          [INTERNAL_TEST_SEND_HEADER]: "1",
-        },
-        body: JSON.stringify({
-          message: "Hello from the browser!",
-          timestamp: new Date().toISOString(),
-        }),
-      });
-      setSent(true);
-    } catch {
-      // Request can fail due to CORS while still reaching the webhook receiver.
-      setSent(true);
-    } finally {
-      if (sentTimeoutRef.current) clearTimeout(sentTimeoutRef.current);
-      sentTimeoutRef.current = setTimeout(() => setSent(false), SEND_FEEDBACK_MS);
-      setSending(false);
-    }
-  };
+  const handleSendTest = useCallback(
+    () =>
+      sendPayload("custom", {
+        message: "Hello from the browser!",
+        timestamp: new Date().toISOString(),
+      }),
+    [sendPayload]
+  );
+
+  const handleSendProvider = useCallback(
+    (provider: string) => {
+      void sendPayload(provider, PROVIDER_PAYLOADS[provider] ?? { provider, event: "test" });
+    },
+    [sendPayload]
+  );
 
   return (
     <div className="flex-1 flex items-center justify-center p-8">
@@ -1105,10 +998,37 @@ function DemoWaitingState({ url }: { url: string }) {
           <p className="font-bold uppercase tracking-wide">Waiting for first request...</p>
         </div>
 
+        <button
+          onClick={handleSendTest}
+          disabled={sending}
+          className="neo-btn-primary w-full py-4 text-lg flex items-center justify-center gap-2"
+        >
+          <Send className="h-5 w-5" />
+          {sending ? "Sending..." : sent ? "Sent!" : "Send your first webhook"}
+        </button>
+
+        <div className="space-y-2">
+          <p className="text-xs font-bold uppercase tracking-wide text-muted-foreground">
+            Or try a provider payload
+          </p>
+          <div className="flex items-center justify-center gap-2">
+            {["Stripe", "GitHub", "Shopify"].map((provider) => (
+              <button
+                key={provider}
+                onClick={() => handleSendProvider(provider.toLowerCase())}
+                disabled={sending}
+                className="neo-btn-outline text-sm py-2 px-4 cursor-pointer"
+              >
+                {provider}
+              </button>
+            ))}
+          </div>
+        </div>
+
         <div className="text-left">
           <div className="flex items-center justify-between mb-2">
             <span className="text-xs font-bold uppercase tracking-wide text-muted-foreground">
-              Send a test webhook
+              Or use curl
             </span>
             <button
               onClick={handleCopy}
@@ -1127,15 +1047,6 @@ function DemoWaitingState({ url }: { url: string }) {
           </div>
           <pre className="neo-code text-sm whitespace-pre-wrap break-all text-left">{curlCmd}</pre>
         </div>
-
-        <button
-          onClick={handleSendTest}
-          disabled={sending}
-          className="neo-btn-primary w-full flex items-center justify-center gap-2"
-        >
-          <Send className="h-4 w-4" />
-          {sending ? "Sending..." : sent ? "Sent!" : "Send test request"}
-        </button>
       </div>
     </div>
   );
