@@ -6,6 +6,7 @@ import { GitHubCard } from "@/components/landing/github-card";
 import { InstallCards } from "@/components/landing/install-cards";
 import { FAQAccordion } from "@/components/landing/faq-accordion";
 import { PricingCTA } from "@/components/landing/pricing-cta";
+import { LivePreview } from "@/components/landing/live-preview";
 import { createPageMetadata } from "@/lib/seo";
 import { JsonLd, softwareApplicationSchema, faqSchema, type FAQItem } from "@/lib/schemas";
 
@@ -110,6 +111,9 @@ export default async function Home() {
 
           {/* Install */}
           <InstallCards />
+
+          {/* Live preview */}
+          <LivePreview />
 
           {/* Provider logos */}
           <div className="mt-8 flex flex-wrap items-center gap-x-6 gap-y-3">
