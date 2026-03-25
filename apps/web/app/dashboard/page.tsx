@@ -7,6 +7,7 @@ import { useAuth } from "@/components/providers/supabase-auth-provider";
 import { UrlBar } from "@/components/dashboard/url-bar";
 import { RequestList } from "@/components/dashboard/request-list";
 import { RequestDetail, RequestDetailEmpty } from "@/components/dashboard/request-detail";
+import { GettingStarted } from "@/components/dashboard/getting-started";
 
 import { ErrorBoundary } from "@/components/error-boundary";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -597,6 +598,7 @@ export default function DashboardPage() {
           ) : undefined
         }
       />
+      <GettingStarted hasReceivedWebhook={hasRequests} />
 
       {/* Split pane or empty state */}
       {hasRequests ? (
