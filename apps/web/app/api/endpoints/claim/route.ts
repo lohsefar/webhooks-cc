@@ -11,7 +11,12 @@ export async function POST(request: Request) {
   const auth = await authenticateRequest(request);
   if (!auth.success) return auth.response;
 
-  const body = (await request.json()) as { slug?: string };
+  let body: { slug?: string };
+  try {
+    body = (await request.json()) as { slug?: string };
+  } catch {
+    return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
+  }
   if (!body.slug || typeof body.slug !== "string") {
     return NextResponse.json({ error: "slug is required" }, { status: 400 });
   }

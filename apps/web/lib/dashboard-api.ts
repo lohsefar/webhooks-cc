@@ -117,7 +117,7 @@ export async function claimGuestEndpointForUser(
       body: JSON.stringify({ slug }),
     })
   );
-  if (!response.ok) return null;
+  if (response.status === 404) return null;
   return readJson<DashboardEndpoint>(response);
 }
 

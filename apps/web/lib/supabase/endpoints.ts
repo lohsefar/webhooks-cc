@@ -262,8 +262,9 @@ export async function claimGuestEndpoint(
   slug: string
 ): Promise<EndpointRecord | null> {
   const admin = createAdminClient();
+  const nowIso = new Date().toISOString();
 
-  // Only claim endpoints that are ephemeral and have no owner
+  // Only claim endpoints that are ephemeral, have no owner, and haven't expired
   const { data, error } = await admin
     .from("endpoints")
     .update({
@@ -274,12 +275,13 @@ export async function claimGuestEndpoint(
     .eq("slug", slug)
     .is("user_id", null)
     .eq("is_ephemeral", true)
+    .gt("expires_at", nowIso)
     .select("id, user_id, slug, name, mock_response, is_ephemeral, expires_at, created_at")
     .returns<SelectedEndpointRow>()
     .maybeSingle();
 
-  if (error || !data) return null;
-  return normalizeEndpoint(data);
+  if (error) throw error;
+  return data ? normalizeEndpoint(data) : null;
 }
 
 export async function updateEndpointBySlugForUser({

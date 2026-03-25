@@ -527,7 +527,7 @@ function GuestLiveDashboardInner() {
   const handleDismissUpgrade = useCallback(() => setUpgradeDismissed(true), []);
 
   const handleRetryCreate = useCallback(() => {
-    autoCreateAttempted.current = false;
+    autoCreateAttempted.current = true; // keep true so the effect doesn't also fire
     setCreateError(null);
     void handleCreateEndpoint();
   }, [handleCreateEndpoint]);

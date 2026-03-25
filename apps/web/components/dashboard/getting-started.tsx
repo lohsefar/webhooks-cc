@@ -5,6 +5,15 @@ import Link from "next/link";
 import { Check, X, Terminal, Code, Bot, Send } from "lucide-react";
 
 const STORAGE_KEY = "getting_started_dismissed";
+const VISITED_KEY = "getting_started_visited";
+
+function safeSetStorage(key: string, value: string) {
+  try {
+    localStorage.setItem(key, value);
+  } catch {
+    // Storage unavailable (incognito/disabled) — checklist still works in-memory
+  }
+}
 
 interface ChecklistItem {
   id: string;
@@ -30,7 +39,7 @@ export function GettingStarted({ hasReceivedWebhook }: { hasReceivedWebhook: boo
       if (stored === "true") return;
       setDismissed(false);
 
-      const v = localStorage.getItem("getting_started_visited");
+      const v = localStorage.getItem(VISITED_KEY);
       if (v) setVisited(new Set(JSON.parse(v) as string[]));
     } catch {
       // localStorage unavailable (incognito/disabled) — stay dismissed
@@ -39,13 +48,13 @@ export function GettingStarted({ hasReceivedWebhook }: { hasReceivedWebhook: boo
 
   const handleDismiss = () => {
     setDismissed(true);
-    localStorage.setItem(STORAGE_KEY, "true");
+    safeSetStorage(STORAGE_KEY, "true");
   };
 
   const markVisited = (id: string) => {
     setVisited((prev) => {
       const next = new Set(prev).add(id);
-      localStorage.setItem("getting_started_visited", JSON.stringify([...next]));
+      safeSetStorage(VISITED_KEY, JSON.stringify([...next]));
       return next;
     });
   };
@@ -59,7 +68,7 @@ export function GettingStarted({ hasReceivedWebhook }: { hasReceivedWebhook: boo
   useEffect(() => {
     if (!dismissed && progress >= total) {
       setDismissed(true);
-      localStorage.setItem(STORAGE_KEY, "true");
+      safeSetStorage(STORAGE_KEY, "true");
     }
   }, [dismissed, progress, total]);
 

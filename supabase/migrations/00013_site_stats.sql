@@ -1,5 +1,5 @@
 -- ============================================================================
--- Migration 00012: Site stats for landing page social proof
+-- Migration 00013: Site stats for landing page social proof
 --
 -- Single-row table with aggregate counts, refreshed by cron 4x/day.
 -- deleted_webhooks accumulates request_count from deleted endpoints so
@@ -65,6 +65,9 @@ grant execute on function public.refresh_site_stats() to service_role;
 
 -- ============================================================================
 -- Accumulate request_count before ephemeral endpoint deletion
+--
+-- This replaces the function body originally created in 00007_ephemeral_cleanup.sql.
+-- The cron schedule (every 5 min) is already registered there — no new schedule needed.
 -- ============================================================================
 
 create or replace function public.cleanup_expired_ephemeral_endpoints()
