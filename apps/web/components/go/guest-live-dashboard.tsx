@@ -468,15 +468,15 @@ function GuestLiveDashboardInner() {
     }
   }, []);
 
-  // Auto-create endpoint when visiting /go with no stored endpoint
+  // Auto-create endpoint when visiting /go with no stored endpoint.
+  // The ref gates this to a single attempt — handleCreateEndpoint is stable (useCallback, []).
   const autoCreateAttempted = useRef(false);
   useEffect(() => {
-    if (!storageReady || endpointSlug || isCreating || autoCreateAttempted.current) return;
-    // Don't auto-create if authenticated (will redirect to /dashboard)
+    if (!storageReady || endpointSlug || autoCreateAttempted.current) return;
     if (isAuthenticated) return;
     autoCreateAttempted.current = true;
     void handleCreateEndpoint();
-  }, [storageReady, endpointSlug, isCreating, isAuthenticated, handleCreateEndpoint]);
+  }, [storageReady, endpointSlug, isAuthenticated, handleCreateEndpoint]);
 
   const handleSelect = useCallback((id: string) => {
     setSelectedId(id);
@@ -496,6 +496,14 @@ function GuestLiveDashboardInner() {
     setSelectedId(requests[0]!._id);
     setNewCount(0);
   }, [requests]);
+
+  const handleDismissUpgrade = useCallback(() => setUpgradeDismissed(true), []);
+
+  const handleRetryCreate = useCallback(() => {
+    autoCreateAttempted.current = false;
+    setCreateError(null);
+    void handleCreateEndpoint();
+  }, [handleCreateEndpoint]);
 
   const endpointUrl = endpointSlug ? getWebhookUrl(endpointSlug) : null;
 
@@ -524,11 +532,7 @@ function GuestLiveDashboardInner() {
               </div>
               <div className="flex items-center justify-center gap-3">
                 <button
-                  onClick={() => {
-                    autoCreateAttempted.current = false;
-                    setCreateError(null);
-                    void handleCreateEndpoint();
-                  }}
+                  onClick={handleRetryCreate}
                   disabled={isCreating}
                   className="neo-btn-primary"
                 >
@@ -634,7 +638,7 @@ function GuestLiveDashboardInner() {
         {!upgradeDismissed && hasRequests && (
           <UpgradePrompt
             requestCount={requestCount}
-            onDismiss={() => setUpgradeDismissed(true)}
+            onDismiss={handleDismissUpgrade}
           />
         )}
 
