@@ -9,6 +9,7 @@ import { PricingCTA } from "@/components/landing/pricing-cta";
 import { LivePreview } from "@/components/landing/live-preview";
 import { createPageMetadata } from "@/lib/seo";
 import { JsonLd, softwareApplicationSchema, faqSchema, type FAQItem } from "@/lib/schemas";
+import { createAdminClient } from "@/lib/supabase/admin";
 
 export const metadata = createPageMetadata({
   title: "Webhook Testing Platform: CLI, SDK & MCP",
@@ -42,12 +43,14 @@ interface SiteStats {
 
 async function getSiteStats(): Promise<SiteStats | null> {
   try {
-    const baseUrl = process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000";
-    const res = await fetch(`${baseUrl}/api/stats`, {
-      next: { revalidate: 3600 },
-    });
-    if (!res.ok) return null;
-    return (await res.json()) as SiteStats;
+    const admin = createAdminClient();
+    const { data, error } = await admin
+      .from("site_stats")
+      .select("total_webhooks, total_endpoints, total_users")
+      .eq("id", 1)
+      .single();
+    if (error || !data) return null;
+    return data as SiteStats;
   } catch {
     return null;
   }
