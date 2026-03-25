@@ -901,30 +901,6 @@ function DemoUrlBar({
         </div>
       </div>
 
-      {/* Sign-up banner */}
-      <div className="border-b-2 border-foreground bg-amber-500/25 px-4 py-1.5 flex items-center justify-between gap-4">
-        <span className="text-xs text-muted-foreground">
-          <span className="hidden md:inline">
-            Guest: <strong className="text-foreground">25 requests</strong>, temporary endpoint.
-            Free account: <strong className="text-foreground">50 requests/day</strong>, permanent
-            endpoints, CLI + SDK.
-          </span>
-          <span className="md:hidden">
-            Free: <strong className="text-foreground">50 requests/day</strong>, permanent endpoints
-          </span>
-        </span>
-        <div className="flex items-center gap-3 shrink-0">
-          <span className="hidden md:inline text-xs text-muted-foreground">
-            Register free, <strong className="text-foreground">no credit card</strong>
-          </span>
-          <OAuthSignInButtons
-            redirectTo="/dashboard"
-            buttonClassName="h-7 text-xs px-3 w-auto"
-            layout="horizontal"
-          />
-        </div>
-      </div>
-
       {/* Mobile-only status row (visible below sm) */}
       <div className="sm:hidden border-b-2 border-foreground bg-card px-4 py-1.5 flex items-center gap-4 text-xs text-muted-foreground">
         <span className="flex items-center gap-1.5">
