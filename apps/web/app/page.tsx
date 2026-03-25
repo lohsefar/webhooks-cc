@@ -34,6 +34,25 @@ async function getStarCount(): Promise<number | null> {
   }
 }
 
+interface SiteStats {
+  total_webhooks: number;
+  total_endpoints: number;
+  total_users: number;
+}
+
+async function getSiteStats(): Promise<SiteStats | null> {
+  try {
+    const baseUrl = process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000";
+    const res = await fetch(`${baseUrl}/api/stats`, {
+      next: { revalidate: 3600 },
+    });
+    if (!res.ok) return null;
+    return (await res.json()) as SiteStats;
+  } catch {
+    return null;
+  }
+}
+
 const LANDING_FAQ: FAQItem[] = [
   {
     question: "How do I test webhooks locally?",
@@ -73,7 +92,7 @@ const LANDING_FAQ: FAQItem[] = [
 ];
 
 export default async function Home() {
-  const stars = await getStarCount();
+  const [stars, stats] = await Promise.all([getStarCount(), getSiteStats()]);
 
   return (
     <main className="min-h-screen">
@@ -115,18 +134,26 @@ export default async function Home() {
           {/* Live preview */}
           <LivePreview />
 
-          {/* Provider logos */}
-          <div className="mt-8 flex flex-wrap items-center gap-x-6 gap-y-3">
-            <span className="text-xs font-bold uppercase tracking-wide text-muted-foreground">
-              Works with
-            </span>
-            {["Stripe", "GitHub", "Shopify", "Twilio", "Slack", "Linear"].map((name) => (
-              <span
-                key={name}
-                className="text-sm font-semibold text-muted-foreground"
-              >
-                {name}
+          {/* Social proof */}
+          <div className="mt-8 flex flex-wrap items-center gap-x-6 gap-y-3 text-sm text-muted-foreground">
+            {stars ? (
+              <span className="font-semibold">
+                <span className="text-foreground">{stars.toLocaleString()}</span> GitHub stars
               </span>
+            ) : null}
+            {stats && stats.total_webhooks > 0 ? (
+              <span className="font-semibold">
+                <span className="text-foreground">{stats.total_webhooks.toLocaleString()}</span> webhooks captured
+              </span>
+            ) : null}
+            {stats && stats.total_users > 0 ? (
+              <span className="font-semibold">
+                <span className="text-foreground">{stats.total_users.toLocaleString()}</span> developers
+              </span>
+            ) : null}
+            <span className="font-semibold">Open source</span>
+            {["Stripe", "GitHub", "Shopify", "Twilio", "Slack", "Linear"].map((name) => (
+              <span key={name} className="font-semibold">{name}</span>
             ))}
           </div>
 
