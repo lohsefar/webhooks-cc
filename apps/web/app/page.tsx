@@ -120,6 +120,28 @@ export default async function Home() {
                 CI with the SDK, or let your AI agent handle it with MCP.
               </p>
               <HeroCTA />
+
+              {/* Social proof — near the CTA for maximum impact */}
+              <div className="mt-6 flex flex-wrap items-center gap-x-5 gap-y-2 text-sm text-muted-foreground">
+                {stars ? (
+                  <span className="font-semibold">
+                    <span className="text-foreground">{stars.toLocaleString()}</span> GitHub stars
+                  </span>
+                ) : null}
+                {stats && stats.total_webhooks > 0 ? (
+                  <span className="font-semibold">
+                    <span className="text-foreground">{stats.total_webhooks.toLocaleString()}</span>{" "}
+                    webhooks captured
+                  </span>
+                ) : null}
+                {stats && stats.total_users > 0 ? (
+                  <span className="font-semibold">
+                    <span className="text-foreground">{stats.total_users.toLocaleString()}</span>{" "}
+                    developers
+                  </span>
+                ) : null}
+                <span className="font-semibold">Open source</span>
+              </div>
             </div>
 
             {/* GitHub — hidden on mobile to keep CTA above the fold */}
@@ -133,29 +155,6 @@ export default async function Home() {
 
           {/* Live preview */}
           <LivePreview />
-
-          {/* Social proof */}
-          <div className="mt-8 flex flex-wrap items-center gap-x-6 gap-y-3 text-sm text-muted-foreground">
-            {stars ? (
-              <span className="font-semibold">
-                <span className="text-foreground">{stars.toLocaleString()}</span> GitHub stars
-              </span>
-            ) : null}
-            {stats && stats.total_webhooks > 0 ? (
-              <span className="font-semibold">
-                <span className="text-foreground">{stats.total_webhooks.toLocaleString()}</span> webhooks captured
-              </span>
-            ) : null}
-            {stats && stats.total_users > 0 ? (
-              <span className="font-semibold">
-                <span className="text-foreground">{stats.total_users.toLocaleString()}</span> developers
-              </span>
-            ) : null}
-            <span className="font-semibold">Open source</span>
-            {["Stripe", "GitHub", "Shopify", "Twilio", "Slack", "Linear"].map((name) => (
-              <span key={name} className="font-semibold">{name}</span>
-            ))}
-          </div>
 
           {/* Code preview */}
           <div className="mt-6 neo-code overflow-x-auto">
