@@ -41,16 +41,24 @@ interface SiteStats {
   total_users: number;
 }
 
+// Untyped client for site_stats (not in generated Database type yet).
+// Cached at module scope so it's reused across renders.
+let _statsClient: ReturnType<typeof createClient> | null = null;
+function getStatsClient() {
+  if (_statsClient) return _statsClient;
+  const url = process.env.SUPABASE_URL;
+  const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  if (!url || !key) return null;
+  _statsClient = createClient(url, key, {
+    auth: { autoRefreshToken: false, persistSession: false },
+  });
+  return _statsClient;
+}
+
 async function getSiteStats(): Promise<SiteStats | null> {
   try {
-    const url = process.env.SUPABASE_URL;
-    const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
-    if (!url || !key) return null;
-
-    // Untyped client — site_stats isn't in the generated Database type yet
-    const supabase = createClient(url, key, {
-      auth: { autoRefreshToken: false, persistSession: false },
-    });
+    const supabase = getStatsClient();
+    if (!supabase) return null;
     const { data, error } = await supabase
       .from("site_stats")
       .select("total_webhooks, total_endpoints, total_users")
