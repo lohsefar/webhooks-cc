@@ -195,11 +195,13 @@ function LivePreviewInner() {
                 Create a free account and send actual Stripe, GitHub, and Shopify webhooks to your
                 own endpoint.
               </p>
-              <OAuthSignInButtons
-                redirectTo="/dashboard"
-                layout="horizontal"
-                buttonClassName="h-10 text-sm px-4 neo-btn-outline cursor-pointer"
-              />
+              <div className="flex justify-center">
+                <OAuthSignInButtons
+                  redirectTo="/dashboard"
+                  layout="horizontal"
+                  buttonClassName="h-10 text-sm px-4 neo-btn-outline cursor-pointer"
+                />
+              </div>
               <p className="text-sm text-muted-foreground">
                 or{" "}
                 <Link
