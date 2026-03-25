@@ -91,8 +91,8 @@ export default async function Home() {
                 Free forever &middot; No credit card
               </div>
               <h1 className="text-5xl md:text-7xl font-bold tracking-tight mb-6 leading-[1.1]">
-                Inspect webhooks{" "}
-                <span className="bg-primary text-primary-foreground px-2">instantly</span>
+                See every webhook{" "}
+                <span className="bg-primary text-primary-foreground px-2">as it arrives</span>
               </h1>
               <p className="text-xl md:text-2xl text-muted-foreground mb-8 max-w-2xl leading-relaxed">
                 Get a URL, send a webhook, see it arrive. Forward to localhost with the CLI, test in
@@ -101,12 +101,29 @@ export default async function Home() {
               <HeroCTA />
             </div>
 
-            {/* GitHub */}
-            <GitHubCard stars={stars} />
+            {/* GitHub — hidden on mobile to keep CTA above the fold */}
+            <div className="hidden lg:block">
+              <GitHubCard stars={stars} />
+            </div>
           </div>
 
           {/* Install */}
           <InstallCards />
+
+          {/* Provider logos */}
+          <div className="mt-8 flex flex-wrap items-center gap-x-6 gap-y-3">
+            <span className="text-xs font-bold uppercase tracking-wide text-muted-foreground">
+              Works with
+            </span>
+            {["Stripe", "GitHub", "Shopify", "Twilio", "Slack", "Linear"].map((name) => (
+              <span
+                key={name}
+                className="text-sm font-semibold text-muted-foreground"
+              >
+                {name}
+              </span>
+            ))}
+          </div>
 
           {/* Code preview */}
           <div className="mt-6 neo-code overflow-x-auto">
@@ -155,6 +172,43 @@ export default async function Home() {
         </div>
       </section>
 
+      {/* How it works */}
+      <section className="py-20 px-4 bg-muted">
+        <div className="max-w-6xl mx-auto">
+          <h2 className="text-3xl md:text-4xl font-bold mb-12">How it works</h2>
+          <div className="grid md:grid-cols-3 gap-8">
+            {[
+              {
+                step: "1",
+                title: "Get a URL",
+                description: "Create an endpoint in one click. You get a unique public URL.",
+              },
+              {
+                step: "2",
+                title: "Point your service",
+                description:
+                  "Configure Stripe, GitHub, or any service to send webhooks to your URL.",
+              },
+              {
+                step: "3",
+                title: "See what arrives",
+                description: "Headers, body, query params — live. Forward to localhost or assert in tests.",
+              },
+            ].map((item) => (
+              <div key={item.step} className="flex gap-4">
+                <div className="w-10 h-10 border-2 border-foreground bg-primary text-primary-foreground flex items-center justify-center font-bold text-lg shrink-0 shadow-neo-sm">
+                  {item.step}
+                </div>
+                <div>
+                  <h3 className="font-bold text-lg mb-1">{item.title}</h3>
+                  <p className="text-muted-foreground text-sm">{item.description}</p>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
       {/* Features */}
       <section className="py-20 px-4">
         <div className="max-w-6xl mx-auto">
@@ -170,10 +224,10 @@ export default async function Home() {
               <div className="w-12 h-12 border-2 border-foreground bg-primary flex items-center justify-center mb-4 shadow-neo-sm">
                 <Eye className="h-6 w-6 text-primary-foreground" />
               </div>
-              <h3 className="font-bold text-xl mb-2">Capture & inspect</h3>
+              <h3 className="font-bold text-xl mb-2">See requests the moment they arrive</h3>
               <p className="text-muted-foreground">
-                See requests the moment they arrive. Headers, body, query params — formatted and
-                searchable. Export as JSON or CSV.
+                Headers, body, query params — formatted, searchable, and exportable as JSON or CSV.
+                Live updates, no refresh needed.
               </p>
             </div>
 
@@ -181,10 +235,10 @@ export default async function Home() {
               <div className="w-12 h-12 border-2 border-foreground bg-secondary flex items-center justify-center mb-4 shadow-neo-sm">
                 <Zap className="h-6 w-6 text-secondary-foreground" />
               </div>
-              <h3 className="font-bold text-xl mb-2">Send signed templates</h3>
+              <h3 className="font-bold text-xl mb-2">Test Stripe, GitHub, and Shopify webhooks</h3>
               <p className="text-muted-foreground">
-                Send realistic Stripe, GitHub, Shopify, and Twilio webhooks from the dashboard.
-                Signature headers are generated for each provider.
+                Send signed provider templates from the dashboard. Realistic payloads with correct
+                signature headers — test your verification code end-to-end.
               </p>
             </div>
 
@@ -192,11 +246,11 @@ export default async function Home() {
               <div className="w-12 h-12 border-2 border-foreground bg-accent flex items-center justify-center mb-4 shadow-neo-sm">
                 <Terminal className="h-6 w-6 text-accent-foreground" />
               </div>
-              <h3 className="font-bold text-xl mb-2">CLI & TypeScript SDK</h3>
+              <h3 className="font-bold text-xl mb-2">Forward to localhost. Assert in CI.</h3>
               <p className="text-muted-foreground">
-                Forward webhooks to localhost with{" "}
-                <code className="font-mono font-bold">whk tunnel</code>. Write test assertions with
-                composable matchers. Run in CI with GitHub Actions.
+                <code className="font-mono font-bold">whk tunnel</code> forwards webhooks to your
+                local port. The TypeScript SDK waits for events and asserts payload shape in your test
+                suite.
               </p>
             </div>
 
@@ -204,10 +258,10 @@ export default async function Home() {
               <div className="w-12 h-12 border-2 border-foreground bg-foreground flex items-center justify-center mb-4 shadow-neo-sm">
                 <Bot className="h-6 w-6 text-background" />
               </div>
-              <h3 className="font-bold text-xl mb-2">MCP server for AI agents</h3>
+              <h3 className="font-bold text-xl mb-2">Let your AI agent debug webhooks</h3>
               <p className="text-muted-foreground">
-                Connect Claude Code, Cursor, VS Code, or Codex. Your AI agent creates endpoints,
-                sends test webhooks, and replays requests — in natural language.
+                Connect Claude Code, Cursor, VS Code, or Codex via MCP. Your agent creates endpoints,
+                sends tests, and inspects requests — through natural language.
               </p>
             </div>
           </div>
