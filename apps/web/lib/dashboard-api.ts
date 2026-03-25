@@ -105,6 +105,22 @@ export async function createDashboardEndpoint(
   return readJson<DashboardEndpoint>(response);
 }
 
+export async function claimGuestEndpointForUser(
+  accessToken: string,
+  slug: string
+): Promise<DashboardEndpoint | null> {
+  const response = await fetch(
+    "/api/endpoints/claim",
+    withAuthHeaders(accessToken, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ slug }),
+    })
+  );
+  if (!response.ok) return null;
+  return readJson<DashboardEndpoint>(response);
+}
+
 export async function updateDashboardEndpoint(
   accessToken: string,
   slug: string,

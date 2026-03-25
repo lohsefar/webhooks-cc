@@ -252,6 +252,36 @@ export async function createGuestEndpoint(): Promise<EndpointRecord> {
   });
 }
 
+/**
+ * Claim an ephemeral guest endpoint for an authenticated user.
+ * Assigns the user_id, clears the ephemeral flag, and removes the expiry.
+ * Returns the updated endpoint, or null if the slug doesn't exist or isn't ephemeral.
+ */
+export async function claimGuestEndpoint(
+  userId: string,
+  slug: string
+): Promise<EndpointRecord | null> {
+  const admin = createAdminClient();
+
+  // Only claim endpoints that are ephemeral and have no owner
+  const { data, error } = await admin
+    .from("endpoints")
+    .update({
+      user_id: userId,
+      is_ephemeral: false,
+      expires_at: null,
+    })
+    .eq("slug", slug)
+    .is("user_id", null)
+    .eq("is_ephemeral", true)
+    .select("id, user_id, slug, name, mock_response, is_ephemeral, expires_at, created_at")
+    .returns<SelectedEndpointRow>()
+    .maybeSingle();
+
+  if (error || !data) return null;
+  return normalizeEndpoint(data);
+}
+
 export async function updateEndpointBySlugForUser({
   userId,
   slug,

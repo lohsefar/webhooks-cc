@@ -22,6 +22,8 @@ import {
   fetchDashboardSearch,
   fetchDashboardSearchCount,
   subscribeDashboardEndpointsChanged,
+  createDashboardEndpoint,
+  claimGuestEndpointForUser,
   type DashboardEndpoint,
 } from "@/lib/dashboard-api";
 import { buildRetainedCountParams, computeShowHasMore } from "@/lib/dashboard-count";
@@ -84,8 +86,27 @@ export default function DashboardPage() {
     return () => clearTimeout(searchDebounceRef.current);
   }, [searchInput]);
 
+  const guestClaimAttempted = useRef(false);
+
   const loadEndpoints = useCallback(async () => {
     if (!accessToken) return;
+
+    // On first load, try to claim a guest endpoint from /go
+    if (!guestClaimAttempted.current) {
+      guestClaimAttempted.current = true;
+      try {
+        const stored = localStorage.getItem("demo_endpoint");
+        if (stored) {
+          const parsed = JSON.parse(stored) as { slug?: string };
+          if (parsed.slug) {
+            await claimGuestEndpointForUser(accessToken, parsed.slug);
+          }
+          localStorage.removeItem("demo_endpoint");
+        }
+      } catch {
+        // Claim is best-effort — proceed with normal load
+      }
+    }
 
     try {
       const nextEndpoints = await fetchDashboardEndpoints(accessToken);
@@ -545,7 +566,7 @@ export default function DashboardPage() {
   }
 
   if (endpoints.length === 0) {
-    return <EmptyEndpoints />;
+    return <AutoCreateEndpoint accessToken={accessToken} onCreated={loadEndpoints} />;
   }
 
   if (!currentEndpoint) return null;
@@ -887,19 +908,51 @@ function WaitingForRequests({ slug }: { slug: string }) {
   );
 }
 
-function EmptyEndpoints() {
+function AutoCreateEndpoint({
+  accessToken,
+  onCreated,
+}: {
+  accessToken: string | null;
+  onCreated: () => Promise<void>;
+}) {
+  const [error, setError] = useState<string | null>(null);
+  const attempted = useRef(false);
+
+  useEffect(() => {
+    if (!accessToken || attempted.current) return;
+    attempted.current = true;
+
+    createDashboardEndpoint(accessToken, {})
+      .then(() => onCreated())
+      .catch(() => setError("Could not create your first endpoint."));
+  }, [accessToken, onCreated]);
+
+  if (error) {
+    return (
+      <div className="flex-1 flex items-center justify-center p-8">
+        <div className="text-center space-y-4">
+          <div className="w-16 h-16 border-2 border-foreground bg-muted flex items-center justify-center mx-auto mb-2">
+            <Send className="h-8 w-8 text-muted-foreground" />
+          </div>
+          <h2 className="text-xl font-bold uppercase tracking-wide">No endpoints yet</h2>
+          <p className="text-muted-foreground max-w-sm">{error}</p>
+          <button
+            onClick={() => {
+              attempted.current = false;
+              setError(null);
+            }}
+            className="neo-btn-primary"
+          >
+            Try again
+          </button>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="flex-1 flex items-center justify-center p-8">
-      <div className="text-center space-y-4">
-        <div className="w-16 h-16 border-2 border-foreground bg-muted flex items-center justify-center mx-auto mb-2">
-          <Send className="h-8 w-8 text-muted-foreground" />
-        </div>
-        <h2 className="text-xl font-bold uppercase tracking-wide">No endpoints yet</h2>
-        <p className="text-muted-foreground max-w-sm">
-          Create your first endpoint to start capturing webhooks. Click{" "}
-          <span className="font-bold text-foreground">&quot;New Endpoint&quot;</span> above.
-        </p>
-      </div>
+      <p className="text-muted-foreground animate-pulse">Setting up your first endpoint...</p>
     </div>
   );
 }
