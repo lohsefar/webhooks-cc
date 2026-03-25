@@ -1,7 +1,10 @@
 "use client";
 
 import { useState, useCallback, useRef } from "react";
+import Link from "next/link";
 import { Send, ArrowRight } from "lucide-react";
+import { OAuthSignInButtons } from "@/components/auth/oauth-signin-buttons";
+import { SupabaseAuthProvider, useAuth } from "@/components/providers/supabase-auth-provider";
 
 const MOCK_SLUG = "abc123";
 const MOCK_URL = `https://go.webhooks.cc/w/${MOCK_SLUG}`;
@@ -61,9 +64,19 @@ const MOCK_REQUESTS: MockRequest[] = [
 ];
 
 export function LivePreview() {
+  return (
+    <SupabaseAuthProvider>
+      <LivePreviewInner />
+    </SupabaseAuthProvider>
+  );
+}
+
+function LivePreviewInner() {
+  const { isAuthenticated } = useAuth();
   const [requests, setRequests] = useState<MockRequest[]>([]);
   const [selected, setSelected] = useState<MockRequest | null>(null);
   const [sending, setSending] = useState(false);
+  const [showOverlay, setShowOverlay] = useState(false);
   const nextIndex = useRef(0);
 
   const handleSend = useCallback(() => {
@@ -77,8 +90,12 @@ export function LivePreview() {
       setSelected(newReq);
       nextIndex.current++;
       setSending(false);
+
+      if (nextIndex.current >= 2 && !isAuthenticated) {
+        setShowOverlay(true);
+      }
     }, 300);
-  }, [sending]);
+  }, [sending, isAuthenticated]);
 
   return (
     <div className="mt-10 space-y-4">
@@ -96,7 +113,7 @@ export function LivePreview() {
         </button>
       </div>
 
-      <div className="neo-card neo-card-static p-0! overflow-hidden">
+      <div className="neo-card neo-card-static p-0! overflow-hidden relative">
         {/* URL bar */}
         <div className="bg-card px-4 py-2 border-b-2 border-foreground flex items-center gap-3">
           <span className="text-xs font-bold uppercase tracking-wide text-muted-foreground shrink-0">
@@ -168,6 +185,40 @@ export function LivePreview() {
             )}
           </div>
         </div>
+
+        {/* Signup overlay — appears after 2nd send for unauthenticated users */}
+        {showOverlay && (
+          <div className="absolute inset-0 bg-background/90 backdrop-blur-sm flex items-center justify-center z-10">
+            <div className="text-center space-y-4 max-w-sm px-6">
+              <p className="font-bold text-lg">Try it with real webhooks</p>
+              <p className="text-sm text-muted-foreground">
+                Create a free account and send actual Stripe, GitHub, and Shopify webhooks to your
+                own endpoint.
+              </p>
+              <OAuthSignInButtons
+                redirectTo="/dashboard"
+                layout="horizontal"
+                buttonClassName="h-10 text-sm px-4 neo-btn-outline cursor-pointer"
+              />
+              <p className="text-sm text-muted-foreground">
+                or{" "}
+                <Link
+                  href="/go"
+                  className="text-foreground font-bold hover:text-primary transition-colors"
+                >
+                  try without an account
+                  <ArrowRight className="inline-block ml-1 h-3.5 w-3.5" />
+                </Link>
+              </p>
+              <button
+                onClick={() => setShowOverlay(false)}
+                className="text-xs text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
+              >
+                Dismiss
+              </button>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );
