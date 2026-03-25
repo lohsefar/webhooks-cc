@@ -33,6 +33,26 @@ const EXPIRY_MS = 12 * 60 * 60 * 1000;
 const COPY_FEEDBACK_MS = 2000;
 const SEND_FEEDBACK_MS = 3000;
 const DEMO_ENDPOINT_STORAGE_KEY = "demo_endpoint";
+const PROVIDER_PAYLOADS: Record<string, Record<string, unknown>> = {
+  stripe: {
+    id: "evt_1Example",
+    type: "checkout.session.completed",
+    data: {
+      object: { id: "cs_test_123", amount_total: 4999, currency: "usd", status: "complete" },
+    },
+  },
+  github: {
+    action: "opened",
+    pull_request: { number: 42, title: "Add webhook handler", user: { login: "octocat" } },
+  },
+  shopify: {
+    topic: "orders/create",
+    id: "820982911946154508",
+    total_price: "59.99",
+    currency: "USD",
+    line_items: [{ title: "Widget", quantity: 2, price: "29.99" }],
+  },
+};
 
 const RequestList = dynamic(
   () => import("@/components/dashboard/request-list").then((module) => module.RequestList),
@@ -973,31 +993,7 @@ function DemoWaitingState({ url }: { url: string }) {
 
   const handleSendProvider = useCallback(
     (provider: string) => {
-      const payloads: Record<string, Record<string, unknown>> = {
-        stripe: {
-          id: "evt_1Example",
-          type: "checkout.session.completed",
-          data: {
-            object: { id: "cs_test_123", amount_total: 4999, currency: "usd", status: "complete" },
-          },
-        },
-        github: {
-          action: "opened",
-          pull_request: {
-            number: 42,
-            title: "Add webhook handler",
-            user: { login: "octocat" },
-          },
-        },
-        shopify: {
-          topic: "orders/create",
-          id: "820982911946154508",
-          total_price: "59.99",
-          currency: "USD",
-          line_items: [{ title: "Widget", quantity: 2, price: "29.99" }],
-        },
-      };
-      void sendPayload(provider, payloads[provider] ?? { provider, event: "test" });
+      void sendPayload(provider, PROVIDER_PAYLOADS[provider] ?? { provider, event: "test" });
     },
     [sendPayload]
   );

@@ -25,15 +25,15 @@ export function GettingStarted({ hasReceivedWebhook }: { hasReceivedWebhook: boo
   const [visited, setVisited] = useState<Set<string>>(new Set());
 
   useEffect(() => {
-    const stored = localStorage.getItem(STORAGE_KEY);
-    if (stored === "true") return;
-    setDismissed(false);
-
     try {
+      const stored = localStorage.getItem(STORAGE_KEY);
+      if (stored === "true") return;
+      setDismissed(false);
+
       const v = localStorage.getItem("getting_started_visited");
       if (v) setVisited(new Set(JSON.parse(v) as string[]));
     } catch {
-      // ignore
+      // localStorage unavailable (incognito/disabled) — stay dismissed
     }
   }, []);
 
@@ -50,19 +50,20 @@ export function GettingStarted({ hasReceivedWebhook }: { hasReceivedWebhook: boo
     });
   };
 
-  if (dismissed) return null;
-
-  const completed = ITEMS.filter(
+  const progress = ITEMS.filter(
     (item) => (item.id === "webhook" && hasReceivedWebhook) || visited.has(item.id)
-  );
-  const progress = completed.length;
+  ).length;
   const total = ITEMS.length;
 
-  // Auto-dismiss when all done
-  if (progress >= total) {
-    localStorage.setItem(STORAGE_KEY, "true");
-    return null;
-  }
+  // Auto-dismiss when all items complete
+  useEffect(() => {
+    if (!dismissed && progress >= total) {
+      setDismissed(true);
+      localStorage.setItem(STORAGE_KEY, "true");
+    }
+  }, [dismissed, progress, total]);
+
+  if (dismissed) return null;
 
   return (
     <div className="border-b-2 border-foreground bg-card px-4 py-3 shrink-0">

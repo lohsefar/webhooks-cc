@@ -929,6 +929,11 @@ function AutoCreateEndpoint({
       .catch(() => setError("Could not create your first endpoint."));
   }, [accessToken, onCreated]);
 
+  const handleRetry = useCallback(() => {
+    attempted.current = false;
+    setError(null);
+  }, []);
+
   if (error) {
     return (
       <div className="flex-1 flex items-center justify-center p-8">
@@ -938,13 +943,7 @@ function AutoCreateEndpoint({
           </div>
           <h2 className="text-xl font-bold uppercase tracking-wide">No endpoints yet</h2>
           <p className="text-muted-foreground max-w-sm">{error}</p>
-          <button
-            onClick={() => {
-              attempted.current = false;
-              setError(null);
-            }}
-            className="neo-btn-primary"
-          >
+          <button onClick={handleRetry} className="neo-btn-primary">
             Try again
           </button>
         </div>
