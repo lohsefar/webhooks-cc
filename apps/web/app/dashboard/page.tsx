@@ -66,14 +66,15 @@ export default function DashboardPage() {
   const [shortcutsOpen, setShortcutsOpen] = useState(false);
   const searchInputRef = useRef<HTMLInputElement>(null);
 
-  // Tab state from URL
+  // Tab state from URL — read searchParams for deriving current tab,
+  // but write via window.location.search to avoid subscribing to the object (rerender-defer-reads).
   const router = useRouter();
   const pathname = usePathname();
   const tabParam = searchParams.get("tab") as Tab | null;
   const activeTab: Tab = tabParam && TABS.includes(tabParam) ? tabParam : "body";
   const setActiveTab = useCallback(
     (tab: Tab) => {
-      const params = new URLSearchParams(searchParams.toString());
+      const params = new URLSearchParams(window.location.search);
       if (tab === "body") {
         params.delete("tab");
       } else {
@@ -82,7 +83,7 @@ export default function DashboardPage() {
       const qs = params.toString();
       router.replace(`${pathname}${qs ? `?${qs}` : ""}`, { scroll: false });
     },
-    [searchParams, router, pathname]
+    [router, pathname]
   );
 
   // Retained request history state
@@ -595,7 +596,18 @@ export default function DashboardPage() {
     }
   }, [currentEndpoint, methodFilter, debouncedSearch, fetchFromClickHouse]);
 
-  // Keyboard shortcuts
+  // Keyboard shortcuts — use refs for frequently-changing values so the
+  // listener doesn't re-register on every state change (rerender-dependencies).
+  const displayedItemsRef = useRef(displayedItems);
+  displayedItemsRef.current = displayedItems;
+  const selectedIdRef = useRef(selectedId);
+  selectedIdRef.current = selectedId;
+  const displayRequestRef = useRef(displayRequest);
+  displayRequestRef.current = displayRequest;
+
+  // Ref for cURL button (avoids DOM scraping in keyboard handler)
+  const curlBtnRef = useRef<HTMLButtonElement>(null);
+
   useEffect(() => {
     function handleKeyDown(e: KeyboardEvent) {
       const tag = (e.target as HTMLElement)?.tagName;
@@ -627,9 +639,10 @@ export default function DashboardPage() {
         case "j":
         case "k": {
           e.preventDefault();
-          if (displayedItems.length === 0) break;
-          const ids = displayedItems.map((item) => ("_id" in item ? item._id : item.id));
-          const currentIndex = selectedId ? ids.indexOf(selectedId) : -1;
+          const items = displayedItemsRef.current;
+          if (items.length === 0) break;
+          const ids = items.map((item) => ("_id" in item ? item._id : item.id));
+          const currentIndex = selectedIdRef.current ? ids.indexOf(selectedIdRef.current) : -1;
           const nextIndex =
             e.key === "j"
               ? Math.min(currentIndex + 1, ids.length - 1)
@@ -647,26 +660,20 @@ export default function DashboardPage() {
           break;
         }
         case "c":
-          if (displayRequest) {
+          if (displayRequestRef.current) {
             e.preventDefault();
-            document.querySelectorAll("button").forEach((btn) => {
-              if (btn.textContent?.includes("cURL")) btn.click();
-            });
+            curlBtnRef.current?.click();
           }
           break;
         case "r":
-          if (displayRequest) {
+          if (displayRequestRef.current) {
             e.preventDefault();
-            document.querySelectorAll("button").forEach((btn) => {
-              if (btn.textContent?.trim() === "Replay") btn.click();
-            });
+            document.querySelector<HTMLButtonElement>('[data-shortcut="replay"]')?.click();
           }
           break;
         case "n":
           e.preventDefault();
-          document.querySelectorAll("button").forEach((btn) => {
-            if (btn.textContent?.trim() === "New" || btn.getAttribute("aria-label")?.includes("new endpoint")) btn.click();
-          });
+          document.querySelector<HTMLButtonElement>('[data-shortcut="new-endpoint"]')?.click();
           break;
         case "l":
           e.preventDefault();
@@ -677,7 +684,7 @@ export default function DashboardPage() {
 
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [displayedItems, selectedId, handleSelect, handleToggleLiveMode, setActiveTab, displayRequest]);
+  }, [handleSelect, handleToggleLiveMode, setActiveTab]);
 
   if (authLoading || endpoints === undefined) {
     return <DashboardSkeleton />;
@@ -755,12 +762,10 @@ export default function DashboardPage() {
                     request={displayRequest}
                     activeTab={activeTab}
                     onTabChange={setActiveTab}
+                    curlBtnRef={curlBtnRef}
                   />
                 ) : (
-                  <RequestDetailEmpty
-                    slug={currentEndpoint.slug}
-                    endpointName={currentEndpoint.name || currentEndpoint.slug}
-                  />
+                  <RequestDetailEmpty slug={currentEndpoint.slug} />
                 )}
               </ErrorBoundary>
             </div>

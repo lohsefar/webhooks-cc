@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef, useEffect, useCallback } from "react";
+import { useState, useRef, useEffect, useCallback, useMemo } from "react";
 import { cn } from "@/lib/utils";
 import { Copy, Check, ChevronDown, Send, Settings, Link as LinkIcon } from "lucide-react";
 import { ReplayDialog } from "./replay-dialog";
@@ -24,6 +24,8 @@ interface RequestDetailProps {
   activeTab?: Tab;
   /** Callback when tab changes. */
   onTabChange?: (tab: Tab) => void;
+  /** Ref forwarded to the cURL copy button (for keyboard shortcuts). */
+  curlBtnRef?: React.RefObject<HTMLButtonElement | null>;
 }
 
 /**
@@ -89,7 +91,7 @@ function generateCurlCommand(request: DisplayableRequest): string {
 export type Tab = "body" | "headers" | "query" | "raw";
 export const TABS: Tab[] = ["body", "headers", "query", "raw"];
 
-export function RequestDetail({ request, activeTab, onTabChange }: RequestDetailProps) {
+export function RequestDetail({ request, activeTab, onTabChange, curlBtnRef }: RequestDetailProps) {
   const [internalTab, setInternalTab] = useState<Tab>("body");
   const tab = activeTab ?? internalTab;
   const setTab = onTabChange ?? setInternalTab;
@@ -122,14 +124,22 @@ export function RequestDetail({ request, activeTab, onTabChange }: RequestDetail
     }
   }, []);
 
-  const curlCommand = generateCurlCommand(request);
+  const curlCommand = useMemo(() => generateCurlCommand(request), [request]);
   const fullTime = new Date(request.receivedAt).toLocaleString();
   const bodyFormat = detectFormat(request.contentType, request.body);
-  const formattedBody = request.body ? formatBody(request.body, bodyFormat) : "(empty body)";
-  const highlightedBody = highlightBody(formattedBody, bodyFormat);
+  const formattedBody = useMemo(
+    () => (request.body ? formatBody(request.body, bodyFormat) : "(empty body)"),
+    [request.body, bodyFormat]
+  );
+  const highlightedBody = useMemo(
+    () => highlightBody(formattedBody, bodyFormat),
+    [formattedBody, bodyFormat]
+  );
   const highlightLanguage = getHighlightLanguage(bodyFormat);
-  const isJsonBody = bodyFormat === "json" && !!request.body;
-  const tsInterface = isJsonBody ? jsonToTypeScript(request.body!) : null;
+  const tsInterface = useMemo(
+    () => (bodyFormat === "json" && request.body ? jsonToTypeScript(request.body) : null),
+    [request.body, bodyFormat]
+  );
 
   return (
     <div className="flex flex-col h-full">
@@ -148,6 +158,7 @@ export function RequestDetail({ request, activeTab, onTabChange }: RequestDetail
           </div>
           <div className="flex items-center gap-2 shrink-0">
             <button
+              ref={curlBtnRef}
               onClick={() => handleCopy(curlCommand, "curl")}
               className="neo-btn-outline py-1.5! px-3! text-xs flex items-center gap-1.5"
             >
@@ -336,19 +347,22 @@ function BodyCopyDropdown({
     };
   }, [open]);
 
-  const csvBody = jsonToCsvValue(body);
+  const csvBody = useMemo(() => jsonToCsvValue(body), [body]);
   const isCopied = copied === "body" || copied === "body-formatted" || copied === "ts" || copied === "csv";
 
-  const options: { key: string; label: string; value: string }[] = [
-    { key: "body", label: "Raw body", value: body },
-    { key: "body-formatted", label: "Formatted", value: formattedBody },
-  ];
-  if (tsInterface) {
-    options.push({ key: "ts", label: "TypeScript interface", value: tsInterface });
-  }
-  if (csvBody) {
-    options.push({ key: "csv", label: "CSV", value: csvBody });
-  }
+  const options = useMemo(() => {
+    const opts: { key: string; label: string; value: string }[] = [
+      { key: "body", label: "Raw body", value: body },
+      { key: "body-formatted", label: "Formatted", value: formattedBody },
+    ];
+    if (tsInterface) {
+      opts.push({ key: "ts", label: "TypeScript interface", value: tsInterface });
+    }
+    if (csvBody) {
+      opts.push({ key: "csv", label: "CSV", value: csvBody });
+    }
+    return opts;
+  }, [body, formattedBody, tsInterface, csvBody]);
 
   return (
     <div className="absolute top-0 right-0" ref={ref}>
@@ -385,7 +399,6 @@ function BodyCopyDropdown({
 
 interface RequestDetailEmptyProps {
   slug?: string;
-  endpointName?: string;
   onSendTest?: () => void;
   onOpenSettings?: () => void;
 }
