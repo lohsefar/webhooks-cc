@@ -5,7 +5,15 @@ section: dashboard
 order: 5
 lastUpdated: 2026-03-26
 schema: none
-keywords: ["dashboard", "keyboard shortcuts", "pin requests", "compare requests", "timeline", "webhook inspector"]
+keywords:
+  [
+    "dashboard",
+    "keyboard shortcuts",
+    "pin requests",
+    "compare requests",
+    "timeline",
+    "webhook inspector",
+  ]
 seo:
   ogTitle: "Dashboard Features Guide — webhooks.cc"
   ogDescription: "Master every dashboard feature: keyboard shortcuts, request pinning, notes, side-by-side comparison, timeline visualization, and resizable split pane."
@@ -14,24 +22,25 @@ seo:
 The dashboard packs a lot of power into a simple split-pane layout. This page covers every feature beyond the basics covered in [Requests](/docs/requests) and [Endpoints](/docs/endpoints).
 
 <Callout type="tip">
-  Click the **Guide** button in the dashboard URL bar for an interactive reference you can use without leaving the dashboard.
+  Click the **Guide** button in the dashboard URL bar for an interactive reference you can use
+  without leaving the dashboard.
 </Callout>
 
 ## Keyboard shortcuts
 
 Navigate the entire dashboard without touching the mouse. Press **?** to see the full list at any time.
 
-| Key | Action |
-|-----|--------|
-| `j` / `k` | Move down / up in the request list |
-| `1` `2` `3` `4` | Switch to Body / Headers / Query / Raw tab |
-| `c` | Copy cURL command for the selected request |
-| `r` | Open the replay dialog |
-| `n` | Create a new endpoint |
-| `/` | Focus the search input |
-| `l` | Toggle live / paused mode |
-| `[` | Collapse or expand the sidebar |
-| `Esc` | Close any dialog, exit compare mode, or blur the search input |
+| Key             | Action                                                        |
+| --------------- | ------------------------------------------------------------- |
+| `j` / `k`       | Move down / up in the request list                            |
+| `1` `2` `3` `4` | Switch to Body / Headers / Query / Raw tab                    |
+| `c`             | Copy cURL command for the selected request                    |
+| `r`             | Open the replay dialog                                        |
+| `n`             | Create a new endpoint                                         |
+| `/`             | Focus the search input                                        |
+| `l`             | Toggle live / paused mode                                     |
+| `[`             | Collapse or expand the sidebar                                |
+| `Esc`           | Close any dialog, exit compare mode, or blur the search input |
 
 Shortcuts are disabled when you're typing in an input field, and modifier keys (Ctrl, Cmd, Alt) are never intercepted so browser shortcuts work normally.
 
@@ -60,8 +69,12 @@ Attach a short note (up to 280 characters) to any request.
 
 <Steps>
   <Step title="Select a request">Click a request in the list to view its details.</Step>
-  <Step title="Add a note">Click **Add note...** below the request detail header. Type your note and press Enter.</Step>
-  <Step title="Find annotated requests">Requests with notes show a sticky note icon in the list.</Step>
+  <Step title="Add a note">
+    Click **Add note...** below the request detail header. Type your note and press Enter.
+  </Step>
+  <Step title="Find annotated requests">
+    Requests with notes show a sticky note icon in the list.
+  </Step>
 </Steps>
 
 - Click an existing note to edit it
@@ -75,10 +88,12 @@ Attach a short note (up to 280 characters) to any request.
 Compare two requests side by side to spot differences in headers, body, and query parameters.
 
 **To start a comparison:**
+
 1. Select a request normally (click it)
 2. **Shift-click** a second request, or right-click and choose **Compare with selected**
 
 **The diff view shows:**
+
 - **Method & path** differences (if any)
 - **Headers** — added (green), removed (red), changed (yellow), unchanged (gray)
 - **Body** — structural JSON diff when both bodies are valid JSON, or a plain text diff otherwise
@@ -117,24 +132,30 @@ Minimum width is 240px, maximum is 50% of the viewport. On mobile, the list and 
 Multiple ways to get request data out of the dashboard.
 
 ### cURL command
+
 Click the **cURL** button (or press `c`) to copy a shell command that reproduces the selected request. Headers, method, body, and query parameters are included.
 
 ### Copy dropdown
+
 In the **Body** tab, the **Copy** dropdown offers:
+
 - **Raw body** — the original body text
 - **Formatted** — prettified JSON, XML, etc.
 - **TypeScript interface** — a generated TypeScript type from the JSON structure (JSON bodies only)
 - **CSV** — the body as CSV (JSON objects/arrays only)
 
 ### Export
+
 The **Export** dropdown in the URL bar lets you download all visible requests as JSON or CSV.
 
 ## Replay & send
 
 ### Replay
+
 Click **Replay** (or press `r`) to send the captured request to any URL. The request is sent from your browser with the original method, headers, and body. Supports localhost URLs for local development.
 
 ### Send test webhook
+
 Click **Send** in the URL bar to fire a test webhook at your endpoint. Choose from provider templates (Stripe, GitHub, Shopify, Twilio, Slack, and more) with realistic payloads and mock signatures.
 
 ## Endpoint settings
