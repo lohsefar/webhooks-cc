@@ -11,6 +11,8 @@ import { createPageMetadata } from "@/lib/seo";
 import { JsonLd, softwareApplicationSchema, faqSchema, type FAQItem } from "@/lib/schemas";
 import { createClient } from "@supabase/supabase-js";
 
+export const revalidate = 600; // re-render landing page every 10 min to pick up fresh site_stats
+
 export const metadata = createPageMetadata({
   title: "Webhook Testing Platform: CLI, SDK & MCP",
   description:
