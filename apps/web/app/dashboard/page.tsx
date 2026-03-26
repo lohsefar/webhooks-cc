@@ -155,14 +155,11 @@ export default function DashboardPage() {
   useEffect(() => {
     if (!compareId) return;
     function handleEscape(e: KeyboardEvent) {
-      if (e.key === "Escape") {
-        setCompareId(null);
-        setCompareRequest(null);
-      }
+      if (e.key === "Escape") exitCompare();
     }
     window.addEventListener("keydown", handleEscape);
     return () => window.removeEventListener("keydown", handleEscape);
-  }, [compareId]);
+  }, [compareId, exitCompare]);
 
   // View mode (list vs timeline)
   const [viewMode, setViewMode] = useState<"list" | "timeline">("list");

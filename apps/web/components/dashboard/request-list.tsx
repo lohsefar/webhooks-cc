@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState, useEffect, useCallback } from "react";
+import { useRef, useState, useEffect, useCallback, useMemo } from "react";
 import { cn } from "@/lib/utils";
 import {
   Circle,
@@ -124,21 +124,19 @@ export function RequestList({
   }, []);
 
   // Pin/unpin split
-  const { pinned, unpinned } = (() => {
+  const { pinned, unpinned } = useMemo(() => {
+    const sorted = sortNewest ? requests : [...requests].reverse();
     if (!pinnedIds || pinnedIds.size === 0) {
-      const sorted = sortNewest ? requests : [...requests].reverse();
       return { pinned: [] as AnyRequestSummary[], unpinned: sorted };
     }
-    const sorted = sortNewest ? requests : [...requests].reverse();
     const p: AnyRequestSummary[] = [];
     const u: AnyRequestSummary[] = [];
     for (const r of sorted) {
-      const id = getItemId(r);
-      if (pinnedIds.has(id)) p.push(r);
+      if (pinnedIds.has(getItemId(r))) p.push(r);
       else u.push(r);
     }
     return { pinned: p, unpinned: u };
-  })();
+  }, [requests, sortNewest, pinnedIds]);
 
   // Shift-click compare
   const handleRowClick = useCallback(
@@ -171,7 +169,7 @@ export function RequestList({
     return () => clearInterval(interval);
   }, [relativeTime]);
 
-  const toggleTimestampMode = () => {
+  const toggleTimestampMode = useCallback(() => {
     setRelativeTime((prev) => {
       const next = !prev;
       try {
@@ -181,7 +179,7 @@ export function RequestList({
       }
       return next;
     });
-  };
+  }, []);
 
   const renderTimestamp = (ts: number) =>
     relativeTime ? formatRelativeTimestamp(ts) : formatTimestamp(ts);
