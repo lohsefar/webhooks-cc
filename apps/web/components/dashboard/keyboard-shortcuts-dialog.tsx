@@ -33,6 +33,7 @@ const SHORTCUT_GROUPS: { title: string; shortcuts: ShortcutDef[] }[] = [
       { key: "r", label: "Open replay dialog" },
       { key: "n", label: "New endpoint" },
       { key: "l", label: "Toggle live / paused" },
+      { key: "[", label: "Toggle sidebar" },
       { key: "?", label: "Show keyboard shortcuts" },
     ],
   },

@@ -67,6 +67,75 @@ export default function DashboardPage() {
   const [searchInput, setSearchInput] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
 
+  // Resizable split pane
+  const PANE_MIN = 240;
+  const PANE_DEFAULT = 320;
+  const [paneWidth, setPaneWidth] = useState(() => {
+    if (typeof window === "undefined") return PANE_DEFAULT;
+    try {
+      const stored = localStorage.getItem("dashboard_pane_width");
+      if (stored === "collapsed") return 0;
+      const val = stored ? parseInt(stored, 10) : PANE_DEFAULT;
+      return val >= PANE_MIN ? val : PANE_DEFAULT;
+    } catch {
+      return PANE_DEFAULT;
+    }
+  });
+  const isDragging = useRef(false);
+  const paneCollapsed = paneWidth === 0;
+
+  const handleDragStart = useCallback(
+    (e: React.MouseEvent) => {
+      if (paneCollapsed) return;
+      e.preventDefault();
+      isDragging.current = true;
+      const startX = e.clientX;
+      const startWidth = paneWidth;
+
+      const onMouseMove = (ev: MouseEvent) => {
+        if (!isDragging.current) return;
+        const maxWidth = Math.floor(window.innerWidth * 0.5);
+        const newWidth = Math.max(PANE_MIN, Math.min(maxWidth, startWidth + (ev.clientX - startX)));
+        setPaneWidth(newWidth);
+      };
+
+      const onMouseUp = () => {
+        isDragging.current = false;
+        document.removeEventListener("mousemove", onMouseMove);
+        document.removeEventListener("mouseup", onMouseUp);
+        document.body.style.cursor = "";
+        document.body.style.userSelect = "";
+        // Persist after drag ends
+        setPaneWidth((w) => {
+          try {
+            localStorage.setItem("dashboard_pane_width", String(w));
+          } catch {
+            /* noop */
+          }
+          return w;
+        });
+      };
+
+      document.body.style.cursor = "col-resize";
+      document.body.style.userSelect = "none";
+      document.addEventListener("mousemove", onMouseMove);
+      document.addEventListener("mouseup", onMouseUp);
+    },
+    [paneWidth, paneCollapsed]
+  );
+
+  const toggleCollapse = useCallback(() => {
+    setPaneWidth((prev) => {
+      const next = prev === 0 ? PANE_DEFAULT : 0;
+      try {
+        localStorage.setItem("dashboard_pane_width", next === 0 ? "collapsed" : String(next));
+      } catch {
+        /* noop */
+      }
+      return next;
+    });
+  }, []);
+
   // Keyboard shortcuts dialog
   const [shortcutsOpen, setShortcutsOpen] = useState(false);
   const searchInputRef = useRef<HTMLInputElement>(null);
@@ -684,12 +753,16 @@ export default function DashboardPage() {
           e.preventDefault();
           handleToggleLiveMode();
           break;
+        case "[":
+          e.preventDefault();
+          toggleCollapse();
+          break;
       }
     }
 
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [handleSelect, handleToggleLiveMode, setActiveTab]);
+  }, [handleSelect, handleToggleLiveMode, setActiveTab, toggleCollapse]);
 
   if (authLoading || endpoints === undefined) {
     return <DashboardSkeleton />;
@@ -734,31 +807,42 @@ export default function DashboardPage() {
       {/* Split pane or empty state */}
       {hasRequests ? (
         <>
-          {/* Desktop: side-by-side */}
+          {/* Desktop: side-by-side with resizable pane */}
           <div className="hidden md:flex flex-1 overflow-hidden">
-            <div className="w-80 shrink-0 border-r-2 border-foreground overflow-hidden">
-              <RequestList
-                requests={displayedItems}
-                selectedId={selectedId}
-                onSelect={handleSelect}
-                liveMode={liveMode}
-                onToggleLiveMode={handleToggleLiveMode}
-                sortNewest={sortNewest}
-                onToggleSort={handleToggleSort}
-                newCount={newCount}
-                onJumpToNew={handleJumpToNew}
-                totalCount={retainedTotalCount ?? undefined}
-                methodFilter={methodFilter}
-                onMethodFilterChange={setMethodFilter}
-                searchQuery={searchInput}
-                onSearchQueryChange={setSearchInput}
-                onLoadMore={handleLoadMore}
-                hasMore={showHasMore}
-                loadingMore={loadingMore}
-                searchLoading={searchLoading}
-                searchError={searchError}
-                searchInputRef={searchInputRef}
-              />
+            {!paneCollapsed && (
+              <div className="shrink-0 overflow-hidden" style={{ width: paneWidth }}>
+                <RequestList
+                  requests={displayedItems}
+                  selectedId={selectedId}
+                  onSelect={handleSelect}
+                  liveMode={liveMode}
+                  onToggleLiveMode={handleToggleLiveMode}
+                  sortNewest={sortNewest}
+                  onToggleSort={handleToggleSort}
+                  newCount={newCount}
+                  onJumpToNew={handleJumpToNew}
+                  totalCount={retainedTotalCount ?? undefined}
+                  methodFilter={methodFilter}
+                  onMethodFilterChange={setMethodFilter}
+                  searchQuery={searchInput}
+                  onSearchQueryChange={setSearchInput}
+                  onLoadMore={handleLoadMore}
+                  hasMore={showHasMore}
+                  loadingMore={loadingMore}
+                  searchLoading={searchLoading}
+                  searchError={searchError}
+                  searchInputRef={searchInputRef}
+                />
+              </div>
+            )}
+            {/* Drag handle / divider */}
+            <div
+              className="shrink-0 border-r-2 border-foreground relative group cursor-col-resize select-none"
+              onMouseDown={handleDragStart}
+              onDoubleClick={toggleCollapse}
+              title={paneCollapsed ? "Expand sidebar" : "Drag to resize, double-click to collapse"}
+            >
+              <div className="w-1.5 h-full group-hover:bg-primary/20 transition-colors" />
             </div>
             <div className="flex-1 overflow-hidden">
               <ErrorBoundary resetKey={selectedId ?? undefined}>

@@ -45,10 +45,10 @@ html {
   --color-input: hsl(var(--input));
   --color-ring: hsl(var(--ring));
 
-  /* Box shadows */
-  --shadow-neo: 4px 4px 0 0 hsl(var(--foreground));
-  --shadow-neo-sm: 2px 2px 0 0 hsl(var(--foreground));
-  --shadow-neo-lg: 6px 6px 0 0 hsl(var(--foreground));
+  /* Box shadows — use --shadow-color so dark mode can soften them */
+  --shadow-neo: 4px 4px 0 0 hsl(var(--shadow-color));
+  --shadow-neo-sm: 2px 2px 0 0 hsl(var(--shadow-color));
+  --shadow-neo-lg: 6px 6px 0 0 hsl(var(--shadow-color));
 }
 
 @layer base {
@@ -74,6 +74,7 @@ html {
     --input: 0 0% 0%;
     --ring: 162 100% 41%;
     --radius: 0;
+    --shadow-color: 0 0% 0%;
   }
 
   .dark {
@@ -89,15 +90,16 @@ html {
     --secondary: 52 100% 50%;
     --secondary-foreground: 0 0% 0%;
     --muted: 240 5% 20%;
-    --muted-foreground: 60 5% 65%;
+    --muted-foreground: 60 5% 70%;
     --accent: 280 100% 70%;
     --accent-foreground: 0 0% 0%;
     --destructive: 0 84% 60%;
     --destructive-foreground: 0 0% 100%;
-    --border: 60 9% 98%;
-    --input: 60 9% 98%;
+    --border: 60 9% 80%;
+    --input: 60 9% 80%;
     --ring: 162 100% 45%;
     --radius: 0;
+    --shadow-color: 60 9% 70%;
   }
 }
 
@@ -121,7 +123,7 @@ html {
   :is(.dark) body {
     background-image: radial-gradient(
       circle at center,
-      hsl(var(--foreground) / 0.04) 2px,
+      hsl(var(--foreground) / 0.08) 2px,
       transparent 2px
     );
   }
@@ -165,94 +167,94 @@ html {
   /* Neubrutalism card with hard shadow */
   .neo-card {
     @apply border-2 border-foreground bg-card p-6;
-    box-shadow: 4px 4px 0 0 hsl(var(--foreground));
+    box-shadow: 4px 4px 0 0 hsl(var(--shadow-color));
   }
 
   .neo-card:hover {
-    box-shadow: 6px 6px 0 0 hsl(var(--foreground));
+    box-shadow: 6px 6px 0 0 hsl(var(--shadow-color));
     transform: translate(-2px, -2px);
   }
 
   .neo-card-static:hover {
-    box-shadow: 4px 4px 0 0 hsl(var(--foreground));
+    box-shadow: 4px 4px 0 0 hsl(var(--shadow-color));
     transform: none;
   }
 
   /* Neubrutalism button base styles */
   .neo-btn {
     @apply border-2 border-foreground px-6 py-3 font-bold uppercase tracking-wide transition-all cursor-pointer;
-    box-shadow: 4px 4px 0 0 hsl(var(--foreground));
+    box-shadow: 4px 4px 0 0 hsl(var(--shadow-color));
   }
 
   .neo-btn:hover {
-    box-shadow: 2px 2px 0 0 hsl(var(--foreground));
+    box-shadow: 2px 2px 0 0 hsl(var(--shadow-color));
     transform: translate(2px, 2px);
   }
 
   .neo-btn:active {
-    box-shadow: 0 0 0 0 hsl(var(--foreground));
+    box-shadow: 0 0 0 0 hsl(var(--shadow-color));
     transform: translate(4px, 4px);
   }
 
   .neo-btn-primary {
     @apply border-2 border-foreground px-6 py-3 font-bold uppercase tracking-wide transition-all cursor-pointer bg-primary text-primary-foreground;
-    box-shadow: 4px 4px 0 0 hsl(var(--foreground));
+    box-shadow: 4px 4px 0 0 hsl(var(--shadow-color));
   }
 
   .neo-btn-primary:hover {
-    box-shadow: 2px 2px 0 0 hsl(var(--foreground));
+    box-shadow: 2px 2px 0 0 hsl(var(--shadow-color));
     transform: translate(2px, 2px);
   }
 
   .neo-btn-primary:active {
-    box-shadow: 0 0 0 0 hsl(var(--foreground));
+    box-shadow: 0 0 0 0 hsl(var(--shadow-color));
     transform: translate(4px, 4px);
   }
 
   .neo-btn-secondary {
     @apply border-2 border-foreground px-6 py-3 font-bold uppercase tracking-wide transition-all cursor-pointer bg-secondary text-secondary-foreground;
-    box-shadow: 4px 4px 0 0 hsl(var(--foreground));
+    box-shadow: 4px 4px 0 0 hsl(var(--shadow-color));
   }
 
   .neo-btn-secondary:hover {
-    box-shadow: 2px 2px 0 0 hsl(var(--foreground));
+    box-shadow: 2px 2px 0 0 hsl(var(--shadow-color));
     transform: translate(2px, 2px);
   }
 
   .neo-btn-secondary:active {
-    box-shadow: 0 0 0 0 hsl(var(--foreground));
+    box-shadow: 0 0 0 0 hsl(var(--shadow-color));
     transform: translate(4px, 4px);
   }
 
   .neo-btn-outline {
     @apply border-2 border-foreground px-6 py-3 font-bold uppercase tracking-wide transition-all cursor-pointer bg-background;
-    box-shadow: 4px 4px 0 0 hsl(var(--foreground));
+    box-shadow: 4px 4px 0 0 hsl(var(--shadow-color));
   }
 
   .neo-btn-outline:hover {
-    box-shadow: 2px 2px 0 0 hsl(var(--foreground));
+    box-shadow: 2px 2px 0 0 hsl(var(--shadow-color));
     transform: translate(2px, 2px);
   }
 
   .neo-btn-outline:active {
-    box-shadow: 0 0 0 0 hsl(var(--foreground));
+    box-shadow: 0 0 0 0 hsl(var(--shadow-color));
     transform: translate(4px, 4px);
   }
 
   /* Code blocks */
   .neo-code {
     @apply border-2 border-foreground bg-muted p-4 font-mono text-sm;
-    box-shadow: 4px 4px 0 0 hsl(var(--foreground));
+    box-shadow: 4px 4px 0 0 hsl(var(--shadow-color));
   }
 
   /* Input fields */
   .neo-input {
     @apply border-2 border-foreground bg-background px-4 py-3 outline-none;
-    box-shadow: 4px 4px 0 0 hsl(var(--foreground));
+    box-shadow: 4px 4px 0 0 hsl(var(--shadow-color));
   }
 
   .neo-input:focus {
-    box-shadow: 2px 2px 0 0 hsl(var(--foreground));
+    box-shadow: 2px 2px 0 0 hsl(var(--shadow-color));
     transform: translate(2px, 2px);
   }
 }
@@ -295,6 +297,26 @@ html {
 }
 
 .syntax-highlight .token.punctuation {
+  color: hsl(var(--muted-foreground));
+}
+
+/* JSON tree syntax colors — reuse the Prism palette */
+.syntax-property {
+  color: hsl(var(--primary));
+}
+.syntax-string {
+  color: hsl(45 100% 35%);
+}
+:is(.dark) .syntax-string {
+  color: hsl(var(--secondary));
+}
+.syntax-number {
+  color: hsl(var(--accent));
+}
+.syntax-keyword {
+  color: hsl(var(--accent));
+}
+.syntax-punctuation {
   color: hsl(var(--muted-foreground));
 }
 

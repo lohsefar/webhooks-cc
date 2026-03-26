@@ -12,6 +12,7 @@ import { detectFormat, formatBody, getFormatLabel } from "@/lib/format";
 import { getHighlightLanguage, highlightBody } from "@/lib/highlight";
 import { trackRequestViewed, trackRequestDetailTabChanged } from "@/lib/analytics";
 import { jsonToTypeScript } from "@/lib/json-to-typescript";
+import { JsonTree } from "./json-tree";
 
 /** Any request shape that has the fields needed for display. */
 export type DisplayableRequest = Request | ClickHouseRequest;
@@ -141,6 +142,17 @@ export function RequestDetail({ request, activeTab, onTabChange, curlBtnRef }: R
     [request.body, bodyFormat]
   );
 
+  // JSON tree view: parse once, show tree or formatted view
+  const parsedJson = useMemo(() => {
+    if (bodyFormat !== "json" || !request.body) return null;
+    try {
+      return JSON.parse(request.body) as unknown;
+    } catch {
+      return null;
+    }
+  }, [request.body, bodyFormat]);
+  const [bodyView, setBodyView] = useState<"tree" | "formatted">("tree");
+
   return (
     <div className="flex flex-col h-full">
       {/* Summary bar */}
@@ -207,6 +219,28 @@ export function RequestDetail({ request, activeTab, onTabChange, curlBtnRef }: R
               <span className="px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide border-2 border-foreground bg-muted">
                 {getFormatLabel(bodyFormat)}
               </span>
+              {parsedJson !== null && (
+                <div className="flex items-center border-2 border-foreground">
+                  <button
+                    onClick={() => setBodyView("tree")}
+                    className={cn(
+                      "px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide cursor-pointer transition-colors",
+                      bodyView === "tree" ? "bg-foreground text-background" : "hover:bg-muted"
+                    )}
+                  >
+                    Tree
+                  </button>
+                  <button
+                    onClick={() => setBodyView("formatted")}
+                    className={cn(
+                      "px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide cursor-pointer transition-colors border-l-2 border-foreground",
+                      bodyView === "formatted" ? "bg-foreground text-background" : "hover:bg-muted"
+                    )}
+                  >
+                    Formatted
+                  </button>
+                </div>
+              )}
             </div>
             {request.body && (
               <BodyCopyDropdown
@@ -217,13 +251,19 @@ export function RequestDetail({ request, activeTab, onTabChange, curlBtnRef }: R
                 copied={copied}
               />
             )}
-            <pre className="neo-code syntax-highlight overflow-x-auto text-sm whitespace-pre-wrap break-words">
-              {/* Safe: highlightBody escapes plain/form/text/binary output and Prism.highlight encodes token text for json/xml. */}
-              <code
-                className={`language-${highlightLanguage}`}
-                dangerouslySetInnerHTML={{ __html: highlightedBody }}
-              />
-            </pre>
+            {parsedJson !== null && bodyView === "tree" ? (
+              <div className="neo-code overflow-x-auto p-3">
+                <JsonTree data={parsedJson} />
+              </div>
+            ) : (
+              <pre className="neo-code syntax-highlight overflow-x-auto text-sm whitespace-pre-wrap break-words">
+                {/* Safe: highlightBody escapes plain/form/text/binary output and Prism.highlight encodes token text for json/xml. */}
+                <code
+                  className={`language-${highlightLanguage}`}
+                  dangerouslySetInnerHTML={{ __html: highlightedBody }}
+                />
+              </pre>
+            )}
           </div>
         )}
 
