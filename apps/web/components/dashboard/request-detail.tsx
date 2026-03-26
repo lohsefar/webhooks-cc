@@ -2,7 +2,7 @@
 
 import { useState, useRef, useEffect, useCallback } from "react";
 import { cn } from "@/lib/utils";
-import { Copy, Check, Code, Send, Settings, Link as LinkIcon } from "lucide-react";
+import { Copy, Check, ChevronDown, Send, Settings, Link as LinkIcon } from "lucide-react";
 import { ReplayDialog } from "./replay-dialog";
 import { copyToClipboard } from "@/lib/clipboard";
 import { formatBytes } from "@/types/request";
@@ -197,42 +197,15 @@ export function RequestDetail({ request, activeTab, onTabChange }: RequestDetail
                 {getFormatLabel(bodyFormat)}
               </span>
             </div>
-            <div className="absolute top-0 right-0 flex items-center gap-1">
-              {tsInterface && (
-                <button
-                  onClick={() => handleCopy(tsInterface, "ts")}
-                  className="neo-btn-outline py-1! px-2! text-xs flex items-center gap-1"
-                  title="Copy as TypeScript interface"
-                  aria-label={
-                    copied === "ts"
-                      ? "TypeScript copied to clipboard"
-                      : "Copy as TypeScript interface"
-                  }
-                >
-                  {copied === "ts" ? (
-                    <Check className="h-3 w-3" />
-                  ) : (
-                    <Code className="h-3 w-3" />
-                  )}
-                  <span className="hidden sm:inline">{copied === "ts" ? "Copied!" : "TS"}</span>
-                </button>
-              )}
-              {request.body && (
-                <button
-                  onClick={() => request.body && handleCopy(request.body, "body")}
-                  className="neo-btn-outline py-1! px-2! text-xs flex items-center gap-1"
-                  aria-label={
-                    copied === "body" ? "Copied to clipboard" : "Copy body to clipboard"
-                  }
-                >
-                  {copied === "body" ? (
-                    <Check className="h-3 w-3" />
-                  ) : (
-                    <Copy className="h-3 w-3" />
-                  )}
-                </button>
-              )}
-            </div>
+            {request.body && (
+              <BodyCopyDropdown
+                body={request.body}
+                formattedBody={formattedBody}
+                tsInterface={tsInterface}
+                onCopy={handleCopy}
+                copied={copied}
+              />
+            )}
             <pre className="neo-code syntax-highlight overflow-x-auto text-sm whitespace-pre-wrap break-words">
               {/* Safe: highlightBody escapes plain/form/text/binary output and Prism.highlight encodes token text for json/xml. */}
               <code
@@ -287,6 +260,125 @@ export function RequestDetail({ request, activeTab, onTabChange }: RequestDetail
           </pre>
         )}
       </div>
+    </div>
+  );
+}
+
+function jsonToCsvValue(json: string): string | null {
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(json);
+  } catch {
+    return null;
+  }
+  if (parsed === null || typeof parsed !== "object") return null;
+
+  const rows = Array.isArray(parsed) ? parsed : [parsed];
+  if (rows.length === 0) return null;
+
+  const allKeys = new Set<string>();
+  for (const row of rows) {
+    if (row && typeof row === "object") {
+      for (const key of Object.keys(row as Record<string, unknown>)) {
+        allKeys.add(key);
+      }
+    }
+  }
+  const keys = [...allKeys];
+
+  const escape = (val: unknown): string => {
+    const str = val === null || val === undefined ? "" : typeof val === "object" ? JSON.stringify(val) : String(val);
+    return str.includes(",") || str.includes('"') || str.includes("\n")
+      ? `"${str.replace(/"/g, '""')}"`
+      : str;
+  };
+
+  const header = keys.map(escape).join(",");
+  const lines = rows.map((row) => {
+    const obj = (row ?? {}) as Record<string, unknown>;
+    return keys.map((k) => escape(obj[k])).join(",");
+  });
+
+  return [header, ...lines].join("\n");
+}
+
+function BodyCopyDropdown({
+  body,
+  formattedBody,
+  tsInterface,
+  onCopy,
+  copied,
+}: {
+  body: string;
+  formattedBody: string;
+  tsInterface: string | null;
+  onCopy: (text: string, key: string) => void;
+  copied: string | null;
+}) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    function handleClickOutside(e: MouseEvent) {
+      if (ref.current && !ref.current.contains(e.target as Node)) {
+        setOpen(false);
+      }
+    }
+    function handleEscape(e: KeyboardEvent) {
+      if (e.key === "Escape") setOpen(false);
+    }
+    document.addEventListener("mousedown", handleClickOutside);
+    document.addEventListener("keydown", handleEscape);
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+      document.removeEventListener("keydown", handleEscape);
+    };
+  }, [open]);
+
+  const csvBody = jsonToCsvValue(body);
+  const isCopied = copied === "body" || copied === "body-formatted" || copied === "ts" || copied === "csv";
+
+  const options: { key: string; label: string; value: string }[] = [
+    { key: "body", label: "Raw body", value: body },
+    { key: "body-formatted", label: "Formatted", value: formattedBody },
+  ];
+  if (tsInterface) {
+    options.push({ key: "ts", label: "TypeScript interface", value: tsInterface });
+  }
+  if (csvBody) {
+    options.push({ key: "csv", label: "CSV", value: csvBody });
+  }
+
+  return (
+    <div className="absolute top-0 right-0" ref={ref}>
+      <button
+        onClick={() => setOpen(!open)}
+        className="neo-btn-outline py-1! px-2! text-xs flex items-center gap-1"
+      >
+        {isCopied ? <Check className="h-3 w-3" /> : <Copy className="h-3 w-3" />}
+        {isCopied ? "Copied!" : "Copy"}
+        <ChevronDown className="h-3 w-3" />
+      </button>
+      {open && (
+        <div className="absolute right-0 top-full mt-1 border-2 border-foreground bg-background shadow-neo z-50 min-w-[180px]">
+          {options.map((opt, i) => (
+            <button
+              key={opt.key}
+              onClick={() => {
+                onCopy(opt.value, opt.key);
+                setOpen(false);
+              }}
+              className={cn(
+                "w-full px-3 py-2 text-left text-xs font-bold uppercase tracking-wide hover:bg-muted cursor-pointer transition-colors",
+                i < options.length - 1 && "border-b-2 border-foreground"
+              )}
+            >
+              {opt.label}
+            </button>
+          ))}
+        </div>
+      )}
     </div>
   );
 }
