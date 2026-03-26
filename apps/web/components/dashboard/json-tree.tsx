@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback, useMemo } from "react";
+import { useState, useCallback, useMemo, useEffect, useRef } from "react";
 import { ChevronRight, ChevronDown, Check, ChevronsUpDown } from "lucide-react";
 import { copyToClipboard } from "@/lib/clipboard";
 
@@ -10,7 +10,10 @@ interface JsonTreeProps {
 }
 
 export function JsonTree({ data, defaultExpandDepth = 2 }: JsonTreeProps) {
-  const [expandAll, setExpandAll] = useState<boolean | null>(null);
+  // expandAll uses a version counter: when bumped, every node syncs its
+  // localOpen to expandTarget, then resumes independent control.
+  const [expandTarget, setExpandTarget] = useState(true);
+  const [expandVersion, setExpandVersion] = useState(0);
   const [copiedPath, setCopiedPath] = useState<string | null>(null);
 
   const handleCopyPath = useCallback(async (path: string) => {
@@ -22,7 +25,8 @@ export function JsonTree({ data, defaultExpandDepth = 2 }: JsonTreeProps) {
   }, []);
 
   const toggleAll = useCallback(() => {
-    setExpandAll((prev) => (prev === null ? false : !prev));
+    setExpandTarget((prev) => !prev);
+    setExpandVersion((v) => v + 1);
   }, []);
 
   return (
@@ -33,7 +37,7 @@ export function JsonTree({ data, defaultExpandDepth = 2 }: JsonTreeProps) {
           className="text-[10px] text-muted-foreground hover:text-foreground flex items-center gap-1 cursor-pointer transition-colors uppercase tracking-wide font-bold font-sans"
         >
           <ChevronsUpDown className="h-3 w-3" />
-          {expandAll === false ? "Expand all" : "Collapse all"}
+          {expandTarget ? "Collapse all" : "Expand all"}
         </button>
       </div>
       <JsonNode
@@ -42,7 +46,8 @@ export function JsonTree({ data, defaultExpandDepth = 2 }: JsonTreeProps) {
         path=""
         depth={0}
         defaultExpandDepth={defaultExpandDepth}
-        expandAllOverride={expandAll}
+        expandTarget={expandTarget}
+        expandVersion={expandVersion}
         onCopyPath={handleCopyPath}
         copiedPath={copiedPath}
       />
@@ -56,7 +61,8 @@ interface JsonNodeProps {
   path: string;
   depth: number;
   defaultExpandDepth: number;
-  expandAllOverride: boolean | null;
+  expandTarget: boolean;
+  expandVersion: number;
   onCopyPath: (path: string) => void;
   copiedPath: string | null;
 }
@@ -67,23 +73,29 @@ function JsonNode({
   path,
   depth,
   defaultExpandDepth,
-  expandAllOverride,
+  expandTarget,
+  expandVersion,
   onCopyPath,
   copiedPath,
 }: JsonNodeProps) {
   const isExpandable = value !== null && typeof value === "object";
   const defaultOpen = depth < defaultExpandDepth;
-  const [localOpen, setLocalOpen] = useState(defaultOpen);
+  const [isOpen, setIsOpen] = useState(defaultOpen);
 
-  // expandAllOverride takes precedence when set
-  const isOpen = expandAllOverride !== null ? expandAllOverride : localOpen;
+  // Sync to expand/collapse all — only fires when version bumps (not on mount)
+  const prevVersion = useRef(expandVersion);
+  useEffect(() => {
+    if (expandVersion !== prevVersion.current) {
+      prevVersion.current = expandVersion;
+      setIsOpen(expandTarget);
+    }
+  }, [expandVersion, expandTarget]);
 
-  const toggle = useCallback(() => setLocalOpen((prev) => !prev), []);
+  const toggle = useCallback(() => setIsOpen((prev) => !prev), []);
 
   const currentPath = useMemo(() => {
     if (!keyName) return path;
     if (!path) return keyName;
-    // Use bracket notation for keys with special characters
     return /^[a-zA-Z_$][a-zA-Z0-9_$]*$/.test(keyName)
       ? `${path}.${keyName}`
       : `${path}["${keyName}"]`;
@@ -119,7 +131,6 @@ function JsonNode({
   const openBracket = isArray ? "[" : "{";
   const closeBracket = isArray ? "]" : "}";
 
-  // Truncate large arrays
   const MAX_ITEMS = 100;
   const displayEntries = entries.slice(0, MAX_ITEMS);
   const hasMore = entries.length > MAX_ITEMS;
@@ -171,7 +182,8 @@ function JsonNode({
               path={isArray ? `${currentPath}[${k}]` : currentPath}
               depth={depth + 1}
               defaultExpandDepth={defaultExpandDepth}
-              expandAllOverride={expandAllOverride}
+              expandTarget={expandTarget}
+              expandVersion={expandVersion}
               onCopyPath={onCopyPath}
               copiedPath={copiedPath}
             />
