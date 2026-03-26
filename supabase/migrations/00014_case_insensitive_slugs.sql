@@ -13,7 +13,12 @@
 -- The unique index will catch any conflict and fail the migration safely.
 update public.endpoints set slug = lower(slug) where slug != lower(slug);
 
--- 2. Update capture_webhook to normalize slug input
+-- 2. Replace the unique index with a case-insensitive functional index.
+-- Prevents mixed-case slugs from bypassing uniqueness via direct SQL inserts.
+drop index if exists public.endpoints_slug;
+create unique index endpoints_slug on public.endpoints (lower(slug));
+
+-- 3. Update capture_webhook to normalize slug input
 create or replace function public.capture_webhook(
   p_slug        text,
   p_method      text,
@@ -34,7 +39,6 @@ declare
   v_user        record;
   v_quota       record;
   v_period      record;
-  v_remaining   integer;
   v_retry_after bigint;
   v_size        integer;
   v_mock        jsonb;

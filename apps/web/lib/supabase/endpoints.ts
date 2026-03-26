@@ -115,7 +115,7 @@ async function generateUniqueSlug(): Promise<string> {
     const { data, error } = await admin
       .from("endpoints")
       .select("id")
-      .eq("slug", slug)
+      .eq("slug", slug.toLowerCase())
       .maybeSingle();
 
     if (error) {
