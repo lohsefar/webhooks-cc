@@ -15,13 +15,22 @@ export const TRACK_LABELS: Record<ChangelogTrack, string> = {
   mcp: "MCP",
 };
 
-export const APP_VERSION = "0.10.0";
+export const APP_VERSION = "0.10.1";
 export const CLI_VERSION = "0.5.3";
 export const SDK_VERSION = "1.1.0";
 export const MCP_VERSION = "1.1.0";
 
 export const CHANGELOG: ChangelogEntry[] = [
   // ─── Web App ────────────────────────────────────────────────────────
+  {
+    version: "0.10.1",
+    date: "2026-03-26",
+    title: "Case-Insensitive Slugs",
+    track: "web",
+    items: [
+      "Endpoint slugs are now case-insensitive (e.g. /w/AbC and /w/abc resolve to the same endpoint)",
+    ],
+  },
   {
     version: "0.10.0",
     date: "2026-03-25",
