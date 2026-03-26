@@ -42,8 +42,8 @@ function walk(left: unknown, right: unknown, path: string, entries: DiffEntry[])
 
     for (const key of allKeys) {
       const childPath = path ? `${path}.${key}` : key;
-      const inLeft = key in leftObj;
-      const inRight = key in rightObj;
+      const inLeft = Object.prototype.hasOwnProperty.call(leftObj, key);
+      const inRight = Object.prototype.hasOwnProperty.call(rightObj, key);
 
       if (inLeft && !inRight) {
         entries.push({ path: childPath, key, type: "removed", leftValue: leftObj[key] });
@@ -117,8 +117,8 @@ export function computeMapDiff(
   const allKeys = new Set([...Object.keys(left), ...Object.keys(right)]);
 
   for (const key of allKeys) {
-    const inLeft = key in left;
-    const inRight = key in right;
+    const inLeft = Object.prototype.hasOwnProperty.call(left, key);
+    const inRight = Object.prototype.hasOwnProperty.call(right, key);
 
     if (inLeft && !inRight) {
       entries.push({ path: key, key, type: "removed", leftValue: left[key] });

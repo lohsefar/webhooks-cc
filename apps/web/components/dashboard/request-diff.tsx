@@ -40,6 +40,11 @@ export function RequestDiff({ left, right, onExit }: RequestDiffProps) {
     return null;
   }, [left.body, right.body]);
 
+  const changedBodyDiff = useMemo(
+    () => bodyDiff?.filter((e) => e.type !== "unchanged") ?? [],
+    [bodyDiff]
+  );
+
   const headerDiff = useMemo(
     () => computeMapDiff(left.headers, right.headers),
     [left.headers, right.headers]
@@ -123,20 +128,18 @@ export function RequestDiff({ left, right, onExit }: RequestDiffProps) {
         {/* Body */}
         <DiffSection title="Body">
           {bodyDiff ? (
-            bodyDiff.length === 0 ? (
+            changedBodyDiff.length === 0 ? (
               <span className="text-xs text-muted-foreground">(identical)</span>
             ) : (
-              bodyDiff
-                .filter((e) => e.type !== "unchanged")
-                .map((entry) => (
-                  <DiffRow
-                    key={entry.path}
-                    label={entry.path}
-                    type={entry.type}
-                    leftValue={entry.leftValue}
-                    rightValue={entry.rightValue}
-                  />
-                ))
+              changedBodyDiff.map((entry) => (
+                <DiffRow
+                  key={entry.path}
+                  label={entry.path}
+                  type={entry.type}
+                  leftValue={entry.leftValue}
+                  rightValue={entry.rightValue}
+                />
+              ))
             )
           ) : (
             <div className="text-xs font-mono">

@@ -96,22 +96,16 @@ export default function DashboardPage() {
     (note: string) => {
       if (!selectedId) return;
       setNote(selectedId, note);
-      setNoteIds((prev) => {
-        const next = new Set(prev);
-        if (note.trim()) {
-          next.add(selectedId);
-        } else {
-          next.delete(selectedId);
-        }
-        return next;
-      });
+      // Rebuild from canonical store in case eviction pruned entries
+      setNoteIds(new Set(Object.keys(getAllNotes())));
     },
     [selectedId]
   );
 
-  // Compare mode
+  // Compare mode — freeze both sides so live changes don't mutate the diff
   const [compareId, setCompareId] = useState<string | null>(null);
   const [compareRequest, setCompareRequest] = useState<ClickHouseRequest | null>(null);
+  const [compareBase, setCompareBase] = useState<ClickHouseRequest | null>(null);
   const compareIdRef = useRef(compareId);
   compareIdRef.current = compareId;
   const recentRequestsRef = useRef(recentRequests);
@@ -122,8 +116,27 @@ export default function DashboardPage() {
       if (compareIdRef.current === id) {
         setCompareId(null);
         setCompareRequest(null);
+        setCompareBase(null);
       } else {
         setCompareId(id);
+        // Snapshot the currently selected request as the frozen left side
+        const base = displayRequestRef.current;
+        if (base) {
+          const baseId = "_id" in base ? base._id : base.id;
+          setCompareBase({
+            id: baseId,
+            slug: currentSlug ?? "",
+            method: base.method,
+            path: base.path,
+            headers: base.headers,
+            body: base.body,
+            queryParams: base.queryParams,
+            contentType: base.contentType,
+            ip: base.ip,
+            size: base.size,
+            receivedAt: base.receivedAt,
+          });
+        }
         const fromRecent = recentRequestsRef.current.find((r) => r._id === id);
         if (fromRecent) {
           setCompareRequest({
@@ -150,6 +163,7 @@ export default function DashboardPage() {
   const exitCompare = useCallback(() => {
     setCompareId(null);
     setCompareRequest(null);
+    setCompareBase(null);
   }, []);
 
   useEffect(() => {
@@ -960,8 +974,8 @@ export default function DashboardPage() {
             </div>
             <div className="flex-1 overflow-hidden">
               <ErrorBoundary resetKey={selectedId ?? undefined}>
-                {compareId && compareRequest && displayRequest ? (
-                  <RequestDiff left={displayRequest} right={compareRequest} onExit={exitCompare} />
+                {compareId && compareBase && compareRequest ? (
+                  <RequestDiff left={compareBase} right={compareRequest} onExit={exitCompare} />
                 ) : displayRequest ? (
                   <RequestDetail
                     request={displayRequest}

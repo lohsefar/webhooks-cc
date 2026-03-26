@@ -471,16 +471,21 @@ function NoteBar({ note, onChange }: { note: string | null; onChange: (note: str
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(note ?? "");
   const inputRef = useRef<HTMLInputElement>(null);
+  const cancelledRef = useRef(false);
 
   useEffect(() => {
     setDraft(note ?? "");
   }, [note]);
 
   useEffect(() => {
-    if (editing) inputRef.current?.focus();
+    if (editing) {
+      cancelledRef.current = false;
+      inputRef.current?.focus();
+    }
   }, [editing]);
 
   const save = useCallback(() => {
+    if (cancelledRef.current) return;
     onChange(draft);
     setEditing(false);
   }, [draft, onChange]);
@@ -508,6 +513,8 @@ function NoteBar({ note, onChange }: { note: string | null; onChange: (note: str
           onKeyDown={(e) => {
             if (e.key === "Enter") save();
             if (e.key === "Escape") {
+              e.stopPropagation();
+              cancelledRef.current = true;
               setDraft(note ?? "");
               setEditing(false);
             }
@@ -523,15 +530,19 @@ function NoteBar({ note, onChange }: { note: string | null; onChange: (note: str
   return (
     <div className="border-b-2 border-foreground px-4 py-1.5 flex items-center gap-2 shrink-0 group">
       <StickyNote className="h-3 w-3 text-muted-foreground shrink-0" />
-      <span
-        className="flex-1 text-xs font-mono truncate cursor-pointer"
+      <button
+        type="button"
+        className="flex-1 text-xs font-mono truncate cursor-pointer text-left bg-transparent border-0 p-0"
         onClick={() => setEditing(true)}
+        aria-label="Edit request note"
       >
         {note}
-      </span>
+      </button>
       <button
+        type="button"
         onClick={() => onChange("")}
-        className="opacity-0 group-hover:opacity-100 text-muted-foreground hover:text-foreground transition-opacity cursor-pointer"
+        aria-label="Delete request note"
+        className="opacity-0 group-hover:opacity-100 focus-visible:opacity-100 text-muted-foreground hover:text-foreground transition-opacity cursor-pointer"
       >
         <X className="h-3 w-3" />
       </button>

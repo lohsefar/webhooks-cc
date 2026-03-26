@@ -120,7 +120,12 @@ export function RequestList({
 
   const handleContextMenu = useCallback((e: React.MouseEvent, id: string) => {
     e.preventDefault();
-    setCtxMenu({ x: e.clientX, y: e.clientY, id });
+    // Clamp to viewport so the menu doesn't overflow off-screen
+    const menuW = 180;
+    const menuH = 120;
+    const x = Math.min(e.clientX, window.innerWidth - menuW - 8);
+    const y = Math.min(e.clientY, window.innerHeight - menuH - 8);
+    setCtxMenu({ x: Math.max(0, x), y: Math.max(0, y), id });
   }, []);
 
   // Pin/unpin split
@@ -197,6 +202,8 @@ export function RequestList({
               onClick={() => onViewModeChange(viewMode === "list" ? "timeline" : "list")}
               className="p-1.5 hover:bg-muted transition-colors cursor-pointer border-2 border-foreground"
               title={viewMode === "list" ? "Switch to timeline view" : "Switch to list view"}
+              aria-label={viewMode === "list" ? "Switch to timeline view" : "Switch to list view"}
+              aria-pressed={viewMode === "timeline"}
             >
               {viewMode === "list" ? (
                 <BarChart3 className="h-3.5 w-3.5" />
