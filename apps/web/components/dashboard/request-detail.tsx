@@ -510,6 +510,7 @@ function NoteBar({ note, onChange }: { note: string | null; onChange: (note: str
           ref={inputRef}
           value={draft}
           onChange={(e) => setDraft(e.target.value)}
+          maxLength={280}
           onKeyDown={(e) => {
             if (e.key === "Enter") save();
             if (e.key === "Escape") {
