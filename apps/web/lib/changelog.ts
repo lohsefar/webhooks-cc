@@ -15,13 +15,26 @@ export const TRACK_LABELS: Record<ChangelogTrack, string> = {
   mcp: "MCP",
 };
 
-export const APP_VERSION = "0.10.1";
+export const APP_VERSION = "0.11.0";
 export const CLI_VERSION = "0.5.3";
 export const SDK_VERSION = "1.1.0";
 export const MCP_VERSION = "1.1.0";
 
 export const CHANGELOG: ChangelogEntry[] = [
   // ─── Web App ────────────────────────────────────────────────────────
+  {
+    version: "0.11.0",
+    date: "2026-03-26",
+    title: "Dashboard Quick Wins",
+    track: "web",
+    items: [
+      "Keyboard shortcuts for dashboard navigation",
+      "Collapsible JSON tree viewer for request bodies",
+      "JSON to TypeScript type generation",
+      "Resizable split pane in request viewer",
+      "Richer request list rows with method badges and size",
+    ],
+  },
   {
     version: "0.10.1",
     date: "2026-03-26",
