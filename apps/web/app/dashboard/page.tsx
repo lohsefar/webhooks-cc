@@ -1,13 +1,19 @@
 "use client";
 
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
-import { useSearchParams } from "next/navigation";
+import { useSearchParams, useRouter, usePathname } from "next/navigation";
 import Link from "next/link";
 import { useAuth } from "@/components/providers/supabase-auth-provider";
 import { UrlBar } from "@/components/dashboard/url-bar";
 import { RequestList } from "@/components/dashboard/request-list";
-import { RequestDetail, RequestDetailEmpty } from "@/components/dashboard/request-detail";
+import {
+  RequestDetail,
+  RequestDetailEmpty,
+  TABS,
+  type Tab,
+} from "@/components/dashboard/request-detail";
 import { GettingStarted } from "@/components/dashboard/getting-started";
+import { KeyboardShortcutsDialog } from "@/components/dashboard/keyboard-shortcuts-dialog";
 
 import { ErrorBoundary } from "@/components/error-boundary";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -36,6 +42,8 @@ import type {
 } from "@/types/request";
 
 const CLICKHOUSE_PAGE_SIZE = 50;
+const PANE_MIN = 240;
+const PANE_DEFAULT = 320;
 
 export default function DashboardPage() {
   const { session, isLoading: authLoading } = useAuth();
@@ -60,6 +68,99 @@ export default function DashboardPage() {
   const [methodFilter, setMethodFilter] = useState<string>("ALL");
   const [searchInput, setSearchInput] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
+
+  // Resizable split pane
+  const [paneWidth, setPaneWidth] = useState(() => {
+    if (typeof window === "undefined") return PANE_DEFAULT;
+    try {
+      const stored = localStorage.getItem("dashboard_pane_width");
+      if (stored === "collapsed") return 0;
+      const val = stored ? parseInt(stored, 10) : PANE_DEFAULT;
+      if (!Number.isFinite(val)) return PANE_DEFAULT;
+      const maxWidth = Math.floor(window.innerWidth * 0.5);
+      return maxWidth >= PANE_MIN ? Math.max(PANE_MIN, Math.min(maxWidth, val)) : PANE_DEFAULT;
+    } catch {
+      return PANE_DEFAULT;
+    }
+  });
+  const isDragging = useRef(false);
+  const paneCollapsed = paneWidth === 0;
+  const paneWidthRef = useRef(paneWidth);
+  paneWidthRef.current = paneWidth;
+
+  const handleDragStart = useCallback((e: React.MouseEvent) => {
+    if (paneWidthRef.current === 0) return;
+    e.preventDefault();
+    isDragging.current = true;
+    const startX = e.clientX;
+    const startWidth = paneWidthRef.current;
+
+    const onMouseMove = (ev: MouseEvent) => {
+      if (!isDragging.current) return;
+      const maxWidth = Math.floor(window.innerWidth * 0.5);
+      const newWidth = Math.max(PANE_MIN, Math.min(maxWidth, startWidth + (ev.clientX - startX)));
+      setPaneWidth(newWidth);
+    };
+
+    const onMouseUp = () => {
+      isDragging.current = false;
+      document.removeEventListener("mousemove", onMouseMove);
+      document.removeEventListener("mouseup", onMouseUp);
+      document.body.style.cursor = "";
+      document.body.style.userSelect = "";
+      // Persist after drag ends
+      setPaneWidth((w) => {
+        try {
+          localStorage.setItem("dashboard_pane_width", String(w));
+        } catch {
+          /* noop */
+        }
+        return w;
+      });
+    };
+
+    document.body.style.cursor = "col-resize";
+    document.body.style.userSelect = "none";
+    document.addEventListener("mousemove", onMouseMove);
+    document.addEventListener("mouseup", onMouseUp);
+  }, []);
+
+  const toggleCollapse = useCallback(() => {
+    setPaneWidth((prev) => {
+      const next = prev === 0 ? PANE_DEFAULT : 0;
+      try {
+        localStorage.setItem("dashboard_pane_width", next === 0 ? "collapsed" : String(next));
+      } catch {
+        /* noop */
+      }
+      return next;
+    });
+  }, []);
+
+  // Keyboard shortcuts dialog
+  const [shortcutsOpen, setShortcutsOpen] = useState(false);
+  const desktopSearchInputRef = useRef<HTMLInputElement>(null);
+  const mobileSearchInputRef = useRef<HTMLInputElement>(null);
+
+  // Tab state from URL — read searchParams for deriving current tab,
+  // but write via window.location.search to avoid subscribing to the object (rerender-defer-reads).
+  const router = useRouter();
+  const pathname = usePathname();
+  const tabParam = searchParams.get("tab") as Tab | null;
+  const activeTab: Tab = tabParam && TABS.includes(tabParam) ? tabParam : "body";
+  const setActiveTab = useCallback(
+    (tab: Tab) => {
+      const params = new URLSearchParams(window.location.search);
+      if (tab === "body") {
+        params.delete("tab");
+      } else {
+        params.set("tab", tab);
+      }
+      const qs = params.toString();
+      router.replace(`${pathname}${qs ? `?${qs}` : ""}`, { scroll: false });
+    },
+    [router, pathname]
+  );
 
   // Retained request history state
   const [olderRequests, setOlderRequests] = useState<ClickHouseRequest[]>([]);
@@ -414,6 +515,9 @@ export default function DashboardPage() {
         (r): ClickHouseSummary => ({
           id: r.id,
           method: r.method,
+          path: r.path,
+          contentType: r.contentType,
+          size: r.size,
           receivedAt: r.receivedAt,
         })
       );
@@ -425,6 +529,9 @@ export default function DashboardPage() {
         _id: request._id,
         _creationTime: request._creationTime,
         method: request.method,
+        path: request.path,
+        contentType: request.contentType,
+        size: request.size,
         receivedAt: request.receivedAt,
       }));
 
@@ -435,6 +542,9 @@ export default function DashboardPage() {
       .map((r) => ({
         id: r.id,
         method: r.method,
+        path: r.path,
+        contentType: r.contentType,
+        size: r.size,
         receivedAt: r.receivedAt,
       }));
 
@@ -562,6 +672,103 @@ export default function DashboardPage() {
     }
   }, [currentEndpoint, methodFilter, debouncedSearch, fetchFromClickHouse]);
 
+  // Keyboard shortcuts — use refs for frequently-changing values so the
+  // listener doesn't re-register on every state change (rerender-dependencies).
+  const displayedItemsRef = useRef(displayedItems);
+  displayedItemsRef.current = displayedItems;
+  const selectedIdRef = useRef(selectedId);
+  selectedIdRef.current = selectedId;
+  const displayRequestRef = useRef(displayRequest);
+  displayRequestRef.current = displayRequest;
+
+  // Ref for cURL button (avoids DOM scraping in keyboard handler)
+  const curlBtnRef = useRef<HTMLButtonElement>(null);
+
+  useEffect(() => {
+    function handleKeyDown(e: KeyboardEvent) {
+      const tag = (e.target as HTMLElement)?.tagName;
+      const isInput = tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT";
+
+      // Esc always works
+      if (e.key === "Escape") {
+        setShortcutsOpen(false);
+        if (isInput) {
+          (e.target as HTMLElement).blur();
+        }
+        return;
+      }
+
+      // Don't intercept when typing in inputs
+      if (isInput) return;
+      // Don't intercept when modifiers are held (allow browser shortcuts)
+      if (e.ctrlKey || e.metaKey || e.altKey) return;
+
+      switch (e.key) {
+        case "?":
+          e.preventDefault();
+          setShortcutsOpen(true);
+          break;
+        case "/":
+          e.preventDefault();
+          (window.matchMedia("(min-width: 768px)").matches
+            ? desktopSearchInputRef.current
+            : mobileSearchInputRef.current
+          )?.focus();
+          break;
+        case "j":
+        case "k": {
+          e.preventDefault();
+          const items = displayedItemsRef.current;
+          if (items.length === 0) break;
+          const ids = items.map((item) => ("_id" in item ? item._id : item.id));
+          const currentIndex = selectedIdRef.current ? ids.indexOf(selectedIdRef.current) : -1;
+          const nextIndex =
+            e.key === "j"
+              ? Math.min(currentIndex + 1, ids.length - 1)
+              : Math.max(currentIndex - 1, 0);
+          handleSelect(ids[nextIndex]);
+          break;
+        }
+        case "1":
+        case "2":
+        case "3":
+        case "4": {
+          e.preventDefault();
+          const tabIndex = parseInt(e.key) - 1;
+          setActiveTab(TABS[tabIndex]);
+          break;
+        }
+        case "c":
+          if (displayRequestRef.current) {
+            e.preventDefault();
+            curlBtnRef.current?.click();
+          }
+          break;
+        case "r":
+          if (displayRequestRef.current) {
+            e.preventDefault();
+            document.querySelector<HTMLButtonElement>('[data-shortcut="replay"]')?.click();
+          }
+          break;
+        case "n":
+          e.preventDefault();
+          document.querySelector<HTMLButtonElement>('[data-shortcut="new-endpoint"]')?.click();
+          break;
+        case "l":
+          e.preventDefault();
+          handleToggleLiveMode();
+          break;
+        case "[":
+          e.preventDefault();
+          toggleCollapse();
+          break;
+      }
+    }
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [handleSelect, handleToggleLiveMode, setActiveTab, toggleCollapse]);
+
   if (authLoading || endpoints === undefined) {
     return <DashboardSkeleton />;
   }
@@ -586,6 +793,8 @@ export default function DashboardPage() {
 
   return (
     <ErrorBoundary resetKey={currentEndpoint.id}>
+      <KeyboardShortcutsDialog open={shortcutsOpen} onOpenChange={setShortcutsOpen} />
+
       {/* URL Bar */}
       <UrlBar
         endpointId={currentEndpoint.id}
@@ -603,37 +812,54 @@ export default function DashboardPage() {
       {/* Split pane or empty state */}
       {hasRequests ? (
         <>
-          {/* Desktop: side-by-side */}
+          {/* Desktop: side-by-side with resizable pane */}
           <div className="hidden md:flex flex-1 overflow-hidden">
-            <div className="w-80 shrink-0 border-r-2 border-foreground overflow-hidden">
-              <RequestList
-                requests={displayedItems}
-                selectedId={selectedId}
-                onSelect={handleSelect}
-                liveMode={liveMode}
-                onToggleLiveMode={handleToggleLiveMode}
-                sortNewest={sortNewest}
-                onToggleSort={handleToggleSort}
-                newCount={newCount}
-                onJumpToNew={handleJumpToNew}
-                totalCount={retainedTotalCount ?? undefined}
-                methodFilter={methodFilter}
-                onMethodFilterChange={setMethodFilter}
-                searchQuery={searchInput}
-                onSearchQueryChange={setSearchInput}
-                onLoadMore={handleLoadMore}
-                hasMore={showHasMore}
-                loadingMore={loadingMore}
-                searchLoading={searchLoading}
-                searchError={searchError}
-              />
+            {!paneCollapsed && (
+              <div className="shrink-0 overflow-hidden" style={{ width: paneWidth }}>
+                <RequestList
+                  requests={displayedItems}
+                  selectedId={selectedId}
+                  onSelect={handleSelect}
+                  liveMode={liveMode}
+                  onToggleLiveMode={handleToggleLiveMode}
+                  sortNewest={sortNewest}
+                  onToggleSort={handleToggleSort}
+                  newCount={newCount}
+                  onJumpToNew={handleJumpToNew}
+                  totalCount={retainedTotalCount ?? undefined}
+                  methodFilter={methodFilter}
+                  onMethodFilterChange={setMethodFilter}
+                  searchQuery={searchInput}
+                  onSearchQueryChange={setSearchInput}
+                  onLoadMore={handleLoadMore}
+                  hasMore={showHasMore}
+                  loadingMore={loadingMore}
+                  searchLoading={searchLoading}
+                  searchError={searchError}
+                  searchInputRef={desktopSearchInputRef}
+                />
+              </div>
+            )}
+            {/* Drag handle / divider */}
+            <div
+              className="shrink-0 border-r-2 border-foreground relative group cursor-col-resize select-none"
+              onMouseDown={handleDragStart}
+              onDoubleClick={toggleCollapse}
+              title={paneCollapsed ? "Expand sidebar" : "Drag to resize, double-click to collapse"}
+            >
+              <div className="w-1.5 h-full group-hover:bg-primary/20 transition-colors" />
             </div>
             <div className="flex-1 overflow-hidden">
               <ErrorBoundary resetKey={selectedId ?? undefined}>
                 {displayRequest ? (
-                  <RequestDetail request={displayRequest} />
+                  <RequestDetail
+                    request={displayRequest}
+                    activeTab={activeTab}
+                    onTabChange={setActiveTab}
+                    curlBtnRef={curlBtnRef}
+                  />
                 ) : (
-                  <RequestDetailEmpty />
+                  <RequestDetailEmpty slug={currentEndpoint.slug} />
                 )}
               </ErrorBoundary>
             </div>
@@ -651,7 +877,11 @@ export default function DashboardPage() {
                 </button>
                 <div className="flex-1 overflow-hidden">
                   <ErrorBoundary resetKey={selectedId ?? undefined}>
-                    <RequestDetail request={displayRequest} />
+                    <RequestDetail
+                      request={displayRequest}
+                      activeTab={activeTab}
+                      onTabChange={setActiveTab}
+                    />
                   </ErrorBoundary>
                 </div>
               </div>
@@ -676,6 +906,7 @@ export default function DashboardPage() {
                 loadingMore={loadingMore}
                 searchLoading={searchLoading}
                 searchError={searchError}
+                searchInputRef={mobileSearchInputRef}
               />
             )}
           </div>
