@@ -79,7 +79,8 @@ interface TeamMemberRow {
 interface TeamInviteRow {
   id: string;
   team_id: string;
-  invited_by_user_id: string;
+  invited_by: string;
+  invited_email: string;
   invited_user_id: string;
   status: "pending" | "accepted" | "declined";
   created_at: string;
@@ -88,7 +89,7 @@ interface TeamInviteRow {
 interface TeamEndpointRow {
   team_id: string;
   endpoint_id: string;
-  shared_by_user_id: string;
+  shared_by: string;
 }
 
 // ---------------------------------------------------------------------------
@@ -489,11 +490,12 @@ export async function createInvite(
     .from("team_invites")
     .insert({
       team_id: teamId,
-      invited_by_user_id: userId,
+      invited_by: userId,
+      invited_email: email.toLowerCase().trim(),
       invited_user_id: invitedUser.id,
       status: "pending",
     })
-    .select("id, team_id, invited_by_user_id, invited_user_id, status, created_at")
+    .select("id, team_id, invited_by, invited_email, invited_user_id, status, created_at")
     .single();
 
   if (insertError) {
@@ -510,7 +512,7 @@ export async function createInvite(
       id: invite.id,
       teamId: invite.team_id,
       teamName: (teamData as { name: string }).name,
-      invitedBy: invite.invited_by_user_id,
+      invitedBy: invite.invited_by,
       inviterEmail: inviterUser?.email ?? "",
       invitedEmail: invitedUser.email,
       status: invite.status,
@@ -529,7 +531,7 @@ export async function listPendingInvitesForUser(userId: string): Promise<TeamInv
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const { data: invitesData, error: invitesError } = await (admin as any)
     .from("team_invites")
-    .select("id, team_id, invited_by_user_id, invited_user_id, status, created_at")
+    .select("id, team_id, invited_by, invited_email, invited_user_id, status, created_at")
     .eq("invited_user_id", userId)
     .eq("status", "pending")
     .order("created_at", { ascending: false });
@@ -541,7 +543,7 @@ export async function listPendingInvitesForUser(userId: string): Promise<TeamInv
 
   // Collect team IDs and inviter IDs for batch lookups
   const teamIds = [...new Set(invites.map((i) => i.team_id))];
-  const inviterIds = [...new Set(invites.map((i) => i.invited_by_user_id))];
+  const inviterIds = [...new Set(invites.map((i) => i.invited_by))];
 
   // Fetch teams
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -581,9 +583,9 @@ export async function listPendingInvitesForUser(userId: string): Promise<TeamInv
     id: invite.id,
     teamId: invite.team_id,
     teamName: teamMap.get(invite.team_id) ?? "",
-    invitedBy: invite.invited_by_user_id,
-    inviterEmail: inviterMap.get(invite.invited_by_user_id) ?? "",
-    invitedEmail: selfData?.email ?? "",
+    invitedBy: invite.invited_by,
+    inviterEmail: inviterMap.get(invite.invited_by) ?? "",
+    invitedEmail: invite.invited_email,
     status: invite.status,
     createdAt: parseMillis(invite.created_at),
   }));
@@ -614,7 +616,7 @@ export async function listPendingInvitesForTeam(
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const { data: invitesData, error: invitesError } = await (admin as any)
     .from("team_invites")
-    .select("id, team_id, invited_by_user_id, invited_user_id, status, created_at")
+    .select("id, team_id, invited_by, invited_email, invited_user_id, status, created_at")
     .eq("team_id", teamId)
     .eq("status", "pending")
     .order("created_at", { ascending: false });
@@ -637,7 +639,7 @@ export async function listPendingInvitesForTeam(
 
   // Collect invited user IDs and inviter IDs
   const invitedUserIds = [...new Set(invites.map((i) => i.invited_user_id))];
-  const inviterIds = [...new Set(invites.map((i) => i.invited_by_user_id))];
+  const inviterIds = [...new Set(invites.map((i) => i.invited_by))];
   const allUserIds = [...new Set([...invitedUserIds, ...inviterIds])];
 
   // Fetch user emails
@@ -656,9 +658,9 @@ export async function listPendingInvitesForTeam(
     id: invite.id,
     teamId: invite.team_id,
     teamName,
-    invitedBy: invite.invited_by_user_id,
-    inviterEmail: userEmailMap.get(invite.invited_by_user_id) ?? "",
-    invitedEmail: userEmailMap.get(invite.invited_user_id) ?? "",
+    invitedBy: invite.invited_by,
+    inviterEmail: userEmailMap.get(invite.invited_by) ?? "",
+    invitedEmail: invite.invited_email,
     status: invite.status,
     createdAt: parseMillis(invite.created_at),
   }));
@@ -769,7 +771,7 @@ export async function shareEndpointWithTeam(
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const { error: insertError } = await (admin as any)
     .from("team_endpoints")
-    .insert({ team_id: teamId, endpoint_id: endpointId, shared_by_user_id: userId });
+    .insert({ team_id: teamId, endpoint_id: endpointId, shared_by: userId });
 
   if (insertError) {
     if (insertError.code === "23505") {
@@ -841,7 +843,7 @@ export async function getTeamSharesForEndpoint(
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const { data: sharesData, error: sharesError } = await (admin as any)
     .from("team_endpoints")
-    .select("team_id, endpoint_id, shared_by_user_id")
+    .select("team_id, endpoint_id, shared_by")
     .eq("endpoint_id", endpointId);
 
   if (sharesError) throw sharesError;
@@ -905,7 +907,7 @@ export async function getSharedEndpointsForUser(userId: string): Promise<SharedE
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const { data: sharesData, error: sharesError } = await (admin as any)
     .from("team_endpoints")
-    .select("team_id, endpoint_id, shared_by_user_id")
+    .select("team_id, endpoint_id, shared_by")
     .in("team_id", teamIds);
 
   if (sharesError) throw sharesError;
@@ -1045,7 +1047,7 @@ export async function getShareMetadataForOwnedEndpoints(
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const { data: sharesData, error: sharesError } = await (admin as any)
     .from("team_endpoints")
-    .select("team_id, endpoint_id, shared_by_user_id")
+    .select("team_id, endpoint_id, shared_by")
     .in("endpoint_id", endpointIds);
 
   if (sharesError) throw sharesError;
