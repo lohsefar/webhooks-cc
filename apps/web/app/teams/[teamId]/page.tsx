@@ -439,37 +439,80 @@ export default function TeamDetailPage() {
       )}
 
       {/* Shared Endpoints (owner only) */}
-      {isOwner && ownedEndpoints.length > 0 && (
+      {isOwner && (
         <section className="space-y-4">
           <div className="flex items-center gap-2">
             <h2 className="text-lg font-semibold">Shared Endpoints</h2>
             <HelpTooltip text="Endpoints shared with this team. All members can view requests and edit settings. Only the endpoint owner can delete or manage sharing." />
           </div>
-          <div className="border rounded-lg p-6 bg-card">
-            <div className="space-y-4">
-              {ownedEndpoints.map((ep, i) => {
-                const isShared = ep.sharedWith?.some((s) => s.teamId === teamId) ?? false;
-                return (
-                  <div key={ep.id}>
-                    <div className="flex items-center justify-between">
-                      <div className="min-w-0">
-                        <p className="font-medium truncate">{ep.name || ep.slug}</p>
-                        <p className="text-sm text-muted-foreground font-mono truncate">{ep.slug}</p>
-                      </div>
-                      <Button
-                        variant={isShared ? "default" : "outline"}
-                        size="sm"
-                        onClick={() => void handleToggleEndpoint(ep.id, isShared)}
-                        disabled={togglingEndpoint === ep.id}
-                      >
-                        {togglingEndpoint === ep.id ? "..." : isShared ? "Shared" : "Share"}
-                      </Button>
+          <div className="border rounded-lg p-6 bg-card space-y-4">
+            {(() => {
+              const shared = ownedEndpoints.filter(
+                (ep) => ep.sharedWith?.some((s) => s.teamId === teamId)
+              );
+              const unshared = ownedEndpoints.filter(
+                (ep) => !ep.sharedWith?.some((s) => s.teamId === teamId)
+              );
+              return (
+                <>
+                  {shared.length === 0 ? (
+                    <p className="text-sm text-muted-foreground">
+                      No endpoints shared with this team yet.
+                    </p>
+                  ) : (
+                    <div className="space-y-3">
+                      {shared.map((ep) => (
+                        <div key={ep.id} className="flex items-center justify-between gap-3">
+                          <div className="min-w-0">
+                            <p className="text-sm font-medium truncate">{ep.name || ep.slug}</p>
+                            {ep.name && (
+                              <p className="text-xs text-muted-foreground font-mono truncate">{ep.slug}</p>
+                            )}
+                          </div>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="text-destructive hover:text-destructive hover:bg-destructive/10 shrink-0"
+                            onClick={() => void handleToggleEndpoint(ep.id, true)}
+                            disabled={togglingEndpoint === ep.id}
+                          >
+                            {togglingEndpoint === ep.id ? "..." : "Remove"}
+                          </Button>
+                        </div>
+                      ))}
                     </div>
-                    {i < ownedEndpoints.length - 1 && <div className="border-t mt-4" />}
-                  </div>
-                );
-              })}
-            </div>
+                  )}
+                  {unshared.length > 0 && (
+                    <div className={shared.length > 0 ? "pt-4 border-t" : ""}>
+                      <div className="flex gap-2">
+                        <select
+                          id="add-endpoint-select"
+                          className="flex h-10 w-full items-center rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
+                          defaultValue=""
+                          onChange={(e) => {
+                            const endpointId = e.target.value;
+                            if (endpointId) {
+                              void handleToggleEndpoint(endpointId, false);
+                              e.target.value = "";
+                            }
+                          }}
+                          disabled={togglingEndpoint !== null}
+                        >
+                          <option value="" disabled>
+                            Add an endpoint...
+                          </option>
+                          {unshared.map((ep) => (
+                            <option key={ep.id} value={ep.id}>
+                              {ep.name || ep.slug}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                    </div>
+                  )}
+                </>
+              );
+            })()}
           </div>
         </section>
       )}
