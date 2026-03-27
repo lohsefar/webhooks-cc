@@ -118,6 +118,12 @@ export default function TeamDetailPage() {
   // Remove member
   const [removingId, setRemovingId] = useState<string | null>(null);
 
+  // Shared endpoints
+  const [ownedEndpoints, setOwnedEndpoints] = useState<
+    Array<{ id: string; slug: string; name?: string; sharedWith?: Array<{ teamId: string }> }>
+  >([]);
+  const [togglingEndpoint, setTogglingEndpoint] = useState<string | null>(null);
+
   // Delete team
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [deleting, setDeleting] = useState(false);
@@ -130,9 +136,10 @@ export default function TeamDetailPage() {
     if (!session?.access_token) return;
     setLoading(true);
     try {
-      const [teamsRes, membersRes] = await Promise.all([
+      const [teamsRes, membersRes, endpointsRes] = await Promise.all([
         fetch("/api/teams", { headers: authHeader }),
         fetch(`/api/teams/${teamId}/members`, { headers: authHeader }),
+        fetch("/api/endpoints", { headers: authHeader }),
       ]);
 
       if (teamsRes.ok) {
@@ -154,6 +161,13 @@ export default function TeamDetailPage() {
           await membersRes.json();
         setMembers(data.members ?? []);
         setPendingInvites(data.pendingInvites ?? []);
+      }
+
+      if (endpointsRes.ok) {
+        const data = (await endpointsRes.json()) as {
+          owned: Array<{ id: string; slug: string; name?: string; sharedWith?: Array<{ teamId: string }> }>;
+        };
+        setOwnedEndpoints(data.owned ?? []);
       }
 
       // Identify current user from session
@@ -239,6 +253,34 @@ export default function TeamDetailPage() {
       }
     } finally {
       setRenaming(false);
+    }
+  };
+
+  const handleToggleEndpoint = async (endpointId: string, isShared: boolean) => {
+    setTogglingEndpoint(endpointId);
+    try {
+      if (isShared) {
+        await fetch(`/api/teams/${teamId}/endpoints/${endpointId}`, {
+          method: "DELETE",
+          headers: authHeader,
+        });
+      } else {
+        await fetch(`/api/teams/${teamId}/endpoints`, {
+          method: "POST",
+          headers: { ...authHeader, "Content-Type": "application/json" },
+          body: JSON.stringify({ endpointId }),
+        });
+      }
+      // Refresh endpoint data
+      const res = await fetch("/api/endpoints", { headers: authHeader });
+      if (res.ok) {
+        const data = (await res.json()) as {
+          owned: Array<{ id: string; slug: string; name?: string; sharedWith?: Array<{ teamId: string }> }>;
+        };
+        setOwnedEndpoints(data.owned ?? []);
+      }
+    } finally {
+      setTogglingEndpoint(null);
     }
   };
 
@@ -392,6 +434,42 @@ export default function TeamDetailPage() {
                 {inviteMessage.text}
               </p>
             )}
+          </div>
+        </section>
+      )}
+
+      {/* Shared Endpoints (owner only) */}
+      {isOwner && ownedEndpoints.length > 0 && (
+        <section className="space-y-4">
+          <div className="flex items-center gap-2">
+            <h2 className="text-lg font-semibold">Shared Endpoints</h2>
+            <HelpTooltip text="Endpoints shared with this team. All members can view requests and edit settings. Only the endpoint owner can delete or manage sharing." />
+          </div>
+          <div className="border rounded-lg p-6 bg-card">
+            <div className="space-y-4">
+              {ownedEndpoints.map((ep, i) => {
+                const isShared = ep.sharedWith?.some((s) => s.teamId === teamId) ?? false;
+                return (
+                  <div key={ep.id}>
+                    <div className="flex items-center justify-between">
+                      <div className="min-w-0">
+                        <p className="font-medium truncate">{ep.name || ep.slug}</p>
+                        <p className="text-sm text-muted-foreground font-mono truncate">{ep.slug}</p>
+                      </div>
+                      <Button
+                        variant={isShared ? "default" : "outline"}
+                        size="sm"
+                        onClick={() => void handleToggleEndpoint(ep.id, isShared)}
+                        disabled={togglingEndpoint === ep.id}
+                      >
+                        {togglingEndpoint === ep.id ? "..." : isShared ? "Shared" : "Share"}
+                      </Button>
+                    </div>
+                    {i < ownedEndpoints.length - 1 && <div className="border-t mt-4" />}
+                  </div>
+                );
+              })}
+            </div>
           </div>
         </section>
       )}
