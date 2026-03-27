@@ -282,81 +282,84 @@ export default function TeamDetailPage() {
       </div>
 
       {/* Members */}
-      <section className="space-y-3">
+      <section className="space-y-4">
         <div className="flex items-center gap-2">
-          <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">
-            Members
-          </h2>
+          <h2 className="text-lg font-semibold">Members</h2>
           <HelpTooltip text="Owner can manage the team, invite and remove members, and delete it. Members can view and edit shared endpoints." />
         </div>
-        {members.length === 0 ? (
-          <p className="text-sm text-muted-foreground">No members yet.</p>
-        ) : (
-          <div className="border rounded-lg bg-card divide-y">
-            {members.map((member) => (
-              <div
-                key={member.id}
-                className="p-4 flex items-center justify-between gap-3"
-              >
-                <div className="flex items-center gap-3 min-w-0">
-                  <MemberAvatar member={member} />
-                  <div className="min-w-0">
-                    {member.name && (
-                      <p className="font-medium truncate">{member.name}</p>
-                    )}
-                    <p className="text-sm text-muted-foreground truncate">
-                      {member.email}
-                    </p>
+        <div className="border rounded-lg p-6 bg-card">
+          {members.length === 0 ? (
+            <p className="text-sm text-muted-foreground">No members yet.</p>
+          ) : (
+            <div className="space-y-4">
+              {members.map((member, i) => (
+                <div key={member.id}>
+                  <div className="flex items-center justify-between gap-3">
+                    <div className="flex items-center gap-3 min-w-0">
+                      <MemberAvatar member={member} />
+                      <div className="min-w-0">
+                        {member.name && (
+                          <p className="font-medium truncate">{member.name}</p>
+                        )}
+                        <p className="text-sm text-muted-foreground truncate">
+                          {member.email}
+                        </p>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2 shrink-0">
+                      <Badge variant={member.role === "owner" ? "default" : "secondary"}>
+                        {member.role}
+                      </Badge>
+                      {isOwner && member.role !== "owner" && member.id !== currentUserId && (
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          className="text-destructive hover:text-destructive hover:bg-destructive/10"
+                          onClick={() => void handleRemoveMember(member.id)}
+                          disabled={removingId === member.id}
+                          aria-label={`Remove ${member.name ?? member.email}`}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      )}
+                    </div>
                   </div>
+                  {i < members.length - 1 && <div className="border-t mt-4" />}
                 </div>
-                <div className="flex items-center gap-2 shrink-0">
-                  <Badge variant={member.role === "owner" ? "default" : "secondary"}>
-                    {member.role}
-                  </Badge>
-                  {isOwner && member.role !== "owner" && member.id !== currentUserId && (
-                    <Button
-                      size="sm"
-                      variant="ghost"
-                      className="text-destructive hover:text-destructive hover:bg-destructive/10"
-                      onClick={() => void handleRemoveMember(member.id)}
-                      disabled={removingId === member.id}
-                      aria-label={`Remove ${member.name ?? member.email}`}
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
-                  )}
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
+              ))}
+            </div>
+          )}
 
-        {/* Pending Invites */}
-        {pendingInvites.length > 0 && (
-          <div className="border rounded-lg bg-card divide-y mt-2">
-            {pendingInvites.map((invite) => (
-              <div
-                key={invite.id}
-                className="p-4 flex items-center justify-between gap-3"
-              >
-                <p className="text-sm">{invite.email}</p>
-                <Badge variant="outline">pending</Badge>
+          {/* Pending Invites */}
+          {pendingInvites.length > 0 && (
+            <>
+              <div className="border-t mt-4 pt-4">
+                <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-3">Pending Invites</p>
+                <div className="space-y-3">
+                  {pendingInvites.map((invite) => (
+                    <div
+                      key={invite.id}
+                      className="flex items-center justify-between gap-3"
+                    >
+                      <p className="text-sm">{invite.email}</p>
+                      <Badge variant="outline">pending</Badge>
+                    </div>
+                  ))}
+                </div>
               </div>
-            ))}
-          </div>
-        )}
+            </>
+          )}
+        </div>
       </section>
 
       {/* Invite Member (owner only) */}
       {isOwner && (
-        <section className="space-y-3">
+        <section className="space-y-4">
           <div className="flex items-center gap-2">
-            <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">
-              Invite Member
-            </h2>
+            <h2 className="text-lg font-semibold">Invite Member</h2>
             <HelpTooltip text="Enter the email of a registered webhooks.cc user. They'll receive an invite they can accept or decline." />
           </div>
-          <div className="border rounded-lg bg-card p-4 space-y-3">
+          <div className="border rounded-lg p-6 space-y-4 bg-card">
             <Label htmlFor="invite-email">Email address</Label>
             <div className="flex gap-2">
               <Input
@@ -395,11 +398,9 @@ export default function TeamDetailPage() {
 
       {/* Team Settings (owner only) */}
       {isOwner && (
-        <section className="space-y-3">
-          <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">
-            Team Settings
-          </h2>
-          <div className="border rounded-lg bg-card p-4 space-y-3">
+        <section className="space-y-4">
+          <h2 className="text-lg font-semibold">Team Settings</h2>
+          <div className="border rounded-lg p-6 space-y-4 bg-card">
             <Label htmlFor="team-name">Team name</Label>
             <div className="flex gap-2">
               <Input
@@ -439,24 +440,15 @@ export default function TeamDetailPage() {
 
       {/* Danger Zone (owner only) */}
       {isOwner && (
-        <section className="space-y-3">
-          <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide text-destructive">
-            Danger Zone
-          </h2>
-          <div className="border border-destructive/40 rounded-lg bg-card p-4 flex items-center justify-between gap-4">
-            <div>
-              <p className="font-medium text-sm">Delete this team</p>
-              <p className="text-sm text-muted-foreground">
-                Permanently delete the team and remove all members. This cannot
-                be undone.
-              </p>
-            </div>
+        <section className="space-y-4">
+          <h2 className="text-lg font-semibold text-destructive">Danger Zone</h2>
+          <div className="border rounded-lg p-6 bg-card space-y-2">
+            <p className="text-sm text-muted-foreground">
+              Permanently delete this team and remove all members. This cannot be undone.
+            </p>
             <Dialog open={deleteOpen} onOpenChange={setDeleteOpen}>
               <DialogTrigger asChild>
-                <Button variant="destructive" size="sm" className="shrink-0">
-                  <Trash2 className="h-4 w-4 mr-1" />
-                  Delete Team
-                </Button>
+                <Button variant="destructive">Delete Team</Button>
               </DialogTrigger>
               <DialogContent>
                 <DialogHeader>

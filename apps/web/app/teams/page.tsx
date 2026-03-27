@@ -187,36 +187,37 @@ export default function TeamsPage() {
 
       {/* Pending Invites */}
       {invites.length > 0 && (
-        <section className="space-y-3">
-          <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">
-            Pending Invites
-          </h2>
-          <div className="border rounded-lg bg-card divide-y">
-            {invites.map((invite) => (
-              <div key={invite.id} className="p-4 flex items-center justify-between">
-                <div>
-                  <p className="font-medium">{invite.teamName}</p>
-                  <p className="text-sm text-muted-foreground">
-                    Invited by {invite.inviterEmail}
-                  </p>
+        <section className="space-y-4">
+          <h2 className="text-lg font-semibold">Pending Invites</h2>
+          <div className="border rounded-lg p-6 space-y-4 bg-card">
+            {invites.map((invite, i) => (
+              <div key={invite.id}>
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="font-medium">{invite.teamName}</p>
+                    <p className="text-sm text-muted-foreground">
+                      Invited by {invite.inviterEmail}
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Button
+                      size="sm"
+                      onClick={() => void handleAccept(invite.id)}
+                      disabled={acceptingId === invite.id || decliningId === invite.id}
+                    >
+                      {acceptingId === invite.id ? "Accepting..." : "Accept"}
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => void handleDecline(invite.id)}
+                      disabled={acceptingId === invite.id || decliningId === invite.id}
+                    >
+                      {decliningId === invite.id ? "Declining..." : "Decline"}
+                    </Button>
+                  </div>
                 </div>
-                <div className="flex items-center gap-2">
-                  <Button
-                    size="sm"
-                    onClick={() => void handleAccept(invite.id)}
-                    disabled={acceptingId === invite.id || decliningId === invite.id}
-                  >
-                    {acceptingId === invite.id ? "Accepting..." : "Accept"}
-                  </Button>
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    onClick={() => void handleDecline(invite.id)}
-                    disabled={acceptingId === invite.id || decliningId === invite.id}
-                  >
-                    {decliningId === invite.id ? "Declining..." : "Decline"}
-                  </Button>
-                </div>
+                {i < invites.length - 1 && <div className="border-t mt-4" />}
               </div>
             ))}
           </div>
@@ -224,66 +225,66 @@ export default function TeamsPage() {
       )}
 
       {/* My Teams */}
-      <section className="space-y-3">
-        <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">
-          My Teams
-        </h2>
-        {ownedTeams.length === 0 ? (
-          <p className="text-sm text-muted-foreground">
-            You have not created any teams yet.
-          </p>
-        ) : (
-          <div className="border rounded-lg bg-card divide-y">
-            {ownedTeams.map((team) => (
-              <div key={team.id} className="p-4 flex items-center justify-between">
-                <div>
-                  <p className="font-medium">{team.name}</p>
-                  <p className="text-sm text-muted-foreground">
-                    {team.memberCount} {team.memberCount === 1 ? "member" : "members"}
-                  </p>
+      <section className="space-y-4">
+        <h2 className="text-lg font-semibold">My Teams</h2>
+        <div className="border rounded-lg p-6 bg-card">
+          {ownedTeams.length === 0 ? (
+            <p className="text-sm text-muted-foreground">
+              You haven&apos;t created any teams yet.
+            </p>
+          ) : (
+            <div className="space-y-4">
+              {ownedTeams.map((team, i) => (
+                <div key={team.id}>
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="font-medium">{team.name}</p>
+                      <p className="text-sm text-muted-foreground">
+                        {team.memberCount} {team.memberCount === 1 ? "member" : "members"}
+                      </p>
+                    </div>
+                    <Button size="sm" variant="outline" asChild>
+                      <Link href={`/teams/${team.id}`}>Manage</Link>
+                    </Button>
+                  </div>
+                  {i < ownedTeams.length - 1 && <div className="border-t mt-4" />}
                 </div>
-                <Button size="sm" variant="outline" asChild>
-                  <Link href={`/teams/${team.id}`}>Manage</Link>
-                </Button>
-              </div>
-            ))}
-          </div>
-        )}
+              ))}
+            </div>
+          )}
+        </div>
       </section>
 
       {/* Teams I'm In */}
-      <section className="space-y-3">
-        <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">
-          Teams I&apos;m In
-        </h2>
-        {memberTeams.length === 0 ? (
-          <p className="text-sm text-muted-foreground">
-            You are not a member of any teams.
-          </p>
-        ) : (
-          <div className="border rounded-lg bg-card divide-y">
-            {memberTeams.map((team) => (
-              <div key={team.id} className="p-4 flex items-center justify-between">
-                <div>
-                  <p className="font-medium">{team.name}</p>
-                  <p className="text-sm text-muted-foreground">
-                    {team.memberCount} {team.memberCount === 1 ? "member" : "members"}
-                  </p>
+      <section className="space-y-4">
+        <h2 className="text-lg font-semibold">Teams I&apos;m In</h2>
+        <div className="border rounded-lg p-6 bg-card">
+          {memberTeams.length === 0 ? (
+            <p className="text-sm text-muted-foreground">
+              You&apos;re not a member of any other teams.
+            </p>
+          ) : (
+            <div className="space-y-4">
+              {memberTeams.map((team, i) => (
+                <div key={team.id}>
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="font-medium">{team.name}</p>
+                      <p className="text-sm text-muted-foreground">
+                        {team.memberCount} {team.memberCount === 1 ? "member" : "members"}
+                      </p>
+                    </div>
+                    <Button size="sm" variant="outline" asChild>
+                      <Link href={`/teams/${team.id}`}>View</Link>
+                    </Button>
+                  </div>
+                  {i < memberTeams.length - 1 && <div className="border-t mt-4" />}
                 </div>
-                <Button size="sm" variant="outline" asChild>
-                  <Link href={`/teams/${team.id}`}>View</Link>
-                </Button>
-              </div>
-            ))}
-          </div>
-        )}
+              ))}
+            </div>
+          )}
+        </div>
       </section>
-
-      {teams.length === 0 && invites.length === 0 && (
-        <p className="text-sm text-muted-foreground text-center py-4">
-          No teams yet. Create one or ask a team owner to invite you.
-        </p>
-      )}
     </main>
   );
 }
