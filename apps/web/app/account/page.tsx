@@ -10,11 +10,11 @@ import { UpgradeButton } from "@/components/billing/upgrade-button";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { ACCOUNT_PROFILE_SELECT, type AccountProfile } from "@/lib/account-profile";
-import { trackUpgradeCompleted, resetUser, identifyUser } from "@/lib/analytics";
+import { trackUpgradeCompleted, identifyUser } from "@/lib/analytics";
 import { useAuth } from "@/components/providers/supabase-auth-provider";
 import { createClient } from "@/lib/supabase/client";
 import { subscribeToUserRow } from "@/lib/supabase/realtime";
-import { CheckCircle, LogOut, Trash2 } from "lucide-react";
+import { CheckCircle, Trash2 } from "lucide-react";
 import { GitHubIcon } from "@/components/ui/icons";
 import Link from "next/link";
 import { APP_VERSION } from "@/lib/changelog";
@@ -96,7 +96,6 @@ export default function AccountPage() {
   const [nowMs, setNowMs] = useState(() => Date.now());
   const [apiKeys, setApiKeys] = useState<ApiKeyEntry[]>([]);
   const [deletingKeyId, setDeletingKeyId] = useState<string | null>(null);
-  const router = useRouter();
 
   const refreshProfile = useCallback(async () => {
     if (!authUser) {
@@ -191,13 +190,6 @@ export default function AccountPage() {
 
     return () => clearInterval(interval);
   }, []);
-
-  const handleSignOut = async () => {
-    const supabase = createClient();
-    resetUser();
-    await supabase.auth.signOut();
-    router.push("/");
-  };
 
   if (authLoading || profileLoading) {
     return (
@@ -427,11 +419,7 @@ export default function AccountPage() {
         </div>
       </section>
 
-      <section className="flex items-center justify-between">
-        <Button variant="outline" onClick={handleSignOut} className="flex items-center gap-2">
-          <LogOut className="h-4 w-4" />
-          Sign Out
-        </Button>
+      <section className="flex justify-end">
         <Link href="/changelog" className="text-xs text-muted-foreground hover:text-foreground">
           v{APP_VERSION}
         </Link>
