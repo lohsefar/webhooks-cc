@@ -66,7 +66,7 @@ export const metadata = createPageMetadata({
   ],
 });
 
-export default function CompareSmeeePage() {
+export default function CompareSmeePage() {
   return (
     <main className="min-h-screen pt-32 pb-20 px-4">
       <JsonLd
