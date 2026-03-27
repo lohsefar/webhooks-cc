@@ -122,7 +122,7 @@ export default function TeamDetailPage() {
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [deleting, setDeleting] = useState(false);
 
-  const authHeader = session?.access_token
+  const authHeader: Record<string, string> = session?.access_token
     ? { Authorization: `Bearer ${session.access_token}` }
     : {};
 

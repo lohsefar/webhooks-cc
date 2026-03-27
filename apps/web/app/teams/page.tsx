@@ -44,7 +44,7 @@ export default function TeamsPage() {
   const [acceptingId, setAcceptingId] = useState<string | null>(null);
   const [decliningId, setDecliningId] = useState<string | null>(null);
 
-  const authHeader = session?.access_token
+  const authHeader: Record<string, string> = session?.access_token
     ? { Authorization: `Bearer ${session.access_token}` }
     : {};
 
