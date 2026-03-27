@@ -4,6 +4,7 @@ import {
   getEndpointBySlugForUser,
   updateEndpointBySlugForUser,
 } from "@/lib/supabase/endpoints";
+import { resolveEndpointAccess } from "@/lib/supabase/teams";
 
 export async function GET(request: Request, { params }: { params: Promise<{ slug: string }> }) {
   const auth = await authenticateRequest(request);
@@ -79,8 +80,14 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ sl
   }
 
   try {
+    // Allow team members to edit (they can rename + change mock response)
+    const access = await resolveEndpointAccess(auth.userId, slug);
+    if (!access) {
+      return Response.json({ error: "Endpoint not found" }, { status: 404 });
+    }
+
     const endpoint = await updateEndpointBySlugForUser({
-      userId: auth.userId,
+      userId: access.ownerId,
       slug,
       name: body.name as string | undefined,
       mockResponse:
