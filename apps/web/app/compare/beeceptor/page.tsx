@@ -139,7 +139,7 @@ export default function CompareBeeceptorPage() {
               webhooks.cc provides three integration layers beyond the dashboard: a CLI for
               tunneling webhooks to localhost, a TypeScript SDK for programmatic access and CI
               assertions, and an MCP server for AI coding agents. Team collaboration on webhooks.cc
-              starts at $8/month with up to 25 members, while Beeceptor&apos;s Team plan costs
+              starts at $8/month with up to 25 members, while Beeceptor&apos;s Team+ plan costs
               $25/month. Beeceptor is browser-first with API access on paid plans.
             </p>
           </div>
