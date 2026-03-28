@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useAuth } from "@/components/providers/supabase-auth-provider";
+import { createClient } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -13,7 +14,7 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
-import { Plus } from "lucide-react";
+import { Plus, Lock } from "lucide-react";
 import Link from "next/link";
 
 interface Team {
@@ -34,7 +35,8 @@ interface Invite {
 }
 
 export default function TeamsPage() {
-  const { session, isLoading: authLoading } = useAuth();
+  const { user: authUser, session, isLoading: authLoading } = useAuth();
+  const [plan, setPlan] = useState<string | null>(null);
   const [teams, setTeams] = useState<Team[]>([]);
   const [invites, setInvites] = useState<Invite[]>([]);
   const [loading, setLoading] = useState(true);
@@ -49,9 +51,23 @@ export default function TeamsPage() {
     : {};
 
   const fetchData = async () => {
-    if (!session?.access_token) return;
+    if (!session?.access_token || !authUser) return;
     setLoading(true);
     try {
+      // Fetch plan
+      const supabase = createClient();
+      const { data: userRow } = await supabase
+        .from("users")
+        .select("plan")
+        .eq("id", authUser.id)
+        .single<{ plan: string }>();
+      setPlan(userRow?.plan ?? "free");
+
+      if (userRow?.plan !== "pro") {
+        setLoading(false);
+        return;
+      }
+
       const [teamsRes, invitesRes] = await Promise.all([
         fetch("/api/teams", { headers: authHeader }),
         fetch("/api/invites", { headers: authHeader }),
@@ -131,6 +147,31 @@ export default function TeamsPage() {
     return (
       <main className="container mx-auto px-4 py-8 max-w-2xl">
         <div className="animate-pulse text-muted-foreground">Loading...</div>
+      </main>
+    );
+  }
+
+  if (plan !== "pro") {
+    return (
+      <main className="container mx-auto px-4 py-8 max-w-2xl">
+        <section className="space-y-4">
+          <h1 className="text-2xl font-bold">Teams</h1>
+          <div className="border rounded-lg p-6 bg-card space-y-4">
+            <div className="flex items-center gap-3">
+              <Lock className="h-5 w-5 text-muted-foreground" />
+              <div>
+                <p className="font-medium">Teams is a Pro feature</p>
+                <p className="text-sm text-muted-foreground">
+                  Collaborate on webhook endpoints with your team. Create teams, invite
+                  members, and share endpoints — all in real time.
+                </p>
+              </div>
+            </div>
+            <Button asChild>
+              <Link href="/account">Upgrade to Pro</Link>
+            </Button>
+          </div>
+        </section>
       </main>
     );
   }

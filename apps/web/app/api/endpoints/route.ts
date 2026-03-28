@@ -1,4 +1,4 @@
-import { authenticateRequest } from "@/lib/api-auth";
+import { authenticateRequest, extractBearerToken, validateBearerTokenWithPlan } from "@/lib/api-auth";
 import { parseJsonBody } from "@/lib/request-validation";
 import { checkRateLimitByKey } from "@/lib/rate-limit";
 import { createEndpointForUser, listEndpointsForUser } from "@/lib/supabase/endpoints";
@@ -15,10 +15,15 @@ export async function GET(request: Request) {
   if (!auth.success) return auth.response;
 
   try {
+    // Check plan — team features only for pro users
+    const token = extractBearerToken(request);
+    const validation = token ? await validateBearerTokenWithPlan(token) : null;
+    const isPro = validation?.plan === "pro";
+
     const [endpoints, shareMetadata, sharedEndpoints] = await Promise.all([
       listEndpointsForUser(auth.userId),
-      getShareMetadataForOwnedEndpoints(auth.userId),
-      getSharedEndpointsForUser(auth.userId),
+      isPro ? getShareMetadataForOwnedEndpoints(auth.userId) : Promise.resolve(new Map()),
+      isPro ? getSharedEndpointsForUser(auth.userId) : Promise.resolve([]),
     ]);
 
     const owned = endpoints.map((ep) => ({

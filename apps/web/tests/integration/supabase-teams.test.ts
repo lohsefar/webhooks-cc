@@ -69,7 +69,12 @@ async function createTestUser(email: string, name: string): Promise<string> {
     user_metadata: { full_name: name },
   });
   if (error) throw error;
-  return data.user!.id;
+  const userId = data.user!.id;
+
+  // Upgrade to pro (teams require pro plan)
+  await admin.from("users").update({ plan: "pro" }).eq("id", userId);
+
+  return userId;
 }
 
 async function insertRequest(epId: string, userId: string, path: string) {
@@ -278,8 +283,8 @@ describe("Teams Integration", () => {
       const invite = invites.find((i) => i.teamId === teamId);
       expect(invite).toBeDefined();
 
-      const accepted = await acceptInvite(memberId, invite!.id);
-      expect(accepted).toBe(true);
+      const result = await acceptInvite(memberId, invite!.id);
+      expect(result.accepted).toBe(true);
     });
 
     it("member now appears in team members list", async () => {
@@ -771,7 +776,7 @@ describe("Teams Integration", () => {
 
     it("wrong user cannot accept someone else's invite", async () => {
       const result = await acceptInvite(thirdId, inviteForMember);
-      expect(result).toBe(false);
+      expect(result.accepted).toBe(false);
     });
 
     it("wrong user cannot decline someone else's invite", async () => {
@@ -780,11 +785,11 @@ describe("Teams Integration", () => {
     });
 
     it("accepting an already-accepted invite returns false", async () => {
-      const accepted = await acceptInvite(memberId, inviteForMember);
-      expect(accepted).toBe(true);
+      const first = await acceptInvite(memberId, inviteForMember);
+      expect(first.accepted).toBe(true);
 
       const again = await acceptInvite(memberId, inviteForMember);
-      expect(again).toBe(false);
+      expect(again.accepted).toBe(false);
     });
 
     it("non-team-member cannot invite", async () => {
@@ -891,6 +896,55 @@ describe("Teams Integration", () => {
     it("cleanup temp teams", async () => {
       for (const id of tempTeamIds) {
         await deleteTeam(ownerId, id);
+      }
+    });
+  });
+
+  // ---------------------------------------------------------------------------
+  // Pro-only enforcement
+  // ---------------------------------------------------------------------------
+
+  describe("Pro-only enforcement", () => {
+    let freeUserId: string;
+    let freeInviteId: string;
+
+    it("creates a free user for pro-only tests", async () => {
+      const { data, error } = await admin.auth.admin.createUser({
+        email: `test-teams-free-${ts}@webhooks-test.local`,
+        password: TEST_PASSWORD,
+        email_confirm: true,
+        user_metadata: { full_name: "Free User" },
+      });
+      if (error) throw error;
+      freeUserId = data.user!.id;
+      // Stays on free plan (default)
+    });
+
+    it("free user cannot create a team", async () => {
+      const result = await createTeam(freeUserId, "Free Team");
+      expect("error" in result).toBe(true);
+      if ("error" in result) {
+        expect(result.error).toContain("Pro");
+      }
+    });
+
+    it("free user cannot accept a team invite", async () => {
+      const inviteResult = await createInvite(
+        ownerId,
+        teamId,
+        `test-teams-free-${ts}@webhooks-test.local`
+      );
+      expect(inviteResult.invite).toBeDefined();
+      freeInviteId = inviteResult.invite!.id;
+
+      const acceptResult = await acceptInvite(freeUserId, freeInviteId);
+      expect(acceptResult.accepted).toBe(false);
+      expect(acceptResult.error).toContain("Pro");
+    });
+
+    it("cleanup free user", async () => {
+      if (freeUserId) {
+        await admin.auth.admin.deleteUser(freeUserId);
       }
     });
   });

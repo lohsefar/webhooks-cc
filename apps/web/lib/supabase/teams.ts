@@ -139,6 +139,23 @@ function normalizeMockResponse(
 }
 
 // ---------------------------------------------------------------------------
+// Helpers — plan check
+// ---------------------------------------------------------------------------
+
+async function requirePro(userId: string): Promise<string | null> {
+  const admin = createAdminClient();
+  const { data, error } = await admin
+    .from("users")
+    .select("plan")
+    .eq("id", userId)
+    .maybeSingle();
+
+  if (error) throw error;
+  if (!data || data.plan !== "pro") return "Teams require a Pro plan";
+  return null;
+}
+
+// ---------------------------------------------------------------------------
 // 1. createTeam
 // ---------------------------------------------------------------------------
 
@@ -146,6 +163,9 @@ export async function createTeam(
   userId: string,
   name: string
 ): Promise<Team | { error: string }> {
+  const proError = await requirePro(userId);
+  if (proError) return { error: proError };
+
   const admin = createAdminClient();
 
   // Atomic: insert team + owner member in one transaction via stored procedure
@@ -714,7 +734,13 @@ export async function listPendingInvitesForTeam(
 // 10. acceptInvite
 // ---------------------------------------------------------------------------
 
-export async function acceptInvite(userId: string, inviteId: string): Promise<boolean> {
+export async function acceptInvite(
+  userId: string,
+  inviteId: string
+): Promise<{ accepted: boolean; error?: string }> {
+  const proError = await requirePro(userId);
+  if (proError) return { accepted: false, error: proError };
+
   const admin = createAdminClient();
 
   // Atomically claim the invite by updating status from pending → accepted
@@ -730,7 +756,7 @@ export async function acceptInvite(userId: string, inviteId: string): Promise<bo
     .maybeSingle();
 
   if (claimError) throw claimError;
-  if (!claimed) return false;
+  if (!claimed) return { accepted: false };
 
   const inviteRow = claimed as { id: string; team_id: string };
 
@@ -749,7 +775,7 @@ export async function acceptInvite(userId: string, inviteId: string): Promise<bo
       .from("team_invites")
       .update({ status: "pending" })
       .eq("id", inviteId);
-    return false;
+    return { accepted: false, error: "Team has reached the maximum of 25 members" };
   }
 
   // Add as team member
@@ -763,7 +789,7 @@ export async function acceptInvite(userId: string, inviteId: string): Promise<bo
     if (memberError.code !== "23505") throw memberError;
   }
 
-  return true;
+  return { accepted: true };
 }
 
 // ---------------------------------------------------------------------------
@@ -1050,6 +1076,10 @@ export async function resolveEndpointAccess(
   if (endpoint.user_id === userId) {
     return { endpointId: endpoint.id, ownerId, isOwner: true };
   }
+
+  // Team access requires pro plan
+  const proError = await requirePro(userId);
+  if (proError) return null;
 
   // Check team access: user must be a team member AND endpoint must be shared with that team
   // eslint-disable-next-line @typescript-eslint/no-explicit-any

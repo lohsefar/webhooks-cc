@@ -11,8 +11,11 @@ export async function POST(
   const { inviteId } = await params;
 
   try {
-    const accepted = await acceptInvite(auth.userId, inviteId);
-    if (!accepted) {
+    const result = await acceptInvite(auth.userId, inviteId);
+    if (!result.accepted) {
+      if (result.error) {
+        return Response.json({ error: result.error }, { status: 400 });
+      }
       return Response.json({ error: "Invite not found" }, { status: 404 });
     }
     return Response.json({ success: true });
