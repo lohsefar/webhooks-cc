@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { usePathname } from "next/navigation";
 import Link from "next/link";
 import { X } from "lucide-react";
 import { ANNOUNCEMENTS } from "@/lib/announcements";
@@ -8,13 +9,17 @@ import { ANNOUNCEMENTS } from "@/lib/announcements";
 export function AnnouncementBanner() {
   const announcement = ANNOUNCEMENTS[0];
   const announcementId = announcement?.id;
+  const pathname = usePathname();
   const [visible, setVisible] = useState(false);
 
+  // Don't show on dashboard — it has its own DashboardAnnouncement.
+  const isDashboard = pathname.startsWith("/dashboard");
+
   useEffect(() => {
-    if (announcementId && !localStorage.getItem(announcementId)) {
+    if (announcementId && !isDashboard && !localStorage.getItem(announcementId)) {
       setVisible(true);
     }
-  }, [announcementId]);
+  }, [announcementId, isDashboard]);
 
   if (!visible || !announcement) return null;
 

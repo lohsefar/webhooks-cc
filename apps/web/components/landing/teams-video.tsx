@@ -5,6 +5,15 @@ import { useRef, useEffect, useState } from "react";
 export function TeamsVideo() {
   const ref = useRef<HTMLVideoElement>(null);
   const [visible, setVisible] = useState(false);
+  const [reducedMotion, setReducedMotion] = useState(false);
+
+  useEffect(() => {
+    const mql = window.matchMedia("(prefers-reduced-motion: reduce)");
+    setReducedMotion(mql.matches);
+    const handler = (e: MediaQueryListEvent) => setReducedMotion(e.matches);
+    mql.addEventListener("change", handler);
+    return () => mql.removeEventListener("change", handler);
+  }, []);
 
   useEffect(() => {
     const el = ref.current;
@@ -25,17 +34,18 @@ export function TeamsVideo() {
   }, []);
 
   useEffect(() => {
-    if (visible) {
-      ref.current?.play();
+    if (visible && !reducedMotion) {
+      void ref.current?.play().catch(() => {});
     }
-  }, [visible]);
+  }, [visible, reducedMotion]);
 
   return (
     <video
       ref={ref}
-      loop
+      loop={!reducedMotion}
       muted
       playsInline
+      controls={reducedMotion}
       preload="none"
       src={visible ? "/video/TeamsFeature.mp4" : undefined}
       className="w-full h-auto block"
