@@ -6,7 +6,7 @@ import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { ThemeToggle } from "@/components/ui/theme-toggle";
 import { SupabaseAuthProvider, useAuth } from "@/components/providers/supabase-auth-provider";
-import { getNavbarTopClass } from "@/lib/announcements";
+import { getMaintenanceTopOffset } from "@/lib/announcements";
 
 export default function CliVerifyPage() {
   return (
@@ -74,7 +74,10 @@ function CliVerifyContent() {
 
   return (
     <div className="min-h-screen flex flex-col">
-      <nav className={`fixed ${getNavbarTopClass()} left-4 right-4 z-50`}>
+      <nav
+        className="fixed left-4 right-4 z-50"
+        style={{ top: `calc(${getMaintenanceTopOffset()} + var(--ann-h, 0px))` }}
+      >
         <div className="max-w-6xl mx-auto border-2 border-foreground bg-background shadow-neo">
           <div className="px-6 h-16 flex items-center justify-between">
             <Link href="/" className="font-bold text-xl tracking-tight">

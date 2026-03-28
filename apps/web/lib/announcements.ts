@@ -23,20 +23,15 @@ export const ANNOUNCEMENTS: Announcement[] = [
   },
 ];
 
-/** True when there is at least one active announcement (used by the navbar for positioning). */
-export const ANNOUNCEMENT_BANNER_ENABLED = ANNOUNCEMENTS.length > 0;
-
 /**
- * Returns the appropriate Tailwind `top-*` class for fixed navigation elements,
- * accounting for active maintenance and announcement banners.
+ * Returns the base top offset for the maintenance banner only.
+ * The announcement banner offset is handled via the `--ann-h` CSS variable,
+ * which is set client-side by the AnnouncementBanner component and an inline
+ * script in the root layout (so it responds to dismissal in real time).
  */
-export function getNavbarTopClass(): string {
-  // Avoid circular dependency — inline the maintenance check.
+export function getMaintenanceTopOffset(): string {
   const maintenance =
     process.env.NEXT_PUBLIC_MAINTENANCE_BANNER_ENABLED === "true" &&
     !!process.env.NEXT_PUBLIC_MAINTENANCE_BANNER_TEXT;
-  const announcement = ANNOUNCEMENT_BANNER_ENABLED;
-  if (maintenance && announcement) return "top-24";
-  if (maintenance || announcement) return "top-14";
-  return "top-4";
+  return maintenance ? "3.5rem" : "1rem";
 }

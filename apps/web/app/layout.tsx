@@ -13,6 +13,7 @@ import { ThemeProvider } from "@/components/providers/theme-provider";
 import { PostHogProvider } from "@/components/providers/posthog-provider";
 import { MaintenanceBanner } from "@/components/maintenance-banner";
 import { AnnouncementBanner } from "@/components/announcement-banner";
+import { ANNOUNCEMENTS } from "@/lib/announcements";
 
 const spaceGrotesk = Space_Grotesk({
   subsets: ["latin"],
@@ -105,6 +106,13 @@ export default function RootLayout({
             `,
           }}
         />
+        {ANNOUNCEMENTS.length > 0 && (
+          <script
+            dangerouslySetInnerHTML={{
+              __html: `(function(){var d=localStorage.getItem(${JSON.stringify(ANNOUNCEMENTS[0].id)});if(!d)document.documentElement.style.setProperty('--ann-h','42px')})();`,
+            }}
+          />
+        )}
         <JsonLd data={organizationSchema()} />
       </head>
       <body className={`${spaceGrotesk.variable} ${jetbrainsMono.variable} font-sans`}>

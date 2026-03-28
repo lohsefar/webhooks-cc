@@ -6,7 +6,7 @@ import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
 import { Menu, X, ChevronDown, Search } from "lucide-react";
 import { NAV_SECTIONS } from "@/lib/docs-nav";
-import { getNavbarTopClass } from "@/lib/announcements";
+import { getMaintenanceTopOffset } from "@/lib/announcements";
 
 const STORAGE_KEY = "docs-sidebar-sections";
 
@@ -122,29 +122,21 @@ function SidebarContent({
   );
 }
 
-// Each active banner shifts the sidebar down by ~2.5rem.
-// Base offset (no banners): top-24 (6rem) for panels, top-28 (7rem) for mobile toggle.
-function useBannerOffset() {
-  const top = getNavbarTopClass();
-  // top-4 = no banner, top-14 = one, top-24 = two
-  if (top === "top-24")
-    return {
-      toggle: "top-[11rem]",
-      panel: "top-[10.5rem]",
-      desktop: "top-[10.5rem] max-h-[calc(100vh-12rem)]",
-    };
-  if (top === "top-14")
-    return {
-      toggle: "top-[8.5rem]",
-      panel: "top-[8rem]",
-      desktop: "top-[8rem] max-h-[calc(100vh-9.5rem)]",
-    };
-  return { toggle: "top-28", panel: "top-24", desktop: "top-24 max-h-[calc(100vh-7rem)]" };
+// Sidebar offsets: base values shift by maintenance (server-known) + announcement (CSS var).
+// Base offset (no banners): 7rem for mobile toggle, 6rem for panels, 6rem for desktop.
+function useSidebarStyles() {
+  const base = getMaintenanceTopOffset(); // "1rem" or "3.5rem"
+  // toggle sits below the navbar (navbar height ~4rem + gap)
+  const toggle = `calc(${base} + var(--ann-h, 0px) + 5rem)`;
+  const panel = `calc(${base} + var(--ann-h, 0px) + 4.5rem)`;
+  const desktop = `calc(${base} + var(--ann-h, 0px) + 4.5rem)`;
+  const maxH = `calc(100vh - ${base} - var(--ann-h, 0px) - 6rem)`;
+  return { toggle, panel, desktop, maxH };
 }
 
 export function DocsSidebar() {
   const [mobileOpen, setMobileOpen] = useState(false);
-  const offset = useBannerOffset();
+  const s = useSidebarStyles();
 
   useEffect(() => {
     if (!mobileOpen) return;
@@ -165,10 +157,8 @@ export function DocsSidebar() {
       {/* Mobile toggle */}
       <button
         onClick={() => setMobileOpen(!mobileOpen)}
-        className={cn(
-          "md:hidden fixed left-4 z-40 p-2 border-2 border-foreground bg-background shadow-neo-sm cursor-pointer",
-          offset.toggle
-        )}
+        className="md:hidden fixed left-4 z-40 p-2 border-2 border-foreground bg-background shadow-neo-sm cursor-pointer"
+        style={{ top: s.toggle }}
         aria-label="Toggle docs navigation"
       >
         {mobileOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
@@ -177,10 +167,8 @@ export function DocsSidebar() {
       {/* Mobile overlay */}
       {mobileOpen && (
         <div
-          className={cn(
-            "md:hidden fixed left-0 right-0 bottom-0 z-30 bg-background/80",
-            offset.panel
-          )}
+          className="md:hidden fixed left-0 right-0 bottom-0 z-30 bg-background/80"
+          style={{ top: s.panel }}
           onClick={() => setMobileOpen(false)}
         />
       )}
@@ -193,19 +181,17 @@ export function DocsSidebar() {
         aria-hidden={!mobileOpen}
         className={cn(
           "md:hidden fixed left-4 bottom-4 z-[35] w-64 border-2 border-foreground bg-background shadow-neo overflow-y-auto py-6 px-2 transition-transform",
-          offset.panel,
           mobileOpen ? "translate-x-0" : "-translate-x-full"
         )}
+        style={{ top: s.panel }}
       >
         <SidebarContent onNavigate={() => setMobileOpen(false)} onSearchClick={handleSearchClick} />
       </aside>
 
       {/* Desktop sidebar */}
       <aside
-        className={cn(
-          "hidden md:block w-64 shrink-0 sticky self-start border-2 border-foreground bg-background shadow-neo overflow-y-auto py-6 px-2",
-          offset.desktop
-        )}
+        className="hidden md:block w-64 shrink-0 sticky self-start border-2 border-foreground bg-background shadow-neo overflow-y-auto py-6 px-2"
+        style={{ top: s.desktop, maxHeight: s.maxH }}
       >
         <SidebarContent onSearchClick={handleSearchClick} />
       </aside>
