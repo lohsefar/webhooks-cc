@@ -17,7 +17,12 @@ declare
   v_owned_count integer;
   v_max_teams integer := 10;
 begin
-  -- Check team limit
+  -- Lock user's existing owner memberships to prevent race conditions,
+  -- then count them
+  perform 1 from public.team_members
+  where user_id = p_user_id and role = 'owner'
+  for update;
+
   select count(*) into v_owned_count
   from public.team_members
   where user_id = p_user_id and role = 'owner';

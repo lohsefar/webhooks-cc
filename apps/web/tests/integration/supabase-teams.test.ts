@@ -135,7 +135,9 @@ describe("Teams Integration", () => {
 
   describe("Team CRUD", () => {
     it("creates a team and adds creator as owner", async () => {
-      const team = await createTeam(ownerId, "Integration Test Team");
+      const result = await createTeam(ownerId, "Integration Test Team");
+      expect("error" in result).toBe(false);
+      const team = result as Exclude<typeof result, { error: string }>;
 
       expect(team.id).toBeTruthy();
       expect(team.name).toBe("Integration Test Team");
@@ -578,8 +580,9 @@ describe("Teams Integration", () => {
     let tempTeamId: string;
 
     it("creates a temporary team for deletion test", async () => {
-      const team = await createTeam(ownerId, "Temp Delete Team");
-      tempTeamId = team.id;
+      const result = await createTeam(ownerId, "Temp Delete Team");
+      expect("error" in result).toBe(false);
+      tempTeamId = (result as { id: string }).id;
       expect(tempTeamId).toBeTruthy();
     });
 
@@ -1160,7 +1163,6 @@ describe("Teams Integration", () => {
   describe("Member limit at accept time", () => {
     let limitTeamId: string;
     let limitOwnerId: string;
-    let overflowInviteId: string;
 
     it("setup: create team with many members near limit", async () => {
       // Create owner

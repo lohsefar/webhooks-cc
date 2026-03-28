@@ -7,7 +7,6 @@ import {
   fetchDashboardEndpoints,
   subscribeDashboardEndpointsChanged,
   type DashboardEndpointsResponse,
-  type DashboardEndpointWithSharing,
 } from "@/lib/dashboard-api";
 import {
   Select,
