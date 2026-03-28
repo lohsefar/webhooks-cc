@@ -732,14 +732,16 @@ describe("Teams Integration", () => {
   describe("Share/unshare edge cases", () => {
     it("endpoint owner who is not a team member cannot share", async () => {
       // Create a new team owned by thirdId — ownerId is NOT a member
-      const otherTeam = await createTeam(thirdId, "Other Team");
+      const otherTeamResult = await createTeam(thirdId, "Other Team");
+      expect("error" in otherTeamResult).toBe(false);
+      const otherTeamId = (otherTeamResult as { id: string }).id;
 
-      const result = await shareEndpointWithTeam(ownerId, otherTeam.id, endpointId);
+      const result = await shareEndpointWithTeam(ownerId, otherTeamId, endpointId);
       expect(result.success).toBe(false);
       expect(result.error).toContain("not a member");
 
       // Clean up
-      await deleteTeam(thirdId, otherTeam.id);
+      await deleteTeam(thirdId, otherTeamId);
     });
 
     it("team member who does not own endpoint cannot unshare", async () => {
@@ -814,8 +816,9 @@ describe("Teams Integration", () => {
     let secondTeamId: string;
 
     it("share same endpoint with a second team", async () => {
-      const team2 = await createTeam(ownerId, "Second Team");
-      secondTeamId = team2.id;
+      const team2Result = await createTeam(ownerId, "Second Team");
+      expect("error" in team2Result).toBe(false);
+      secondTeamId = (team2Result as { id: string }).id;
 
       // Add member to second team
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
