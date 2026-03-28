@@ -10,6 +10,7 @@ import { EndpointSwitcher } from "@/components/dashboard/endpoint-switcher";
 import { NewEndpointDialog } from "@/components/dashboard/new-endpoint-dialog";
 import { ArrowLeft, Menu, X } from "lucide-react";
 import { resetUser } from "@/lib/analytics";
+import { UserDropdown } from "@/components/nav/user-dropdown";
 
 interface AppHeaderProps {
   showEndpointSwitcher?: boolean;
@@ -78,12 +79,7 @@ export function AppHeader({
             </Link>
           )}
           <ThemeToggle />
-          <Link href="/account" className="text-sm text-muted-foreground hover:text-foreground">
-            Account
-          </Link>
-          <Button variant="ghost" size="sm" onClick={handleSignOut}>
-            Sign out
-          </Button>
+          <UserDropdown />
         </div>
 
         {/* Mobile toggle */}
@@ -133,6 +129,13 @@ export function AppHeader({
               onClick={() => setOpen(false)}
             >
               Account
+            </Link>
+            <Link
+              href="/teams"
+              className="text-foreground font-medium text-lg"
+              onClick={() => setOpen(false)}
+            >
+              Teams
             </Link>
             <div className="pt-3 border-t-2 border-foreground/20">
               <Button

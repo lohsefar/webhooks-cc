@@ -1,7 +1,12 @@
-import { authenticateRequest } from "@/lib/api-auth";
+import {
+  authenticateRequest,
+  extractBearerToken,
+  validateBearerTokenWithPlan,
+} from "@/lib/api-auth";
 import { parseJsonBody } from "@/lib/request-validation";
 import { checkRateLimitByKey } from "@/lib/rate-limit";
 import { createEndpointForUser, listEndpointsForUser } from "@/lib/supabase/endpoints";
+import { getShareMetadataForOwnedEndpoints, getSharedEndpointsForUser } from "@/lib/supabase/teams";
 
 const USER_ENDPOINT_RATE_LIMIT_WINDOW_MS = 10 * 60_000;
 const USER_ENDPOINT_RATE_LIMIT_MAX = 30;
@@ -11,8 +16,34 @@ export async function GET(request: Request) {
   if (!auth.success) return auth.response;
 
   try {
-    const endpoints = await listEndpointsForUser(auth.userId);
-    return Response.json(endpoints);
+    // Check plan — team features only for pro users
+    const token = extractBearerToken(request);
+    const validation = token ? await validateBearerTokenWithPlan(token) : null;
+    const isPro = validation?.plan === "pro";
+
+    const [endpoints, shareMetadata, sharedEndpoints] = await Promise.all([
+      listEndpointsForUser(auth.userId),
+      isPro ? getShareMetadataForOwnedEndpoints(auth.userId) : Promise.resolve(new Map()),
+      isPro ? getSharedEndpointsForUser(auth.userId) : Promise.resolve([]),
+    ]);
+
+    const owned = endpoints.map((ep) => ({
+      ...ep,
+      sharedWith: shareMetadata.get(ep.id) ?? [],
+    }));
+
+    const shared = sharedEndpoints.map((ep) => ({
+      id: ep.id,
+      slug: ep.slug,
+      name: ep.name ?? undefined,
+      url: ep.url,
+      mockResponse: ep.mockResponse ?? undefined,
+      isEphemeral: ep.isEphemeral ?? undefined,
+      createdAt: ep.createdAt,
+      fromTeam: ep.fromTeam,
+    }));
+
+    return Response.json({ owned, shared });
   } catch (error) {
     console.error("Failed to list endpoints:", error);
     return Response.json({ error: "Internal server error" }, { status: 500 });

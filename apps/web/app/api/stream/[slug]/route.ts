@@ -1,6 +1,6 @@
 import { authenticateRequest } from "@/lib/api-auth";
 import { serverEnv } from "@/lib/env";
-import { getEndpointBySlugForUser } from "@/lib/supabase/endpoints";
+import { resolveEndpointAccess } from "@/lib/supabase/teams";
 import type { Database, Json } from "@/lib/supabase/database";
 import { listNewRequestsForEndpointByUser, type RequestRecord } from "@/lib/supabase/requests";
 import { sendError } from "@appsignal/nodejs";
@@ -108,10 +108,11 @@ export async function GET(request: Request, { params }: { params: Promise<{ slug
     return Response.json({ error: "Invalid since timestamp" }, { status: 400 });
   }
 
-  const endpoint = await getEndpointBySlugForUser(auth.userId, slug);
-  if (!endpoint) {
+  const access = await resolveEndpointAccess(auth.userId, slug);
+  if (!access) {
     return Response.json({ error: "Endpoint not found" }, { status: 404 });
   }
+  const endpoint = { id: access.endpointId, slug };
 
   const encoder = new TextEncoder();
   const connectionStart = Date.now();

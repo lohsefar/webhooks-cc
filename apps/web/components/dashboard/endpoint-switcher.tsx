@@ -6,19 +6,22 @@ import { useAuth } from "@/components/providers/supabase-auth-provider";
 import {
   fetchDashboardEndpoints,
   subscribeDashboardEndpointsChanged,
-  type DashboardEndpoint,
+  type DashboardEndpointsResponse,
 } from "@/lib/dashboard-api";
 import {
   Select,
   SelectContent,
+  SelectGroup,
   SelectItem,
+  SelectLabel,
+  SelectSeparator,
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
 
 export function EndpointSwitcher() {
   const { session } = useAuth();
-  const [endpoints, setEndpoints] = useState<DashboardEndpoint[] | null>(null);
+  const [data, setData] = useState<DashboardEndpointsResponse | null>(null);
   const router = useRouter();
   const searchParams = useSearchParams();
   const currentSlug = searchParams.get("endpoint");
@@ -26,7 +29,7 @@ export function EndpointSwitcher() {
   useEffect(() => {
     const accessToken = session?.access_token;
     if (!accessToken) {
-      setEndpoints(null);
+      setData(null);
       return;
     }
 
@@ -34,14 +37,14 @@ export function EndpointSwitcher() {
 
     const load = async () => {
       try {
-        const nextEndpoints = await fetchDashboardEndpoints(accessToken);
+        const nextData = await fetchDashboardEndpoints(accessToken);
         if (!cancelled) {
-          setEndpoints(nextEndpoints);
+          setData(nextData);
         }
       } catch (error) {
         console.error("Failed to load endpoints for switcher:", error);
         if (!cancelled) {
-          setEndpoints([]);
+          setData({ owned: [], shared: [] });
         }
       }
     };
@@ -57,7 +60,9 @@ export function EndpointSwitcher() {
     };
   }, [session?.access_token]);
 
-  if (!endpoints || endpoints.length === 0) {
+  const allEndpoints = [...(data?.owned ?? []), ...(data?.shared ?? [])];
+
+  if (!data || allEndpoints.length === 0) {
     return null;
   }
 
@@ -65,17 +70,76 @@ export function EndpointSwitcher() {
     router.push(`/dashboard?endpoint=${slug}`);
   };
 
+  const defaultSlug = currentSlug || allEndpoints[0]?.slug;
+
+  // Split owned endpoints into personal (not shared) and shared-by-me
+  const personalEndpoints = data.owned.filter((ep) => !ep.sharedWith || ep.sharedWith.length === 0);
+  const sharedByMe = data.owned.filter((ep) => ep.sharedWith && ep.sharedWith.length > 0);
+  const sharedWithMe = data.shared ?? [];
+
+  const hasSections = sharedByMe.length > 0 || sharedWithMe.length > 0;
+
+  const labelClass = "text-xs font-bold uppercase tracking-wide text-muted-foreground";
+
   return (
-    <Select value={currentSlug || endpoints[0]?.slug} onValueChange={handleChange}>
-      <SelectTrigger className="w-[200px]">
+    <Select value={defaultSlug} onValueChange={handleChange}>
+      <SelectTrigger className="w-[260px]">
         <SelectValue placeholder="Select endpoint" />
       </SelectTrigger>
       <SelectContent>
-        {endpoints.map((endpoint) => (
-          <SelectItem key={endpoint.id} value={endpoint.slug}>
-            {endpoint.name || endpoint.slug}
-          </SelectItem>
-        ))}
+        {hasSections ? (
+          <>
+            {personalEndpoints.length > 0 && (
+              <SelectGroup>
+                <SelectLabel className={labelClass}>My Endpoints</SelectLabel>
+                {personalEndpoints.map((ep) => (
+                  <SelectItem key={ep.id} value={ep.slug}>
+                    {ep.name || ep.slug}
+                  </SelectItem>
+                ))}
+              </SelectGroup>
+            )}
+            {sharedByMe.length > 0 && (
+              <>
+                {personalEndpoints.length > 0 && <SelectSeparator />}
+                <SelectGroup>
+                  <SelectLabel className={labelClass}>Shared by me</SelectLabel>
+                  {sharedByMe.map((ep) => {
+                    const teamNames = ep.sharedWith!.map((s) => s.teamName).join(", ");
+                    return (
+                      <SelectItem key={ep.id} value={ep.slug}>
+                        {ep.name || ep.slug}{" "}
+                        <span className="text-muted-foreground">({teamNames})</span>
+                      </SelectItem>
+                    );
+                  })}
+                </SelectGroup>
+              </>
+            )}
+            {sharedWithMe.length > 0 && (
+              <>
+                {(personalEndpoints.length > 0 || sharedByMe.length > 0) && <SelectSeparator />}
+                <SelectGroup>
+                  <SelectLabel className={labelClass}>Shared with me</SelectLabel>
+                  {sharedWithMe.map((ep) => (
+                    <SelectItem key={ep.id} value={ep.slug}>
+                      {ep.name || ep.slug}{" "}
+                      <span className="text-muted-foreground">
+                        ({ep.fromTeam?.teamName ?? "team"})
+                      </span>
+                    </SelectItem>
+                  ))}
+                </SelectGroup>
+              </>
+            )}
+          </>
+        ) : (
+          data.owned.map((ep) => (
+            <SelectItem key={ep.id} value={ep.slug}>
+              {ep.name || ep.slug}
+            </SelectItem>
+          ))
+        )}
       </SelectContent>
     </Select>
   );

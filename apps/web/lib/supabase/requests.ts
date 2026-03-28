@@ -1,5 +1,6 @@
 import { createAdminClient } from "./admin";
 import type { Database, Json } from "./database";
+import { resolveEndpointAccess } from "./teams";
 
 const FREE_RETENTION_MS = 7 * 24 * 60 * 60 * 1000;
 const PRO_RETENTION_MS = 30 * 24 * 60 * 60 * 1000;
@@ -132,6 +133,20 @@ async function getOwnedEndpoint(userId: string, slug: string): Promise<OwnedEndp
   return data;
 }
 
+/**
+ * Like getOwnedEndpoint, but also allows access if the user is a team member
+ * with shared access to the endpoint. Returns the endpoint info plus the owner's
+ * userId for retention lookups.
+ */
+async function getAccessibleEndpoint(
+  userId: string,
+  slug: string
+): Promise<{ id: string; slug: string; ownerId: string } | null> {
+  const access = await resolveEndpointAccess(userId, slug);
+  if (!access) return null;
+  return { id: access.endpointId, slug, ownerId: access.ownerId };
+}
+
 async function getUserCutoff(userId: string): Promise<number> {
   const admin = createAdminClient();
   const { data: user, error } = await admin
@@ -153,15 +168,14 @@ export async function getRequestByIdForUser(
   requestId: string
 ): Promise<RequestRecord | null> {
   const admin = createAdminClient();
-  const cutoff = await getUserCutoff(userId);
 
+  // Fetch request without user_id filter — we check access via endpoint ownership or team membership
   const { data, error } = await admin
     .from("requests")
     .select(
       "id, endpoint_id, method, path, headers, body, query_params, content_type, ip, size, received_at"
     )
     .eq("id", requestId)
-    .eq("user_id", userId)
     .returns<SelectedRequestRow>()
     .maybeSingle();
 
@@ -170,8 +184,22 @@ export async function getRequestByIdForUser(
   }
 
   const row = data as SelectedRequestRow | null;
+  if (!row) return null;
 
-  if (!row || parseMillis(row.received_at) < cutoff) {
+  // Verify user has access to this endpoint (owner or team member)
+  const endpointData = await admin
+    .from("endpoints")
+    .select("slug, user_id")
+    .eq("id", row.endpoint_id)
+    .maybeSingle();
+
+  if (!endpointData.data || !endpointData.data.user_id) return null;
+
+  const access = await resolveEndpointAccess(userId, endpointData.data.slug);
+  if (!access) return null;
+
+  const cutoff = await getUserCutoff(access.ownerId);
+  if (parseMillis(row.received_at) < cutoff) {
     return null;
   }
 
@@ -185,12 +213,12 @@ export async function listRequestsForEndpointByUser(input: {
   since?: number;
 }): Promise<RequestRecord[] | null> {
   const admin = createAdminClient();
-  const endpoint = await getOwnedEndpoint(input.userId, input.slug);
+  const endpoint = await getAccessibleEndpoint(input.userId, input.slug);
   if (!endpoint) {
     return null;
   }
 
-  const cutoff = await getUserCutoff(input.userId);
+  const cutoff = await getUserCutoff(endpoint.ownerId);
   const floor = input.since === undefined ? cutoff : Math.max(input.since, cutoff);
 
   const { data, error } = await admin
@@ -218,12 +246,12 @@ export async function listNewRequestsForEndpointByUser(input: {
   limit?: number;
 }): Promise<RequestRecord[] | null> {
   const admin = createAdminClient();
-  const endpoint = await getOwnedEndpoint(input.userId, input.slug);
+  const endpoint = await getAccessibleEndpoint(input.userId, input.slug);
   if (!endpoint) {
     return null;
   }
 
-  const cutoff = await getUserCutoff(input.userId);
+  const cutoff = await getUserCutoff(endpoint.ownerId);
   const floor = Math.max(input.after, cutoff);
 
   const { data, error } = await admin
@@ -251,7 +279,7 @@ export async function listPaginatedRequestsForEndpointByUser(input: {
   cursor?: string;
 }): Promise<PaginatedRequestPage | null> {
   const admin = createAdminClient();
-  const endpoint = await getOwnedEndpoint(input.userId, input.slug);
+  const endpoint = await getAccessibleEndpoint(input.userId, input.slug);
   if (!endpoint) {
     return null;
   }
@@ -262,7 +290,7 @@ export async function listPaginatedRequestsForEndpointByUser(input: {
   }
 
   const limit = clampLimit(input.limit, 50);
-  const cutoff = decoded?.cutoff ?? (await getUserCutoff(input.userId));
+  const cutoff = decoded?.cutoff ?? (await getUserCutoff(endpoint.ownerId));
   const offset = decoded?.offset ?? 0;
 
   const { data, error } = await admin

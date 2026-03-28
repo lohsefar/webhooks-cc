@@ -320,8 +320,8 @@ export default function DashboardPage() {
     }
 
     try {
-      const nextEndpoints = await fetchDashboardEndpoints(accessToken);
-      setEndpoints(nextEndpoints);
+      const response = await fetchDashboardEndpoints(accessToken);
+      setEndpoints([...response.owned, ...response.shared]);
     } catch (error) {
       console.error("Failed to load dashboard endpoints:", error);
       setEndpoints([]);
