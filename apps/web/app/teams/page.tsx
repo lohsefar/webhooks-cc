@@ -358,21 +358,30 @@ export default function TeamsPage() {
                           {team.memberCount} {team.memberCount === 1 ? "member" : "members"}
                         </p>
                       </div>
-                      {team.suspended && (
+                      {team.suspended ? (
                         <Badge variant="outline" className="text-yellow-600 border-yellow-500/50">
                           Suspended
                         </Badge>
-                      )}
+                      ) : !isPro ? (
+                        <Badge variant="outline" className="text-muted-foreground">
+                          Pro required
+                        </Badge>
+                      ) : null}
                     </div>
                     <Button size="sm" variant="outline" asChild>
                       <Link href={`/teams/${team.id}`}>View</Link>
                     </Button>
                   </div>
-                  {team.suspended && (
+                  {team.suspended ? (
                     <p className="text-xs text-muted-foreground mt-1">
                       The team owner has downgraded their plan. Shared endpoints are inaccessible until they upgrade.
                     </p>
-                  )}
+                  ) : !isPro ? (
+                    <p className="text-xs text-muted-foreground mt-1">
+                      <Link href="/account" className="underline">Upgrade to Pro</Link>{" "}
+                      to access shared endpoints from this team.
+                    </p>
+                  ) : null}
                   {i < memberTeams.length - 1 && <div className="border-t mt-4" />}
                 </div>
               ))}
