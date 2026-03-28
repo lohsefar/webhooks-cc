@@ -13,7 +13,12 @@ export async function GET(request: Request, { params }: { params: Promise<{ slug
   const { slug } = await params;
 
   try {
-    const endpoint = await getEndpointBySlugForUser(auth.userId, slug);
+    const access = await resolveEndpointAccess(auth.userId, slug);
+    if (!access) {
+      return Response.json({ error: "Endpoint not found" }, { status: 404 });
+    }
+
+    const endpoint = await getEndpointBySlugForUser(access.ownerId, slug);
     if (!endpoint) {
       return Response.json({ error: "Endpoint not found" }, { status: 404 });
     }
