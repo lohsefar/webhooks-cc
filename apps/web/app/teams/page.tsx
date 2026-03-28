@@ -22,7 +22,7 @@ interface Team {
   id: string;
   name: string;
   createdBy: string;
-  createdAt: string;
+  createdAt: number;
   memberCount: number;
   role: "owner" | "member";
   suspended: boolean;
@@ -33,7 +33,7 @@ interface Invite {
   teamId: string;
   teamName: string;
   inviterEmail: string;
-  createdAt: string;
+  createdAt: number;
 }
 
 export default function TeamsPage() {

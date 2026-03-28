@@ -38,7 +38,7 @@ export async function GET(request: Request) {
       name: ep.name ?? undefined,
       url: ep.url,
       mockResponse: ep.mockResponse ?? undefined,
-      isEphemeral: ep.isEphemeral || undefined,
+      isEphemeral: ep.isEphemeral ?? undefined,
       createdAt: ep.createdAt,
       fromTeam: ep.fromTeam,
     }));

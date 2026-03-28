@@ -1,9 +1,13 @@
 import { authenticateRequest } from "@/lib/api-auth";
+import { checkRateLimitByKey } from "@/lib/rate-limit";
 import { shareEndpointWithTeam } from "@/lib/supabase/teams";
 
 export async function POST(request: Request, { params }: { params: Promise<{ teamId: string }> }) {
   const auth = await authenticateRequest(request);
   if (!auth.success) return auth.response;
+
+  const rateLimited = checkRateLimitByKey(`team-share:${auth.userId}`, 30, 10 * 60_000);
+  if (rateLimited) return rateLimited;
 
   const { teamId } = await params;
 
