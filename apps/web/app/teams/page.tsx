@@ -261,13 +261,19 @@ export default function TeamsPage() {
                     </p>
                   </div>
                   <div className="flex items-center gap-2">
-                    <Button
-                      size="sm"
-                      onClick={() => void handleAccept(invite.id)}
-                      disabled={acceptingId === invite.id || decliningId === invite.id}
-                    >
-                      {acceptingId === invite.id ? "Accepting..." : "Accept"}
-                    </Button>
+                    {isPro ? (
+                      <Button
+                        size="sm"
+                        onClick={() => void handleAccept(invite.id)}
+                        disabled={acceptingId === invite.id || decliningId === invite.id}
+                      >
+                        {acceptingId === invite.id ? "Accepting..." : "Accept"}
+                      </Button>
+                    ) : (
+                      <Button size="sm" asChild>
+                        <Link href="/account">Upgrade to accept</Link>
+                      </Button>
+                    )}
                     <Button
                       size="sm"
                       variant="outline"
