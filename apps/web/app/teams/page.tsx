@@ -14,6 +14,7 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
+import { Badge } from "@/components/ui/badge";
 import { Plus, Lock } from "lucide-react";
 import Link from "next/link";
 
@@ -24,6 +25,7 @@ interface Team {
   createdAt: string;
   memberCount: number;
   role: "owner" | "member";
+  suspended: boolean;
 }
 
 interface Invite {
@@ -275,14 +277,36 @@ export default function TeamsPage() {
             </p>
           ) : (
             <div className="space-y-4">
+              {ownedTeams.some((t) => t.suspended) && (
+                <div className="rounded-md border border-yellow-500/20 bg-yellow-500/10 p-3 text-sm">
+                  <p className="font-medium text-yellow-700 dark:text-yellow-400">
+                    Your teams are suspended
+                  </p>
+                  <p className="text-muted-foreground">
+                    Your plan has been downgraded. Shared endpoints are inaccessible to team
+                    members until you{" "}
+                    <Link href="/account" className="underline font-medium text-foreground">
+                      upgrade to Pro
+                    </Link>
+                    .
+                  </p>
+                </div>
+              )}
               {ownedTeams.map((team, i) => (
                 <div key={team.id}>
                   <div className="flex items-center justify-between">
-                    <div>
-                      <p className="font-medium">{team.name}</p>
-                      <p className="text-sm text-muted-foreground">
-                        {team.memberCount} {team.memberCount === 1 ? "member" : "members"}
-                      </p>
+                    <div className="flex items-center gap-2">
+                      <div>
+                        <p className="font-medium">{team.name}</p>
+                        <p className="text-sm text-muted-foreground">
+                          {team.memberCount} {team.memberCount === 1 ? "member" : "members"}
+                        </p>
+                      </div>
+                      {team.suspended && (
+                        <Badge variant="outline" className="text-yellow-600 border-yellow-500/50">
+                          Suspended
+                        </Badge>
+                      )}
                     </div>
                     <Button size="sm" variant="outline" asChild>
                       <Link href={`/teams/${team.id}`}>Manage</Link>
@@ -309,16 +333,28 @@ export default function TeamsPage() {
               {memberTeams.map((team, i) => (
                 <div key={team.id}>
                   <div className="flex items-center justify-between">
-                    <div>
-                      <p className="font-medium">{team.name}</p>
-                      <p className="text-sm text-muted-foreground">
-                        {team.memberCount} {team.memberCount === 1 ? "member" : "members"}
-                      </p>
+                    <div className="flex items-center gap-2">
+                      <div>
+                        <p className="font-medium">{team.name}</p>
+                        <p className="text-sm text-muted-foreground">
+                          {team.memberCount} {team.memberCount === 1 ? "member" : "members"}
+                        </p>
+                      </div>
+                      {team.suspended && (
+                        <Badge variant="outline" className="text-yellow-600 border-yellow-500/50">
+                          Suspended
+                        </Badge>
+                      )}
                     </div>
                     <Button size="sm" variant="outline" asChild>
                       <Link href={`/teams/${team.id}`}>View</Link>
                     </Button>
                   </div>
+                  {team.suspended && (
+                    <p className="text-xs text-muted-foreground mt-1">
+                      The team owner has downgraded their plan. Shared endpoints are inaccessible until they upgrade.
+                    </p>
+                  )}
                   {i < memberTeams.length - 1 && <div className="border-t mt-4" />}
                 </div>
               ))}

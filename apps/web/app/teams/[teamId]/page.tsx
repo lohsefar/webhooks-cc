@@ -116,6 +116,7 @@ export default function TeamDetailPage() {
 
   const [teamName, setTeamName] = useState("");
   const [role, setRole] = useState<"owner" | "member">("member");
+  const [suspended, setSuspended] = useState(false);
   const currentUserId = session?.user?.id ?? null;
   const [members, setMembers] = useState<Member[]>([]);
   const [pendingInvites, setPendingInvites] = useState<PendingInvite[]>([]);
@@ -169,12 +170,14 @@ export default function TeamDetailPage() {
           id: string;
           name: string;
           role: "owner" | "member";
+          suspended: boolean;
         }> = await teamsRes.json();
         const team = teams.find((t) => t.id === teamId);
         if (team) {
           setTeamName(team.name);
           setRenameValue(team.name);
           setRole(team.role);
+          setSuspended(team.suspended);
         }
       }
 
@@ -361,6 +364,36 @@ export default function TeamDetailPage() {
         </Link>
         <h1 className="text-2xl font-bold">{teamName}</h1>
       </div>
+
+      {suspended && (
+        <div className="rounded-md border border-yellow-500/20 bg-yellow-500/10 p-4">
+          {isOwner ? (
+            <div className="space-y-2">
+              <p className="font-medium text-yellow-700 dark:text-yellow-400">
+                This team is suspended
+              </p>
+              <p className="text-sm text-muted-foreground">
+                Your plan has been downgraded. Team members can no longer access shared
+                endpoints.{" "}
+                <Link href="/account" className="underline font-medium text-foreground">
+                  Upgrade to Pro
+                </Link>{" "}
+                to reactivate your team.
+              </p>
+            </div>
+          ) : (
+            <div className="space-y-2">
+              <p className="font-medium text-yellow-700 dark:text-yellow-400">
+                This team is suspended
+              </p>
+              <p className="text-sm text-muted-foreground">
+                The team owner has downgraded their plan. Shared endpoints are inaccessible
+                until the owner upgrades to Pro again.
+              </p>
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Members */}
       <section className="space-y-4">

@@ -12,6 +12,7 @@ export interface Team {
   createdAt: number;
   memberCount: number;
   role: "owner" | "member";
+  suspended: boolean;
 }
 
 export interface TeamMember {
@@ -190,6 +191,7 @@ export async function createTeam(
     createdAt: parseMillis(result.created_at ?? null),
     memberCount: 1,
     role: "owner",
+    suspended: false,
   };
 }
 
@@ -224,30 +226,45 @@ export async function listTeamsForUser(userId: string): Promise<Team[]> {
 
   if (teamsError) throw teamsError;
 
-  // Fetch member counts for each team
+  // Fetch member counts and owner plans
   const teams = (teamsData ?? []) as TeamRow[];
-  const results: Team[] = [];
 
-  for (const team of teams) {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const { count, error: countError } = await (admin as any)
-      .from("team_members")
-      .select("id", { count: "exact", head: true })
-      .eq("team_id", team.id);
+  // Batch: get all member counts
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { data: allMembers, error: allMembersError } = await (admin as any)
+    .from("team_members")
+    .select("team_id")
+    .in("team_id", teamIds);
 
-    if (countError) throw countError;
+  if (allMembersError) throw allMembersError;
 
-    results.push({
-      id: team.id,
-      name: team.name,
-      createdBy: team.created_by,
-      createdAt: parseMillis(team.created_at),
-      memberCount: count ?? 0,
-      role: membershipMap.get(team.id) ?? "member",
-    });
+  const countMap = new Map<string, number>();
+  for (const row of (allMembers ?? []) as { team_id: string }[]) {
+    countMap.set(row.team_id, (countMap.get(row.team_id) ?? 0) + 1);
   }
 
-  return results;
+  // Batch: get owner plans to determine suspension
+  const ownerIds = [...new Set(teams.map((t) => t.created_by))];
+  const { data: ownerRows, error: ownerError } = await admin
+    .from("users")
+    .select("id, plan")
+    .in("id", ownerIds);
+
+  if (ownerError) throw ownerError;
+
+  const ownerPlanMap = new Map(
+    (ownerRows ?? []).map((u) => [u.id, u.plan])
+  );
+
+  return teams.map((team) => ({
+    id: team.id,
+    name: team.name,
+    createdBy: team.created_by,
+    createdAt: parseMillis(team.created_at),
+    memberCount: countMap.get(team.id) ?? 0,
+    role: membershipMap.get(team.id) ?? ("member" as const),
+    suspended: ownerPlanMap.get(team.created_by) !== "pro",
+  }));
 }
 
 // ---------------------------------------------------------------------------
@@ -970,25 +987,39 @@ export async function getSharedEndpointsForUser(userId: string): Promise<SharedE
 
   const teamIds = (memberships as { team_id: string }[]).map((m) => m.team_id);
 
-  // Fetch team names
+  // Fetch team names and owners to check suspension
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const { data: teamsData, error: teamsError } = await (admin as any)
     .from("teams")
-    .select("id, name")
+    .select("id, name, created_by")
     .in("id", teamIds);
 
   if (teamsError) throw teamsError;
 
-  const teamMap = new Map(
-    ((teamsData ?? []) as { id: string; name: string }[]).map((t) => [t.id, t.name])
-  );
+  // Filter out suspended teams (owner not on pro)
+  const sharedOwnerIds = [...new Set(
+    ((teamsData ?? []) as { created_by: string }[]).map((t) => t.created_by)
+  )];
+  const { data: sharedOwnerRows } = await admin
+    .from("users")
+    .select("id, plan")
+    .in("id", sharedOwnerIds.length > 0 ? sharedOwnerIds : ["__none__"]);
 
-  // Fetch all shared endpoints for these teams
+  const sharedOwnerPlanMap = new Map((sharedOwnerRows ?? []).map((u) => [u.id, u.plan]));
+  const activeTeams = ((teamsData ?? []) as { id: string; name: string; created_by: string }[])
+    .filter((t) => sharedOwnerPlanMap.get(t.created_by) === "pro");
+
+  if (activeTeams.length === 0) return [];
+
+  const activeTeamIds = activeTeams.map((t) => t.id);
+  const teamMap = new Map(activeTeams.map((t) => [t.id, t.name]));
+
+  // Fetch all shared endpoints for active (non-suspended) teams
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const { data: sharesData, error: sharesError } = await (admin as any)
     .from("team_endpoints")
     .select("team_id, endpoint_id, shared_by")
-    .in("team_id", teamIds);
+    .in("team_id", activeTeamIds);
 
   if (sharesError) throw sharesError;
   if (!sharesData || sharesData.length === 0) return [];
@@ -1103,6 +1134,21 @@ export async function resolveEndpointAccess(
 
   if (shareAccessError) throw shareAccessError;
   if (!shareAccess || (shareAccess as unknown[]).length === 0) return null;
+
+  // Check that the team's owner is still on a pro plan (team not suspended)
+  const shareTeamId = (shareAccess as { team_id: string }[])[0].team_id;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { data: teamRow, error: teamRowError } = await (admin as any)
+    .from("teams")
+    .select("created_by")
+    .eq("id", shareTeamId)
+    .maybeSingle();
+
+  if (teamRowError) throw teamRowError;
+  if (!teamRow) return null;
+
+  const teamOwnerProError = await requirePro((teamRow as { created_by: string }).created_by);
+  if (teamOwnerProError) return null;
 
   return { endpointId: endpoint.id, ownerId, isOwner: false };
 }
