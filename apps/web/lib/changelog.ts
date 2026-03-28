@@ -15,13 +15,26 @@ export const TRACK_LABELS: Record<ChangelogTrack, string> = {
   mcp: "MCP",
 };
 
-export const APP_VERSION = "0.12.1";
+export const APP_VERSION = "0.13.0";
 export const CLI_VERSION = "0.5.3";
 export const SDK_VERSION = "1.1.0";
 export const MCP_VERSION = "1.1.0";
 
 export const CHANGELOG: ChangelogEntry[] = [
   // ─── Web App ────────────────────────────────────────────────────────
+  {
+    version: "0.13.0",
+    date: "2026-03-28",
+    title: "Teams",
+    track: "web",
+    items: [
+      "Create and manage teams with invite-based membership",
+      "Share endpoints with team members",
+      "Team roles: owner and member with scoped permissions",
+      "Endpoint switcher shows personal and team endpoints",
+      "Teams documentation page",
+    ],
+  },
   {
     version: "0.12.1",
     date: "2026-03-27",
