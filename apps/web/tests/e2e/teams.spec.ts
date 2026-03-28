@@ -40,7 +40,7 @@ async function goToTeams(page: import("@playwright/test").Page, user: TestUser) 
   await page.waitForLoadState("networkidle");
 }
 
-test("free user sees upgrade prompt on teams page", async ({ page }) => {
+test("free user with no teams or invites sees upgrade prompt", async ({ page }) => {
   await goToTeams(page, freeUser);
   await expect(page.getByText("Teams is a Pro feature")).toBeVisible({ timeout: 15000 });
   await expect(page.getByRole("link", { name: "Upgrade to Pro" })).toBeVisible();
@@ -87,6 +87,41 @@ test("pro user can invite a member", async ({ page }) => {
   await page.getByRole("button", { name: "Invite" }).click();
 
   await expect(page.getByText("Invite sent")).toBeVisible({ timeout: 10000 });
+});
+
+test("pro owner can invite a free user", async ({ page }) => {
+  await goToTeams(page, proOwner);
+  await expect(page.getByText(TEAM_NAME)).toBeVisible({ timeout: 20000 });
+
+  await page.getByRole("link", { name: "Manage" }).first().click();
+  await page.waitForLoadState("networkidle");
+  await expect(page.getByText("Invite Member")).toBeVisible({ timeout: 15000 });
+
+  await page.getByPlaceholder("user@example.com").fill(freeUser.email);
+  await page.getByRole("button", { name: "Invite" }).click();
+
+  await expect(page.getByText("Invite sent")).toBeVisible({ timeout: 10000 });
+});
+
+test("free user with pending invite sees 'Upgrade to accept' and no empty sections", async ({
+  page,
+}) => {
+  await goToTeams(page, freeUser);
+
+  // Should see the invite
+  await expect(page.getByText("Pending Invites")).toBeVisible({ timeout: 15000 });
+  await expect(page.getByText(TEAM_NAME)).toBeVisible();
+
+  // Should see "Upgrade to accept" instead of "Accept"
+  await expect(page.getByRole("link", { name: "Upgrade to accept" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Accept" })).not.toBeVisible();
+
+  // Should NOT see empty team sections
+  await expect(page.getByText("My Teams")).not.toBeVisible();
+  await expect(page.getByText("Teams I'm In")).not.toBeVisible();
+
+  // Should NOT see the suspension banner
+  await expect(page.getByText("Your teams are suspended")).not.toBeVisible();
 });
 
 test("pro member sees pending invite", async ({ page }) => {
