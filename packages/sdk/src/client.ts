@@ -48,6 +48,7 @@ import {
   RateLimitError,
   TimeoutError,
 } from "./errors";
+import type { RateLimitMeta } from "./errors";
 import { parseDuration } from "./utils";
 import { parseSSE } from "./sse";
 import { buildTemplateSendOptions, TEMPLATE_METADATA, TEMPLATE_PROVIDERS } from "./templates";
@@ -130,7 +131,20 @@ function mapStatusToError(status: number, message: string, response: Response): 
         const parsed = parseInt(retryAfterHeader, 10);
         retryAfter = Number.isNaN(parsed) ? undefined : parsed;
       }
-      return new RateLimitError(retryAfter);
+      // Parse X-RateLimit-* headers for structured metadata
+      const limitHeader = response.headers.get("x-ratelimit-limit");
+      const remainingHeader = response.headers.get("x-ratelimit-remaining");
+      const resetHeader = response.headers.get("x-ratelimit-reset");
+      let meta: RateLimitMeta | undefined;
+      if (limitHeader !== null && remainingHeader !== null && resetHeader !== null) {
+        const limit = parseInt(limitHeader, 10);
+        const remaining = parseInt(remainingHeader, 10);
+        const reset = parseInt(resetHeader, 10);
+        if (!Number.isNaN(limit) && !Number.isNaN(remaining) && !Number.isNaN(reset) && limit >= 0 && remaining >= 0 && reset >= 0) {
+          meta = { limit, remaining, reset };
+        }
+      }
+      return new RateLimitError(retryAfter, meta);
     }
     default:
       return new WebhooksCCError(status, message);

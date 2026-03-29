@@ -1,5 +1,5 @@
 import { extractBearerToken, validateBearerTokenWithPlan } from "@/lib/api-auth";
-import { checkRateLimitByKey } from "@/lib/rate-limit";
+import { checkRateLimitByKeyWithInfo, applyRateLimitHeaders, type RateLimitInfo } from "@/lib/rate-limit";
 import { searchRequestsForUser } from "@/lib/supabase/search";
 import { sendError } from "@appsignal/nodejs";
 
@@ -21,6 +21,7 @@ function parseOptionalInteger(
 }
 
 export async function GET(request: Request) {
+  let rateLimit: RateLimitInfo | undefined;
   try {
     const token = extractBearerToken(request);
     if (!token) {
@@ -35,27 +36,27 @@ export async function GET(request: Request) {
     const userId = validated.userId;
     const plan = validated.plan;
 
-    const rateLimited = checkRateLimitByKey(`search:${userId}`, 60, 10 * 60_000);
-    if (rateLimited) {
-      return rateLimited;
+    rateLimit = checkRateLimitByKeyWithInfo(`search:${userId}`, 60, 10 * 60_000);
+    if (rateLimit.response) {
+      return rateLimit.response;
     }
 
     const url = new URL(request.url);
     const parsedFrom = parseOptionalInteger(url.searchParams, "from");
     if (parsedFrom.error) {
-      return parsedFrom.error;
+      return applyRateLimitHeaders(parsedFrom.error, rateLimit);
     }
     const parsedTo = parseOptionalInteger(url.searchParams, "to");
     if (parsedTo.error) {
-      return parsedTo.error;
+      return applyRateLimitHeaders(parsedTo.error, rateLimit);
     }
     const parsedLimit = parseOptionalInteger(url.searchParams, "limit");
     if (parsedLimit.error) {
-      return parsedLimit.error;
+      return applyRateLimitHeaders(parsedLimit.error, rateLimit);
     }
     const parsedOffset = parseOptionalInteger(url.searchParams, "offset");
     if (parsedOffset.error) {
-      return parsedOffset.error;
+      return applyRateLimitHeaders(parsedOffset.error, rateLimit);
     }
 
     const order = url.searchParams.get("order");
@@ -72,10 +73,11 @@ export async function GET(request: Request) {
       order: order === "asc" ? "asc" : "desc",
     });
 
-    return Response.json(data);
+    return applyRateLimitHeaders(Response.json(data), rateLimit);
   } catch (err) {
     sendError(err instanceof Error ? err : new Error(String(err)));
     console.error("Search API route error:", err);
-    return Response.json({ error: "Internal server error" }, { status: 500 });
+    const response = Response.json({ error: "Internal server error" }, { status: 500 });
+    return rateLimit ? applyRateLimitHeaders(response, rateLimit) : response;
   }
 }

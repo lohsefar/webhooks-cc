@@ -3,7 +3,7 @@ import { beforeEach, describe, expect, test, vi } from "vitest";
 const mockFns = vi.hoisted(() => ({
   extractBearerToken: vi.fn(),
   validateBearerTokenWithPlan: vi.fn(),
-  checkRateLimitByKey: vi.fn(),
+  checkRateLimitByKeyWithInfo: vi.fn(),
   searchRequestsForUser: vi.fn(),
 }));
 
@@ -13,7 +13,8 @@ vi.mock("@/lib/api-auth", () => ({
 }));
 
 vi.mock("@/lib/rate-limit", () => ({
-  checkRateLimitByKey: mockFns.checkRateLimitByKey,
+  checkRateLimitByKeyWithInfo: mockFns.checkRateLimitByKeyWithInfo,
+  applyRateLimitHeaders: (res: Response) => res,
 }));
 
 vi.mock("@/lib/supabase/search", () => ({
@@ -24,7 +25,7 @@ describe("GET /api/search/requests", () => {
   beforeEach(() => {
     vi.resetModules();
     vi.clearAllMocks();
-    mockFns.checkRateLimitByKey.mockReturnValue(null);
+    mockFns.checkRateLimitByKeyWithInfo.mockReturnValue({ allowed: true, response: null, limit: 60, remaining: 59, reset: 0 });
   });
 
   test("returns search results for a validated bearer token", async () => {
@@ -115,9 +116,13 @@ describe("GET /api/search/requests", () => {
       userId: "user_123",
       plan: "free",
     });
-    mockFns.checkRateLimitByKey.mockReturnValue(
-      Response.json({ error: "Too many requests" }, { status: 429 })
-    );
+    mockFns.checkRateLimitByKeyWithInfo.mockReturnValue({
+      allowed: false,
+      response: Response.json({ error: "Too many requests" }, { status: 429 }),
+      limit: 60,
+      remaining: 0,
+      reset: 0,
+    });
 
     const { GET } = await import("./route");
     const response = await GET(new Request("https://webhooks.cc/api/search/requests"));
