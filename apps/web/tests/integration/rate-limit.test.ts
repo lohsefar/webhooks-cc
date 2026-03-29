@@ -2,12 +2,12 @@ import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 
 import type {
   RateLimitInfo,
-} from "./rate-limit";
+} from "@/lib/rate-limit";
 
 // Helper to dynamically import a fresh module (resets the in-memory store)
 async function freshImport() {
   vi.resetModules();
-  return import("./rate-limit");
+  return import("@/lib/rate-limit");
 }
 
 describe("checkRateLimitByKeyWithInfo", () => {

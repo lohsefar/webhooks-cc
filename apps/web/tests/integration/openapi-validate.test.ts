@@ -7,7 +7,7 @@ describe("OpenAPI specification", () => {
     const specPath = path.resolve(__dirname, "../../public/openapi.yaml");
     const api = await SwaggerParser.validate(specPath);
 
-    expect(api.openapi).toBe("3.1.0");
+    expect((api as Record<string, unknown>).openapi).toBe("3.1.0");
     expect(api.info.title).toBe("webhooks.cc API");
     expect(api.paths).toBeDefined();
     expect(Object.keys(api.paths!).length).toBeGreaterThan(10);
