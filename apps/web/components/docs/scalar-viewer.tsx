@@ -75,6 +75,10 @@ export function ScalarViewer() {
   const [Component, setComponent] = useState<React.ComponentType<{
     configuration: Record<string, unknown>;
   }> | null>(null);
+  const [themeReady, setThemeReady] = useState(false);
+
+  // Wait one tick for the theme provider to read localStorage
+  useEffect(() => setThemeReady(true), []);
 
   useEffect(() => {
     import("@scalar/api-reference-react").then((mod) => {
@@ -83,7 +87,7 @@ export function ScalarViewer() {
     import("@scalar/api-reference-react/style.css");
   }, []);
 
-  if (!Component) {
+  if (!Component || !themeReady) {
     return (
       <div className="flex items-center justify-center py-20 text-muted-foreground">
         Loading API reference...
@@ -95,6 +99,7 @@ export function ScalarViewer() {
     <>
       <style>{scalarStyles}</style>
       <Component
+        key={resolvedTheme}
         configuration={{
           spec: {
             url: "/openapi.yaml",
