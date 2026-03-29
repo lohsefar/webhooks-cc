@@ -4,7 +4,7 @@ import {
   validateBearerTokenWithPlan,
 } from "@/lib/api-auth";
 import { parseJsonBody } from "@/lib/request-validation";
-import { checkRateLimitByKey } from "@/lib/rate-limit";
+import { checkRateLimitByKeyWithInfo, applyRateLimitHeaders } from "@/lib/rate-limit";
 import { createEndpointForUser, listEndpointsForUser } from "@/lib/supabase/endpoints";
 import { getShareMetadataForOwnedEndpoints, getSharedEndpointsForUser } from "@/lib/supabase/teams";
 
@@ -54,13 +54,13 @@ export async function POST(request: Request) {
   const auth = await authenticateRequest(request);
   if (!auth.success) return auth.response;
 
-  const rateLimited = checkRateLimitByKey(
+  const rateLimit = checkRateLimitByKeyWithInfo(
     `endpoint-create:${auth.userId}`,
     USER_ENDPOINT_RATE_LIMIT_MAX,
     USER_ENDPOINT_RATE_LIMIT_WINDOW_MS
   );
-  if (rateLimited) {
-    return rateLimited;
+  if (rateLimit.response) {
+    return rateLimit.response;
   }
 
   const parsed = await parseJsonBody(request);
@@ -133,13 +133,19 @@ export async function POST(request: Request) {
           : (body.mockResponse as Record<string, unknown>),
     });
 
-    return Response.json(created);
+    return applyRateLimitHeaders(Response.json(created), rateLimit);
   } catch (error) {
     if (error instanceof Error && error.message.includes("Too many active demo endpoints")) {
-      return Response.json({ error: error.message }, { status: 429 });
+      return applyRateLimitHeaders(
+        Response.json({ error: error.message }, { status: 429 }),
+        rateLimit
+      );
     }
 
     console.error("Failed to create endpoint:", error);
-    return Response.json({ error: "Internal server error" }, { status: 500 });
+    return applyRateLimitHeaders(
+      Response.json({ error: "Internal server error" }, { status: 500 }),
+      rateLimit
+    );
   }
 }

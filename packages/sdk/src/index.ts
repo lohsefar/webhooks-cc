@@ -6,6 +6,7 @@ export {
   TimeoutError,
   RateLimitError,
 } from "./errors";
+export type { RateLimitMeta } from "./errors";
 export {
   parseJsonBody,
   parseFormBody,

@@ -3,7 +3,7 @@ import { beforeEach, describe, expect, test, vi } from "vitest";
 const mockFns = vi.hoisted(() => ({
   extractBearerToken: vi.fn(),
   validateBearerTokenWithPlan: vi.fn(),
-  checkRateLimitByKey: vi.fn(),
+  checkRateLimitByKeyWithInfo: vi.fn(),
   countSearchRequestsForUser: vi.fn(),
 }));
 
@@ -13,7 +13,8 @@ vi.mock("@/lib/api-auth", () => ({
 }));
 
 vi.mock("@/lib/rate-limit", () => ({
-  checkRateLimitByKey: mockFns.checkRateLimitByKey,
+  checkRateLimitByKeyWithInfo: mockFns.checkRateLimitByKeyWithInfo,
+  applyRateLimitHeaders: (res: Response) => res,
 }));
 
 vi.mock("@/lib/supabase/search", () => ({
@@ -24,7 +25,7 @@ describe("GET /api/search/requests/count", () => {
   beforeEach(() => {
     vi.resetModules();
     vi.clearAllMocks();
-    mockFns.checkRateLimitByKey.mockReturnValue(null);
+    mockFns.checkRateLimitByKeyWithInfo.mockReturnValue({ allowed: true, response: null, limit: 120, remaining: 119, reset: 0 });
   });
 
   test("returns a retained search count for a validated bearer token", async () => {

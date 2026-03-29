@@ -1,5 +1,5 @@
 import { authenticateRequest } from "@/lib/api-auth";
-import { checkRateLimitByKey } from "@/lib/rate-limit";
+import { checkRateLimitByKeyWithInfo, applyRateLimitHeaders } from "@/lib/rate-limit";
 import { createTeam, listTeamsForUser } from "@/lib/supabase/teams";
 
 const TEAM_CREATE_RATE_LIMIT_MAX = 10;
@@ -22,12 +22,12 @@ export async function POST(request: Request) {
   const auth = await authenticateRequest(request);
   if (!auth.success) return auth.response;
 
-  const rateLimited = checkRateLimitByKey(
+  const rateLimit = checkRateLimitByKeyWithInfo(
     `team-create:${auth.userId}`,
     TEAM_CREATE_RATE_LIMIT_MAX,
     TEAM_CREATE_RATE_LIMIT_WINDOW_MS
   );
-  if (rateLimited) return rateLimited;
+  if (rateLimit.response) return rateLimit.response;
 
   let body: Record<string, unknown>;
   try {
@@ -44,11 +44,17 @@ export async function POST(request: Request) {
   try {
     const result = await createTeam(auth.userId, name);
     if ("error" in result) {
-      return Response.json({ error: result.error }, { status: 400 });
+      return applyRateLimitHeaders(
+        Response.json({ error: result.error }, { status: 400 }),
+        rateLimit
+      );
     }
-    return Response.json(result);
+    return applyRateLimitHeaders(Response.json(result), rateLimit);
   } catch (error) {
     console.error("Failed to create team:", error);
-    return Response.json({ error: "Internal server error" }, { status: 500 });
+    return applyRateLimitHeaders(
+      Response.json({ error: "Internal server error" }, { status: 500 }),
+      rateLimit
+    );
   }
 }

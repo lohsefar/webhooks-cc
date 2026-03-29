@@ -37,15 +37,37 @@ export class TimeoutError extends WebhooksCCError {
   }
 }
 
+/** Rate limit metadata from X-RateLimit-* response headers. */
+export interface RateLimitMeta {
+  /** Maximum number of requests allowed in the current window. */
+  limit: number;
+  /** Number of requests remaining in the current window. */
+  remaining: number;
+  /** Unix epoch timestamp (seconds) when the rate limit window resets. */
+  reset: number;
+}
+
 /** Thrown when the API returns 429 Too Many Requests. */
 export class RateLimitError extends WebhooksCCError {
   /** Seconds until the rate limit resets, if provided by the server. */
   public readonly retryAfter?: number;
+  /** Maximum number of requests allowed in the current window. */
+  public readonly limit?: number;
+  /** Number of requests remaining in the current window. */
+  public readonly remaining?: number;
+  /** Unix epoch timestamp (seconds) when the rate limit window resets. */
+  public readonly reset?: number;
 
-  constructor(retryAfter?: number) {
-    const message = retryAfter ? `Rate limited, retry after ${retryAfter}s` : "Rate limited";
+  constructor(retryAfter?: number, meta?: RateLimitMeta) {
+    const message =
+      retryAfter !== undefined ? `Rate limited, retry after ${retryAfter}s` : "Rate limited";
     super(429, message);
     this.name = "RateLimitError";
     this.retryAfter = retryAfter;
+    if (meta) {
+      this.limit = meta.limit;
+      this.remaining = meta.remaining;
+      this.reset = meta.reset;
+    }
   }
 }
