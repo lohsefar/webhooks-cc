@@ -1360,8 +1360,15 @@ components:
           type: string
         teamName:
           type: string
-        email:
+        invitedEmail:
           type: string
+          description: Email address of the invited user
+        invitedBy:
+          type: string
+          description: User ID of the person who sent the invite
+        inviterEmail:
+          type: string
+          description: Email address of the person who sent the invite
         status:
           type: string
           enum: [pending, accepted, declined]
