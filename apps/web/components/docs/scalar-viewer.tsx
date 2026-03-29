@@ -8,8 +8,10 @@ import { useTheme } from "@/components/providers/theme-provider";
  * Uses `theme: "none"` so only our overrides apply.
  */
 const scalarStyles = `
-  .light-mode,
-  .dark-mode {
+  .scalar-wrapper .light-mode,
+  .scalar-wrapper .dark-mode,
+  .scalar-wrapper.light-mode,
+  .scalar-wrapper.dark-mode {
     --scalar-font: var(--font-sans), system-ui, sans-serif;
     --scalar-font-code: var(--font-mono), monospace;
     --scalar-radius: 0;
@@ -17,7 +19,8 @@ const scalarStyles = `
     --scalar-radius-xl: 0;
   }
 
-  .light-mode {
+  .scalar-wrapper .light-mode,
+  .scalar-wrapper.light-mode {
     --scalar-background-1: #fafaf9;
     --scalar-background-2: #f0f0ed;
     --scalar-background-3: #e7e7e4;
@@ -43,7 +46,8 @@ const scalarStyles = `
     --scalar-button-1-color: #000000;
   }
 
-  .dark-mode {
+  .scalar-wrapper .dark-mode,
+  .scalar-wrapper.dark-mode {
     --scalar-background-1: #18181b;
     --scalar-background-2: #222226;
     --scalar-background-3: #303036;
@@ -77,7 +81,6 @@ export function ScalarViewer() {
   }> | null>(null);
   const [themeReady, setThemeReady] = useState(false);
 
-  // Wait one tick for the theme provider to read localStorage
   useEffect(() => setThemeReady(true), []);
 
   useEffect(() => {
@@ -86,6 +89,18 @@ export function ScalarViewer() {
     });
     import("@scalar/api-reference-react/style.css");
   }, []);
+
+  // Force Scalar's body class to match our theme
+  useEffect(() => {
+    if (!themeReady) return;
+    const addClass = resolvedTheme === "dark" ? "dark-mode" : "light-mode";
+    const removeClass = resolvedTheme === "dark" ? "light-mode" : "dark-mode";
+    document.body.classList.add(addClass);
+    document.body.classList.remove(removeClass);
+    return () => {
+      document.body.classList.remove(addClass);
+    };
+  }, [resolvedTheme, themeReady]);
 
   if (!Component || !themeReady) {
     return (
@@ -96,7 +111,7 @@ export function ScalarViewer() {
   }
 
   return (
-    <>
+    <div className="scalar-wrapper">
       <style>{scalarStyles}</style>
       <Component
         key={resolvedTheme}
@@ -115,6 +130,6 @@ export function ScalarViewer() {
           },
         }}
       />
-    </>
+    </div>
   );
 }
