@@ -80,6 +80,9 @@ export async function POST(request: Request) {
     }), rateLimit);
   } catch (error) {
     const message = error instanceof Error ? error.message : "Upstream fetch failed";
-    return Response.json({ error: message }, { status: 502 });
+    return applyRateLimitHeaders(
+      Response.json({ error: message }, { status: 502 }),
+      rateLimit
+    );
   }
 }

@@ -33,11 +33,17 @@ export async function POST(request: Request, { params }: { params: Promise<{ tea
   try {
     const result = await createInvite(auth.userId, teamId, email);
     if (result.error) {
-      return Response.json({ error: result.error }, { status: 400 });
+      return applyRateLimitHeaders(
+        Response.json({ error: result.error }, { status: 400 }),
+        rateLimit
+      );
     }
     return applyRateLimitHeaders(Response.json(result.invite), rateLimit);
   } catch (error) {
     console.error("Failed to create invite:", error);
-    return Response.json({ error: "Internal server error" }, { status: 500 });
+    return applyRateLimitHeaders(
+      Response.json({ error: "Internal server error" }, { status: 500 }),
+      rateLimit
+    );
   }
 }
