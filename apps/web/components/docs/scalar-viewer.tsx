@@ -1,7 +1,9 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import dynamic from "next/dynamic";
+import { useMemo } from "react";
 import { useTheme } from "@/components/providers/theme-provider";
+import "@scalar/api-reference-react/style.css";
 
 /**
  * Scalar CSS variable overrides mapped to our neubrutalism design tokens.
@@ -90,50 +92,41 @@ const scalarStyles = `
   }
 `;
 
-export function ScalarViewer() {
-  const { resolvedTheme } = useTheme();
-  const [Component, setComponent] = useState<React.ComponentType<{
-    configuration: Record<string, unknown>;
-  }> | null>(null);
-  const [themeReady, setThemeReady] = useState(false);
-
-  useEffect(() => setThemeReady(true), []);
-
-  useEffect(() => {
-    import("@scalar/api-reference-react").then((mod) => {
-      setComponent(() => mod.ApiReferenceReact);
-    });
-    import("@scalar/api-reference-react/style.css");
-  }, []);
-
-  if (!Component || !themeReady) {
-    return (
+const ApiReferenceReact = dynamic(
+  () =>
+    import("@scalar/api-reference-react").then((m) => ({
+      default: m.ApiReferenceReact as React.ComponentType<{ configuration: Record<string, unknown> }>,
+    })),
+  {
+    ssr: false,
+    loading: () => (
       <div className="flex items-center justify-center py-20 text-muted-foreground">
         Loading API reference...
       </div>
-    );
+    ),
   }
+);
+
+export function ScalarViewer() {
+  const { resolvedTheme } = useTheme();
+
+  const configuration = useMemo(
+    () => ({
+      spec: { url: "/openapi.yaml" },
+      hideModels: false,
+      hideDownloadButton: false,
+      darkMode: resolvedTheme === "dark",
+      theme: "none" as const,
+      withDefaultFonts: false,
+      defaultHttpClient: { targetKey: "node", clientKey: "fetch" },
+    }),
+    [resolvedTheme]
+  );
 
   return (
     <>
       <style>{scalarStyles}</style>
-      <Component
-        key={resolvedTheme}
-        configuration={{
-          spec: {
-            url: "/openapi.yaml",
-          },
-          hideModels: false,
-          hideDownloadButton: false,
-          darkMode: resolvedTheme === "dark",
-          theme: "none",
-          withDefaultFonts: false,
-          defaultHttpClient: {
-            targetKey: "node",
-            clientKey: "fetch",
-          },
-        }}
-      />
+      <ApiReferenceReact key={resolvedTheme} configuration={configuration} />
     </>
   );
 }

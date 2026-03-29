@@ -596,6 +596,12 @@ paths:
           $ref: "#/components/responses/RateLimited"
         "500":
           $ref: "#/components/responses/InternalError"
+        "502":
+          description: Upstream receiver unreachable
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
 
   # -- Usage -------------------------------------------------------------------
 

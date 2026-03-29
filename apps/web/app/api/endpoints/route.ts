@@ -136,10 +136,16 @@ export async function POST(request: Request) {
     return applyRateLimitHeaders(Response.json(created), rateLimit);
   } catch (error) {
     if (error instanceof Error && error.message.includes("Too many active demo endpoints")) {
-      return Response.json({ error: error.message }, { status: 429 });
+      return applyRateLimitHeaders(
+        Response.json({ error: error.message }, { status: 429 }),
+        rateLimit
+      );
     }
 
     console.error("Failed to create endpoint:", error);
-    return Response.json({ error: "Internal server error" }, { status: 500 });
+    return applyRateLimitHeaders(
+      Response.json({ error: "Internal server error" }, { status: 500 }),
+      rateLimit
+    );
   }
 }

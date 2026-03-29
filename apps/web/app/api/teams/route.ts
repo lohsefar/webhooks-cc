@@ -44,11 +44,17 @@ export async function POST(request: Request) {
   try {
     const result = await createTeam(auth.userId, name);
     if ("error" in result) {
-      return Response.json({ error: result.error }, { status: 400 });
+      return applyRateLimitHeaders(
+        Response.json({ error: result.error }, { status: 400 }),
+        rateLimit
+      );
     }
     return applyRateLimitHeaders(Response.json(result), rateLimit);
   } catch (error) {
     console.error("Failed to create team:", error);
-    return Response.json({ error: "Internal server error" }, { status: 500 });
+    return applyRateLimitHeaders(
+      Response.json({ error: "Internal server error" }, { status: 500 }),
+      rateLimit
+    );
   }
 }
