@@ -1316,8 +1316,7 @@ components:
           type: string
           enum: [free, pro]
         periodEnd:
-          type: integer
-          nullable: true
+          type: ["integer", "null"]
           description: Unix timestamp (ms) for billing period end, null if period not started
 
     TeamShare:

@@ -99,10 +99,9 @@ describe("RateLimitError", () => {
 
   it("works with zero retryAfter and meta", () => {
     const meta = { limit: 10, remaining: 0, reset: 1711613000 };
-    // retryAfter = 0 is falsy, so message should be "Rate limited"
     const err = new RateLimitError(0, meta);
     expect(err.retryAfter).toBe(0);
-    expect(err.message).toBe("Rate limited");
+    expect(err.message).toBe("Rate limited, retry after 0s");
     expect(err.limit).toBe(10);
     expect(err.remaining).toBe(0);
     expect(err.reset).toBe(1711613000);
