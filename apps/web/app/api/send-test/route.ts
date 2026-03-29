@@ -1,6 +1,6 @@
 import { authenticateRequest } from "@/lib/api-auth";
 import { serverEnv } from "@/lib/env";
-import { checkRateLimit } from "@/lib/rate-limit";
+import { checkRateLimitWithInfo, applyRateLimitHeaders } from "@/lib/rate-limit";
 
 const SLUG_REGEX = /^[a-zA-Z0-9_-]{1,50}$/;
 const ALLOWED_METHODS = new Set(["GET", "POST", "PUT", "PATCH", "DELETE"]);
@@ -10,8 +10,8 @@ export async function POST(request: Request) {
   const auth = await authenticateRequest(request);
   if (!auth.success) return auth.response;
 
-  const rateLimited = checkRateLimit(request, 30); // 30 sends per minute
-  if (rateLimited) return rateLimited;
+  const rateLimit = checkRateLimitWithInfo(request, 30); // 30 sends per minute
+  if (rateLimit.response) return rateLimit.response;
 
   let payload: {
     method: string;
@@ -73,11 +73,11 @@ export async function POST(request: Request) {
 
     const responseBody = await upstream.text();
 
-    return Response.json({
+    return applyRateLimitHeaders(Response.json({
       status: upstream.status,
       statusText: upstream.statusText,
       body: responseBody,
-    });
+    }), rateLimit);
   } catch (error) {
     const message = error instanceof Error ? error.message : "Upstream fetch failed";
     return Response.json({ error: message }, { status: 502 });

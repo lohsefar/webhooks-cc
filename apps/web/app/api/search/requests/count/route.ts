@@ -1,5 +1,5 @@
 import { extractBearerToken, validateBearerTokenWithPlan } from "@/lib/api-auth";
-import { checkRateLimitByKey } from "@/lib/rate-limit";
+import { checkRateLimitByKeyWithInfo, applyRateLimitHeaders } from "@/lib/rate-limit";
 import { countSearchRequestsForUser } from "@/lib/supabase/search";
 import { sendError } from "@appsignal/nodejs";
 
@@ -35,9 +35,9 @@ export async function GET(request: Request) {
     const userId = validated.userId;
     const plan = validated.plan;
 
-    const rateLimited = checkRateLimitByKey(`search-count:${userId}`, 120, 10 * 60_000);
-    if (rateLimited) {
-      return rateLimited;
+    const rateLimit = checkRateLimitByKeyWithInfo(`search-count:${userId}`, 120, 10 * 60_000);
+    if (rateLimit.response) {
+      return rateLimit.response;
     }
 
     const url = new URL(request.url);
@@ -59,7 +59,7 @@ export async function GET(request: Request) {
       to: parsedTo.value,
     });
 
-    return Response.json({ count });
+    return applyRateLimitHeaders(Response.json({ count }), rateLimit);
   } catch (err) {
     sendError(err instanceof Error ? err : new Error(String(err)));
     console.error("Search count API route error:", err);

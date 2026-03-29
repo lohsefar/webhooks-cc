@@ -1,13 +1,13 @@
 import { authenticateRequest } from "@/lib/api-auth";
-import { checkRateLimitByKey } from "@/lib/rate-limit";
+import { checkRateLimitByKeyWithInfo, applyRateLimitHeaders } from "@/lib/rate-limit";
 import { shareEndpointWithTeam } from "@/lib/supabase/teams";
 
 export async function POST(request: Request, { params }: { params: Promise<{ teamId: string }> }) {
   const auth = await authenticateRequest(request);
   if (!auth.success) return auth.response;
 
-  const rateLimited = checkRateLimitByKey(`team-share:${auth.userId}`, 30, 10 * 60_000);
-  if (rateLimited) return rateLimited;
+  const rateLimit = checkRateLimitByKeyWithInfo(`team-share:${auth.userId}`, 30, 10 * 60_000);
+  if (rateLimit.response) return rateLimit.response;
 
   const { teamId } = await params;
 
@@ -28,7 +28,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ tea
     if (!result.success) {
       return Response.json({ error: result.error }, { status: 400 });
     }
-    return Response.json({ success: true });
+    return applyRateLimitHeaders(Response.json({ success: true }), rateLimit);
   } catch (error) {
     console.error("Failed to share endpoint:", error);
     return Response.json({ error: "Internal server error" }, { status: 500 });

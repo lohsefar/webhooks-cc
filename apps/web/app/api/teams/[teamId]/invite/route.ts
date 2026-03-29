@@ -1,5 +1,5 @@
 import { authenticateRequest } from "@/lib/api-auth";
-import { checkRateLimitByKey } from "@/lib/rate-limit";
+import { checkRateLimitByKeyWithInfo, applyRateLimitHeaders } from "@/lib/rate-limit";
 import { createInvite } from "@/lib/supabase/teams";
 
 const INVITE_RATE_LIMIT_MAX = 20;
@@ -9,12 +9,12 @@ export async function POST(request: Request, { params }: { params: Promise<{ tea
   const auth = await authenticateRequest(request);
   if (!auth.success) return auth.response;
 
-  const rateLimited = checkRateLimitByKey(
+  const rateLimit = checkRateLimitByKeyWithInfo(
     `team-invite:${auth.userId}`,
     INVITE_RATE_LIMIT_MAX,
     INVITE_RATE_LIMIT_WINDOW_MS
   );
-  if (rateLimited) return rateLimited;
+  if (rateLimit.response) return rateLimit.response;
 
   const { teamId } = await params;
 
@@ -35,7 +35,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ tea
     if (result.error) {
       return Response.json({ error: result.error }, { status: 400 });
     }
-    return Response.json(result.invite);
+    return applyRateLimitHeaders(Response.json(result.invite), rateLimit);
   } catch (error) {
     console.error("Failed to create invite:", error);
     return Response.json({ error: "Internal server error" }, { status: 500 });
