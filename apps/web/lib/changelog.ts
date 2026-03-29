@@ -15,13 +15,25 @@ export const TRACK_LABELS: Record<ChangelogTrack, string> = {
   mcp: "MCP",
 };
 
-export const APP_VERSION = "0.13.1";
+export const APP_VERSION = "0.14.0";
 export const CLI_VERSION = "0.6.0";
-export const SDK_VERSION = "1.2.0";
+export const SDK_VERSION = "1.2.1";
 export const MCP_VERSION = "1.1.0";
 
 export const CHANGELOG: ChangelogEntry[] = [
   // ─── Web App ────────────────────────────────────────────────────────
+  {
+    version: "0.14.0",
+    date: "2026-03-29",
+    title: "API Explorer & Rate Limiting",
+    track: "web",
+    items: [
+      "Interactive API explorer at /api-explorer powered by Scalar",
+      "OpenAPI 3.1.0 specification at /openapi.yaml",
+      "Improved rate limiting with sliding window and informational headers",
+      "SDK error messages now include rate limit details and Retry-After hints",
+    ],
+  },
   {
     version: "0.13.1",
     date: "2026-03-28",
@@ -355,6 +367,16 @@ export const CHANGELOG: ChangelogEntry[] = [
   },
 
   // ─── SDK ────────────────────────────────────────────────────────────
+  {
+    version: "1.2.1",
+    date: "2026-03-29",
+    title: "Rate Limit Metadata",
+    track: "sdk",
+    items: [
+      "RateLimitError now includes limit, remaining, and reset fields",
+      "New RateLimitMeta type export",
+    ],
+  },
   {
     version: "1.2.0",
     date: "2026-03-28",
